@@ -1,0 +1,65 @@
+name: testing
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  run-tests:
+    if: (github.event_name == 'push') ||
+        (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name != github.repository) ||
+        (github.event_name == 'workflow_dispatch')
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        golang: ['1.23', '1.24', 'stable']
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.golang }}
+
+      - name: run tests
+        run: make test
+
+      - name: run tests with race
+        run: make testrace
+
+  run-tests-with-coverage:
+    if: (github.event_name == 'push') ||
+        (github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name != github.repository) ||
+        (github.event_name == 'workflow_dispatch')
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.golang }}
+
+      - name: run tests, collect code coverage data and send to Coveralls
+        env:
+          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make coverage coveralls-deps coveralls
+
+  run-benchmarks:
+    if: false
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.golang }}
+      - name: run benchmarks
+        run:  make bench
+
