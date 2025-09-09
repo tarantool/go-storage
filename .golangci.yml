@@ -1,0 +1,53 @@
+version: '2'
+
+run:
+  timeout: 3m
+
+formatters:
+  enable:
+    - goimports
+
+linters:
+  default: all
+
+  disable:
+    - dupl     # Dupl is disabled, since we're generating a lot of boilerplate code.
+    - cyclop   # Cyclop is disabled, since cyclomatic complexities is very abstract metric,
+               # that sometimes lead to strange linter behaviour.
+    - wsl      # WSL is disabled, since it's obsolete. Using WSL_v5.
+    - nlreturn # nlreturn is disabled, since it's duplicated by wsl_v5.return check.
+    - ireturn  # ireturn is disabled, since it's not needed.
+
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test.go
+        linters:
+          - wrapcheck
+
+  settings:
+    godot:
+      scope: all
+    lll:
+      line-length: 120
+      tab-width: 4
+    wsl_v5:
+      allow-first-in-block: true
+      allow-whole-block: false
+      branch-max-lines: 2
+      case-max-lines: 0
+      default: all
+    depguard:
+      rules:
+        main:
+          files:
+            - "$all"
+            - "!$test"
+          allow:
+            - $gostd
+        test:
+          files:
+            - "$test"
+          allow:
+            - $gostd
+            - "github.com/stretchr/testify"

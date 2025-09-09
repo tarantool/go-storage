@@ -1,0 +1,5 @@
+[codespell]
+
+skip = ./vendor,./.git
+# ignore-words-list =
+check-filenames = true
