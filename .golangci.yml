@@ -17,6 +17,7 @@ linters:
     - wsl      # WSL is disabled, since it's obsolete. Using WSL_v5.
     - nlreturn # nlreturn is disabled, since it's duplicated by wsl_v5.return check.
     - ireturn  # ireturn is disabled, since it's not needed.
+    - godox    # godox is disabled to allow TODO comments for unimplemented functionality.
 
   exclusions:
     generated: lax
@@ -45,9 +46,13 @@ linters:
             - "!$test"
           allow:
             - $gostd
+            - "github.com/tarantool/go-storage"
+            - "go.etcd.io/etcd/client/v3"
+            - "github.com/tarantool/go-tarantool/v2"
         test:
           files:
             - "$test"
           allow:
             - $gostd
+            - "github.com/tarantool/go-storage"
             - "github.com/stretchr/testify"
