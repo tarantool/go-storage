@@ -2,9 +2,12 @@ package storage
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tarantool/go-storage/driver"
 	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
@@ -84,8 +87,8 @@ func (s storage) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan wa
 }
 
 // Tx implements the Storage interface for transaction creation.
-func (s storage) Tx(_ context.Context) tx.Tx {
-	panic("implement me")
+func (s storage) Tx(ctx context.Context) tx.Tx {
+	return newTx(ctx, s.driver)
 }
 
 // Range implements the Storage interface for range queries.
@@ -99,4 +102,55 @@ func NewStorage(driver driver.Driver, _ ...Option) Storage {
 	return &storage{
 		driver: driver,
 	}
+}
+
+// txBuilder is the internal implementation of the Tx interface.
+type txBuilder struct {
+	driver     driver.Driver
+	ctx        context.Context //nolint:containedctx // Context is stored for transaction execution
+	predicates []predicate.Predicate
+	thenOps    []operation.Operation
+	elseOps    []operation.Operation
+}
+
+// newTx creates a new transaction builder with the given driver and context.
+func newTx(ctx context.Context, driver driver.Driver) tx.Tx {
+	return &txBuilder{
+		driver:     driver,
+		ctx:        ctx,
+		predicates: []predicate.Predicate{},
+		thenOps:    []operation.Operation{},
+		elseOps:    []operation.Operation{},
+	}
+}
+
+// If adds predicates to the transaction condition.
+// Empty predicate list means always true (unconditional execution).
+func (tb *txBuilder) If(predicates ...predicate.Predicate) tx.Tx {
+	tb.predicates = append(tb.predicates, predicates...)
+	return tb
+}
+
+// Then adds operations to execute if predicates evaluate to true.
+// At least one Then call is required.
+func (tb *txBuilder) Then(operations ...operation.Operation) tx.Tx {
+	tb.thenOps = append(tb.thenOps, operations...)
+	return tb
+}
+
+// Else adds operations to execute if predicates evaluate to false.
+// This is optional.
+func (tb *txBuilder) Else(operations ...operation.Operation) tx.Tx {
+	tb.elseOps = append(tb.elseOps, operations...)
+	return tb
+}
+
+// Commit atomically executes the transaction by delegating to the driver.
+func (tb *txBuilder) Commit() (tx.Response, error) {
+	resp, err := tb.driver.Execute(tb.ctx, tb.predicates, tb.thenOps, tb.elseOps)
+	if err != nil {
+		return tx.Response{}, fmt.Errorf("tx execute failed: %w", err)
+	}
+
+	return resp, nil
 }
