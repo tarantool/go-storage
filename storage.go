@@ -2,10 +2,15 @@ package storage
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/tarantool/go-option"
 
 	"github.com/tarantool/go-storage/driver"
 	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/predicate"
+	txPkg "github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
 
@@ -42,7 +47,7 @@ type Storage interface {
 
 	// Tx creates a new transaction.
 	// The context manages timeouts and cancellation for the transaction.
-	Tx(ctx context.Context) tx.Tx
+	Tx(ctx context.Context) txPkg.Tx
 
 	// Range queries a range of keys with optional filtering.
 	// Options:
@@ -84,8 +89,8 @@ func (s storage) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan wa
 }
 
 // Tx implements the Storage interface for transaction creation.
-func (s storage) Tx(_ context.Context) tx.Tx {
-	panic("implement me")
+func (s storage) Tx(ctx context.Context) txPkg.Tx {
+	return newTx(ctx, s.driver)
 }
 
 // Range implements the Storage interface for range queries.
@@ -99,4 +104,83 @@ func NewStorage(driver driver.Driver, _ ...Option) Storage {
 	return &storage{
 		driver: driver,
 	}
+}
+
+// tx is the internal implementation of the Tx interface.
+type tx struct {
+	driver driver.Driver
+	ctx    context.Context //nolint:containedctx // Context is stored for transaction execution
+
+	predicates option.Generic[[]predicate.Predicate]
+	thenOps    option.Generic[[]operation.Operation]
+	elseOps    option.Generic[[]operation.Operation]
+}
+
+// newTx creates a new transaction builder with the given driver and context.
+func newTx(ctx context.Context, driver driver.Driver) txPkg.Tx {
+	return &tx{
+		driver:     driver,
+		ctx:        ctx,
+		predicates: option.None[[]predicate.Predicate](),
+		thenOps:    option.None[[]operation.Operation](),
+		elseOps:    option.None[[]operation.Operation](),
+	}
+}
+
+// If adds predicates to the transaction condition.
+// Empty predicate list means always true (unconditional execution).
+// If should be called before Then/Else.
+func (tb *tx) If(predicates ...predicate.Predicate) txPkg.Tx {
+	if tb.predicates.IsSome() {
+		panic("predicates are already set")
+	} else if tb.thenOps.IsSome() || tb.elseOps.IsSome() {
+		panic("If can only be called before Then/Else")
+	}
+
+	tb.predicates = option.Some(predicates)
+
+	return tb
+}
+
+// Then adds operations to execute if predicates evaluate to true.
+// At least one Then call is required.
+// Then can only be called before Else.
+func (tb *tx) Then(operations ...operation.Operation) txPkg.Tx {
+	if tb.thenOps.IsSome() {
+		panic("then operations are already set")
+	} else if tb.elseOps.IsSome() {
+		panic("Then can only be called before Else")
+	}
+
+	tb.thenOps = option.Some(operations)
+
+	return tb
+}
+
+// Else adds operations to execute if predicates evaluate to false.
+// This is optional.
+// Else can only be called before Commit.
+func (tb *tx) Else(operations ...operation.Operation) txPkg.Tx {
+	if tb.elseOps.IsSome() {
+		panic("else operations are already set")
+	}
+
+	tb.elseOps = option.Some(operations)
+
+	return tb
+}
+
+// Commit atomically executes the transaction by delegating to the driver.
+func (tb *tx) Commit() (txPkg.Response, error) {
+	resp, err := tb.driver.Execute(
+		tb.ctx,
+		tb.predicates.UnwrapOr(nil),
+		tb.thenOps.UnwrapOr(nil),
+		tb.elseOps.UnwrapOr(nil),
+	)
+	if err != nil {
+		return txPkg.Response{}, fmt.Errorf("tx execute failed: %w", err)
+	}
+
+	return resp, nil
 }
