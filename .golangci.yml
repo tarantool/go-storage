@@ -49,6 +49,7 @@ linters:
             - "github.com/tarantool/go-storage"
             - "go.etcd.io/etcd/client/v3"
             - "github.com/tarantool/go-tarantool/v2"
+            - "github.com/tarantool/go-option"
         test:
           files:
             - "$test"
