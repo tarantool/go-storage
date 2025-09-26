@@ -7,6 +7,11 @@ formatters:
   enable:
     - goimports
 
+issues:
+  # Disable limits on the number of printed issues
+  max-issues-per-linter: 0    # 0 = no limit
+  max-same-issues: 0          # 0 = no limit
+
 linters:
   default: all
 
@@ -25,8 +30,16 @@ linters:
       - path: _test.go
         linters:
           - wrapcheck
+          - err113
+          - funlen
 
   settings:
+    varnamelen:
+      ignore-names:
+        - tt
+      ignore-decls:
+        - mc *minimock.Controller
+        - t T
     godot:
       scope: all
     lll:
@@ -50,6 +63,8 @@ linters:
             - "go.etcd.io/etcd/client/v3"
             - "github.com/tarantool/go-tarantool/v2"
             - "github.com/tarantool/go-option"
+            - "github.com/vmihailenco/msgpack/v5"
+            - "github.com/tarantool/go-iproto"
         test:
           files:
             - "$test"
@@ -57,3 +72,7 @@ linters:
             - $gostd
             - "github.com/tarantool/go-storage"
             - "github.com/stretchr/testify"
+            - "github.com/tarantool/go-tarantool/v2"
+            - "github.com/tarantool/go-iproto"
+            - "github.com/vmihailenco/msgpack/v5"
+            - "github.com/gojuno/minimock/v3"

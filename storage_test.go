@@ -131,7 +131,7 @@ func TestTx_Commit_Error(t *testing.T) {
 
 	txInstance.If(pred).Then(thenOp)
 
-	expectedError := errors.New("driver execution failed") //nolint:err113 // Test error is fine
+	expectedError := errors.New("driver execution failed")
 
 	mockDriver.ExecuteMock.Expect(ctx,
 		[]predicate.Predicate{pred},

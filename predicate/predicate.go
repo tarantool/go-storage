@@ -21,7 +21,7 @@ type predicate struct {
 	key    []byte
 	op     Op
 	target Target
-	value  interface{}
+	value  any
 }
 
 // Key returns the key that this predicate applies to.
@@ -40,12 +40,12 @@ func (p predicate) Target() Target {
 }
 
 // Value returns the comparison value for the predicate.
-func (p predicate) Value() interface{} {
+func (p predicate) Value() any {
 	return p.value
 }
 
 // ValueNotEqual creates a predicate that checks if a key's value is not equal to the specified value.
-func ValueNotEqual(key []byte, value interface{}) Predicate {
+func ValueNotEqual(key []byte, value any) Predicate {
 	return &predicate{
 		key:    key,
 		op:     OpNotEqual,
@@ -55,7 +55,7 @@ func ValueNotEqual(key []byte, value interface{}) Predicate {
 }
 
 // ValueEqual creates a predicate that checks if a key's value equals the specified value.
-func ValueEqual(key []byte, value interface{}) Predicate {
+func ValueEqual(key []byte, value any) Predicate {
 	return &predicate{
 		key:    key,
 		op:     OpEqual,

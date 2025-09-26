@@ -26,5 +26,7 @@ type Driver interface {
 
 	// Watch establishes a watch stream for changes to a specific key or prefix.
 	// The returned channel will receive events as changes occur.
-	Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event
+	// The returned cleanup function should be called to stop the watch and release resources.
+	// An error is returned if the watch could not be established.
+	Watch(ctx context.Context, key []byte, opts ...watch.Option) (<-chan watch.Event, func(), error)
 }
