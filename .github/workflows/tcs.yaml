@@ -1,0 +1,57 @@
+name: tcs.yaml
+on:
+  pull_request_target:
+    types: [ labeled ]
+
+env:
+  # Note: Use exactly match version of tool, to avoid unexpected issues with test on CI.
+  GO_VERSION: '1.24.9'
+
+jobs:
+  full-ci-ee:
+    # Tests will run only when the pull request is labeled with `full-ci`. To
+    # avoid security problems, the label must be reset manually for every run.
+    #
+    # We need to use `pull_request_target` because it has access to base
+    # repository secrets unlike `pull_request`.
+    if: (github.event_name == 'push') ||
+      (github.event_name == 'pull_request_target' &&
+      github.event.action == 'labeled' &&
+      github.event.label.name == 'full-ci') ||
+      (github.event_name == 'pull_request' &&
+      github.event.action == 'synchronize' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'full-ci'))
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        sdk-version:
+          - "3.5.0-0-r70.linux.x86_64"
+      fail-fast: false
+    steps:
+      # `ref` as merge request is needed for pull_request_target because this
+      # target runs in the context of the base commit of the pull request.
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request_target'
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/checkout@v4
+        if: github.event_name != 'pull_request_target'
+        with:
+          fetch-depth: 0
+
+      - name: Prepare EE env
+        uses: ./.github/actions/prepare-ee-test-env
+        with:
+          sdk-version: '${{ matrix.sdk-version }}'
+          sdk-download-token: '${{ secrets.SDK_DOWNLOAD_TOKEN }}'
+
+      - name: Integration tests
+        run:
+          go test ./... -count=1 -v
+
+      - name: Integration tests
+        run:
+          go test ./... -count=100 -v -race

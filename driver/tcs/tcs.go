@@ -1,84 +1,108 @@
-// Package tcs provides a Tarantool Cartridge storage driver implementation.
+// Package tcs provides a Tarantool config storage driver implementation.
 // It enables using Tarantool as a distributed key-value storage backend.
 package tcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/tarantool/go-tarantool/v2"
-	"github.com/tarantool/go-tarantool/v2/pool"
 
 	"github.com/tarantool/go-storage/driver"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
+	goOperation "github.com/tarantool/go-storage/operation"
+	goPredicate "github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
 
+// DoerWatcher is an interface that combines tarantool.Doer and NewWatcher method.
+// tarantool.Connection and pool.ConnectionAdapter implement this interface.
+type DoerWatcher interface {
+	Do(req tarantool.Request) (fut *tarantool.Future)
+	NewWatcher(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error)
+}
+
 // Driver is a Tarantool implementation of the storage driver interface.
 // It uses TCS as the underlying key-value storage backend.
 type Driver struct {
-	conn *pool.ConnectionPool // Tarantool connection pool.
+	conn DoerWatcher // Tarantool connection pool.
 }
 
 var (
 	_ driver.Driver = &Driver{} //nolint:exhaustruct
+
+	// ErrUnexpectedResponse is returned when the response from tarantool has unexpected format.
+	ErrUnexpectedResponse = errors.New("unexpected response from tarantool")
 )
 
 // New creates a new Tarantool driver instance.
 // It establishes connections to Tarantool instances using the provided addresses.
-func New(ctx context.Context, addrs []string) (*Driver, error) {
-	instances := make([]pool.Instance, 0, len(addrs))
-	for i, addr := range addrs {
-		instances = append(instances, pool.Instance{
-			Name: fmt.Sprintf("instance-%d", i),
-			Dialer: &tarantool.NetDialer{
-				Address:  addr,
-				User:     "user",
-				Password: "password",
-				RequiredProtocolInfo: tarantool.ProtocolInfo{
-					Auth:     tarantool.AutoAuth,
-					Version:  tarantool.ProtocolVersion(0),
-					Features: nil,
-				},
-			},
-			Opts: tarantool.Opts{
-				Timeout:       0,
-				Reconnect:     0,
-				MaxReconnects: 0,
-				RateLimit:     0,
-				RLimitAction:  tarantool.RLimitAction(0),
-				Concurrency:   0,
-				SkipSchema:    false,
-				Notify:        nil,
-				Handle:        nil,
-				Logger:        nil,
-			},
-		})
-	}
-
-	conn, err := pool.Connect(ctx, instances)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to tarantool pool: %w", err)
-	}
-
-	return &Driver{conn: conn}, nil
+func New(doer DoerWatcher) *Driver {
+	return &Driver{conn: doer}
 }
 
 // Execute executes a transactional operation with conditional logic.
 // It processes predicates to determine whether to execute thenOps or elseOps.
 func (d Driver) Execute(
-	_ context.Context,
-	_ []predicate.Predicate,
-	_ []operation.Operation,
-	_ []operation.Operation,
+	ctx context.Context,
+	predicates []goPredicate.Predicate,
+	thenOps []goOperation.Operation,
+	elseOps []goOperation.Operation,
 ) (tx.Response, error) {
-	panic("implement me")
+	txnArg := newTxnRequest(predicates, thenOps, elseOps)
+
+	req := tarantool.NewCallRequest("config.storage.txn").
+		Args([]any{txnArg}).Context(ctx)
+
+	var result []txnResponse
+
+	switch err := d.conn.Do(req).GetTyped(&result); {
+	case err != nil:
+		return tx.Response{}, fmt.Errorf("failed to execute transaction: %w", err)
+	case len(result) != 1:
+		return tx.Response{}, fmt.Errorf("%w: expected 1 response, got %d", ErrUnexpectedResponse, len(result))
+	}
+
+	return result[0].asTxnResponse(), nil
 }
 
 // Watch monitors changes to a specific key and returns a stream of events.
 // It supports optional watch configuration through the opts parameter.
-func (d Driver) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan watch.Event {
-	panic("implement me")
+// To watch for config storage key "config.storage:" prefix should be used.
+func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
+	rvChan := make(chan watch.Event, 1)
+
+	watcher, err := d.conn.NewWatcher("config.storage:"+string(key), func(_ tarantool.WatchEvent) {
+		select {
+		case rvChan <- watch.Event{Prefix: key}:
+		default:
+		}
+	})
+	if err != nil {
+		close(rvChan)
+		return nil, nil, fmt.Errorf("failed to create watcher: %w", err)
+	}
+
+	var (
+		isStoppedOnce = sync.Once{}
+		isStopped     = make(chan struct{})
+	)
+
+	go func() {
+		defer func() {
+			// When watcher.Unregister() will finish it's execution - means watcher won't call any more callbacks,
+			// that will write messages to rvChan, so we can close it.
+			watcher.Unregister()
+			close(rvChan)
+		}()
+
+		select {
+		case <-ctx.Done():
+		case <-isStopped:
+		}
+	}()
+
+	return rvChan, func() { isStoppedOnce.Do(func() { close(isStopped) }) }, nil
 }

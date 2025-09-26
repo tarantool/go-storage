@@ -10,12 +10,12 @@ codespell:
 .PHONY: test
 test:
 	@echo "Running tests"
-	@go test ./... -count=1
+	@go test ./... -count=1 -v
 
 .PHONY: testrace
 testrace:
 	@echo "Running tests with race flag"
-	@go test ./... -count=100 -race
+	@go test ./... -count=100 -race -v
 
 .PHONY: coverage
 coverage:
