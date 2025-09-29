@@ -2,6 +2,15 @@
 // It defines operation types and configurations used in transactional contexts.
 package operation
 
+import (
+	"bytes"
+)
+
+var (
+	// isPrefixSuffix is a byte sequence that indicates that key is a prefix (ends with /).
+	isPrefixSuffix = []byte("/") //nolint:gochecknoglobals
+)
+
 // Operation represents a storage operation to be executed.
 // This is used within transactions and other operation contexts.
 type Operation struct {
@@ -33,6 +42,15 @@ func (o Operation) Value() []byte {
 // Options returns the configuration options for the operation.
 func (o Operation) Options() []Option {
 	return o.options
+}
+
+// IsPrefix returns true if the operation is a prefix operation.
+func (o Operation) IsPrefix() bool {
+	if o.tp == TypeGet || o.tp == TypeDelete {
+		return bytes.HasSuffix(o.key, isPrefixSuffix)
+	}
+
+	return false
 }
 
 // Get creates a new read operation for the specified key.
