@@ -2,6 +2,9 @@ package tkv_test
 
 import (
 	"context"
+	"errors"
+	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -11,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tarantool/go-tarantool/v2"
 	"github.com/tarantool/go-tarantool/v2/pool"
+	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
 
 	"github.com/tarantool/go-storage/driver/tkv"
 	"github.com/tarantool/go-storage/operation"
@@ -738,4 +742,30 @@ func getRevisionFromResponse(t *testing.T, response tx.Response, position int) i
 	require.NotEmpty(t, response.Results[position].Values, "expected at least %d values", position+1)
 
 	return response.Results[position].Values[0].ModRevision
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	tcs, err := tcshelper.Start(0)
+	switch {
+	case errors.Is(err, tcshelper.ErrNotSupported):
+		fmt.Println("TcS is not supported:", err) //nolint:forbidigo
+	case err != nil:
+		fmt.Println("Failed to start TCS:", err) //nolint:forbidigo
+		os.Exit(1)
+	default:
+		os.Exit(func() int {
+			defer tcs.Stop()
+
+			// os.Setenv is a temporary hack to set the TARANTOOL_ADDR environment variable.
+			err := os.Setenv("TARANTOOL_ADDR", strings.Join(tcs.Endpoints(), ","))
+			if err != nil {
+				fmt.Println("Failed to set TARANTOOL_ADDR:", err) //nolint:forbidigo
+				return 1
+			}
+
+			return m.Run()
+		}())
+	}
 }
