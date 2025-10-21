@@ -17,23 +17,9 @@ inputs:
     required: true
     type: string
 
-env:
-  # Note: Use exactly match version of tool, to avoid unexpected issues with test on CI.
-  GO_VERSION: '1.23.8'
-
 runs:
   using: "composite"
   steps:
-    - name: Setup Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '${{ env.GO_VERSION }}'
-
-    - name: Setup python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '${{ env.PYTHON_VERSION }}'
-
     - name: Cache Tarantool SDK
       id: cache-sdk
       uses: actions/cache@v3
