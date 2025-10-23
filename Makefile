@@ -34,3 +34,15 @@ coveralls-deps:
 	@echo "Installing coveralls"
 	@go get github.com/mattn/goveralls
 	@go install github.com/mattn/goveralls
+
+.PHONY: lint-deps
+lint-deps:
+	@echo "Installing lint deps"
+	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
+
+.PHONY: lint
+lint: lint-deps
+	@echo "Running go-linter"
+	@go mod tidy
+	@go mod vendor
+	@golangci-lint run --config=./.golangci.yml --modules-download-mode vendor --verbose
