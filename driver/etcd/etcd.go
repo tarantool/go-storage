@@ -69,6 +69,6 @@ func (d Driver) Execute(
 
 // Watch monitors changes to a specific key and returns a stream of events.
 // It supports optional watch configuration through the opts parameter.
-func (d Driver) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan watch.Event {
+func (d Driver) Watch(_ context.Context, _ []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
 	panic("implement me")
 }
