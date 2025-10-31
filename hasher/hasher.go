@@ -41,6 +41,8 @@ func (h *sha256Hasher) Hash(data []byte) ([]byte, error) {
 		return nil, ErrDataIsNil
 	}
 
+	h.hash.Reset()
+
 	n, err := h.hash.Write(data)
 	if n < len(data) || err != nil {
 		return nil, fmt.Errorf("failed to write data: %w", err)
@@ -70,6 +72,8 @@ func (h *sha1Hasher) Hash(data []byte) ([]byte, error) {
 	if data == nil {
 		return nil, ErrDataIsNil
 	}
+
+	h.hash.Reset()
 
 	n, err := h.hash.Write(data)
 	if n < len(data) || err != nil {
