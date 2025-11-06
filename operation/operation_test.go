@@ -81,3 +81,62 @@ func TestDeleteWithOptions(t *testing.T) {
 	assert.Nil(t, op.Value())
 	assert.Len(t, op.Options(), 2)
 }
+
+func TestOperation_IsPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		operation operation.Operation
+		want      bool
+	}{
+		{
+			name:      "get operation with key",
+			operation: operation.Get([]byte("/test-key")),
+			want:      false,
+		},
+		{
+			name:      "put operation with key and value",
+			operation: operation.Put([]byte("/test-key"), []byte("test-value")),
+			want:      false,
+		},
+		{
+			name:      "delete operation with key",
+			operation: operation.Delete([]byte("/test-key")),
+			want:      false,
+		},
+		{
+			name:      "get prefix operation with key",
+			operation: operation.Get([]byte("/test-key/")),
+			want:      true,
+		},
+		{
+			name:      "delete prefix operation with key",
+			operation: operation.Delete([]byte("/test-key/")),
+			want:      true,
+		},
+		{
+			name:      "put prefix operation with key and value",
+			operation: operation.Put([]byte("/test-key/"), []byte("test-value")),
+			want:      false,
+		},
+		{
+			name:      "get root",
+			operation: operation.Get([]byte("/")),
+			want:      true,
+		},
+		{
+			name:      "delete root",
+			operation: operation.Delete([]byte("/")),
+			want:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, tt.operation.IsPrefix())
+		})
+	}
+}
