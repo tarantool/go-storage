@@ -65,6 +65,7 @@ linters:
             - "github.com/tarantool/go-option"
             - "github.com/vmihailenco/msgpack/v5"
             - "github.com/tarantool/go-iproto"
+            - "gopkg.in/yaml.v3"
         test:
           files:
             - "$test"
@@ -76,3 +77,4 @@ linters:
             - "github.com/tarantool/go-iproto"
             - "github.com/vmihailenco/msgpack/v5"
             - "github.com/gojuno/minimock/v3"
+            - "gopkg.in/yaml.v3"
