@@ -2,7 +2,8 @@
 package namer
 
 import (
-	"github.com/tarantool/go-storage/kv"
+	"errors"
+	"strings"
 )
 
 // KeyType represents key types.
@@ -15,6 +16,21 @@ const (
 	KeyTypeHash
 	// KeyTypeSignature represents signature of the data type.
 	KeyTypeSignature
+)
+
+const (
+	hashName    = "hash"
+	sigName     = "sig"
+	namesNumber = 3
+)
+
+var (
+	// ErrInvalidKey is returned when missing key, hash or signature.
+	ErrInvalidKey = errors.New("missing key, hash or signature")
+	// ErrHashMismatch is returned when hash mismatch.
+	ErrHashMismatch = errors.New("hash mismatch")
+	// ErrInvalidInput is returned when input data is invalid.
+	ErrInvalidInput = errors.New("failed to generate: invalid input data")
 )
 
 // Key implements internal realization.
@@ -30,13 +46,61 @@ type Namer interface {
 	ParseNames(names []string) []Key    // Convert names into keys.
 }
 
-// Generator generates signer K/V pairs.
-// Implementation should use `generic` and will used for strong typing of the solution.
-type Generator[T any] interface {
-	Generate(name string, value T) ([]kv.KeyValue, error)
+// DefaultNamer represents default namer.
+type DefaultNamer struct {
+	prefix string
 }
 
-// Validator validates and build the object from K/V.
-type Validator[T any] interface {
-	Validate(pairs []kv.KeyValue) (T, error)
+// NewDefaultNamer returns new DefaultNamer object.
+func NewDefaultNamer(prefix string) *DefaultNamer {
+	return &DefaultNamer{
+		prefix: prefix,
+	}
+}
+
+// GenerateNames generates set of names from basic name.
+func (n *DefaultNamer) GenerateNames(name string) []string {
+	return []string{
+		n.prefix + "/" + name,
+		n.prefix + "/" + hashName + "/" + name,
+		n.prefix + "/" + sigName + "/" + name,
+	}
+}
+
+// ParseNames returns set of Keys with different types.
+func (n *DefaultNamer) ParseNames(names []string) []Key {
+	keys := make([]Key, 0, namesNumber)
+
+	for _, name := range names {
+		var key Key
+
+		// Remove prefix.
+		result, _ := strings.CutPrefix(name, n.prefix)
+
+		parts := strings.Split(result, "/")
+
+		key.Name = name
+
+		switch parts[1] {
+		case hashName:
+			{
+				key.Property = ""
+				key.Type = KeyTypeHash
+			}
+		case sigName:
+			{
+				key.Property = ""
+				key.Type = KeyTypeSignature
+			}
+		default:
+			{
+				key.Property = ""
+				key.Type = KeyTypeValue
+			}
+		}
+
+		keys = append(keys, key)
+	}
+
+	return keys
 }
