@@ -1,4 +1,4 @@
-// Package crypto implements crypto interfaces.
+// Package crypto implements verification interfaces.
 package crypto
 
 // Signer implements high-level API for package signing.

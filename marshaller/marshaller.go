@@ -17,7 +17,7 @@ var ErrUnmarshall = errors.New("failed to unmarshal")
 // implements one time for all objects.
 // Required for `integrity.Storage` to set marshalling format for any type object
 // and as recommendation for developers of `Storage` wrappers.
-type DefaultMarshaller interface {
+type DefaultMarshaller interface { //nolint:iface
 	Marshal(data any) ([]byte, error)
 	Unmarshal(data []byte, out any) error
 }
@@ -25,8 +25,8 @@ type DefaultMarshaller interface {
 // Marshallable - custom object serialization, implements for each object.
 // Required for `integrity.Storage` type to set marshalling format to specific object
 // and as recommendation for developers of `Storage` wrappers.
-type Marshallable interface {
-	Marshal() ([]byte, error)
+type Marshallable interface { //nolint:iface
+	Marshal(data any) ([]byte, error)
 	Unmarshal(data []byte, out any) error
 }
 
@@ -34,7 +34,7 @@ type Marshallable interface {
 type YAMLMarshaller struct{}
 
 // NewYamlMarshaller creates new NewYamlMarshaller object.
-func NewYamlMarshaller() YAMLMarshaller {
+func NewYamlMarshaller() Marshallable {
 	return YAMLMarshaller{}
 }
 
