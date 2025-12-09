@@ -12,6 +12,13 @@ const (
 	maxKeyParts   = 3
 )
 
+// Namer defines the interface for generating and parsing storage key names.
+type Namer interface {
+	GenerateNames(name string) ([]Key, error)
+	ParseKey(name string) (DefaultKey, error)
+	ParseKeys(names []string, ignoreError bool) (Results, error)
+}
+
 // DefaultNamer represents default namer.
 type DefaultNamer struct {
 	prefix    string // Key prefix (e.g., "storage/").
