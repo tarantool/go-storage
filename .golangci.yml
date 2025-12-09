@@ -1,4 +1,4 @@
-version: '2'
+version: "2"
 
 run:
   timeout: 3m
@@ -9,20 +9,22 @@ formatters:
 
 issues:
   # Disable limits on the number of printed issues
-  max-issues-per-linter: 0    # 0 = no limit
-  max-same-issues: 0          # 0 = no limit
+  max-issues-per-linter: 0 # 0 = no limit
+  max-same-issues: 0 # 0 = no limit
 
 linters:
   default: all
 
   disable:
-    - dupl     # Dupl is disabled, since we're generating a lot of boilerplate code.
-    - cyclop   # Cyclop is disabled, since cyclomatic complexities is very abstract metric,
-               # that sometimes lead to strange linter behaviour.
-    - wsl      # WSL is disabled, since it's obsolete. Using WSL_v5.
+    - dupl # Dupl is disabled, since we're generating a lot of boilerplate code.
+    - cyclop # Cyclop is disabled, since cyclomatic complexities is very abstract metric,
+      # that sometimes lead to strange linter behaviour.
+    - wsl # WSL is disabled, since it's obsolete. Using WSL_v5.
     - nlreturn # nlreturn is disabled, since it's duplicated by wsl_v5.return check.
-    - ireturn  # ireturn is disabled, since it's not needed.
-    - godox    # godox is disabled to allow TODO comments for unimplemented functionality.
+    - ireturn # ireturn is disabled, since it's not needed.
+    - godox # godox is disabled to allow TODO comments for unimplemented functionality.
+    - gocognit # gocognit is disabled, cognitive complexity is too restrictive.
+    - funlen # funlen is disabled, function length limits are too restrictive.
 
   exclusions:
     generated: lax
@@ -40,6 +42,14 @@ linters:
       ignore-decls:
         - mc *minimock.Controller
         - t T
+    revive:
+      rules:
+        - name: var-naming
+          arguments:
+            - []
+            - []
+            - - skip-package-name-checks: true
+
     godot:
       scope: all
     lll:
