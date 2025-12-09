@@ -1,5 +1,5 @@
-// Package crypto implements crypto interfaces.
-package crypto
+// Package verification implements verification interfaces.
+package verification
 
 // Signer implements high-level API for package signing.
 type Signer interface {

@@ -1,4 +1,4 @@
-package crypto
+package verification
 
 import (
 	"crypto"
@@ -29,12 +29,12 @@ func NewRSAPSS(privKey rsa.PrivateKey, pubKey rsa.PublicKey) RSAPSS {
 }
 
 // Name implements SignerVerifier interface.
-func (r *RSAPSS) Name() string {
+func (r RSAPSS) Name() string {
 	return "RSASSA-PSS"
 }
 
 // Sign generates SHA-256 digest and signs it using RSASSA-PSS.
-func (r *RSAPSS) Sign(data []byte) ([]byte, error) {
+func (r RSAPSS) Sign(data []byte) ([]byte, error) {
 	digest, err := r.hasher.Hash(data)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to get hash: %w", err)
@@ -52,7 +52,7 @@ func (r *RSAPSS) Sign(data []byte) ([]byte, error) {
 }
 
 // Verify compares data with signature.
-func (r *RSAPSS) Verify(data []byte, signature []byte) error {
+func (r RSAPSS) Verify(data []byte, signature []byte) error {
 	digest, err := r.hasher.Hash(data)
 	if err != nil {
 		return fmt.Errorf("failed to get hash: %w", err)

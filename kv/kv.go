@@ -9,7 +9,6 @@ type KeyValue struct {
 	Key []byte
 	// Value is the serialized representation of the value.
 	Value []byte
-
 	// ModRevision is the revision number of the last modification to this key.
 	ModRevision int64
 }

@@ -2,26 +2,23 @@
 package namer
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"iter"
 	"strings"
-)
 
-// KeyType represents key types.
-type KeyType int
+	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/verification"
 
-const (
-	// KeyTypeValue represents data type.
-	KeyTypeValue KeyType = iota + 1
-	// KeyTypeHash represents hash of the data type.
-	KeyTypeHash
-	// KeyTypeSignature represents signature of the data type.
-	KeyTypeSignature
+	"github.com/tarantool/go-storage/hasher"
+	"github.com/tarantool/go-storage/marshaller"
 )
 
 const (
-	hashName    = "hash"
-	sigName     = "sig"
-	namesNumber = 3
+	hashName      = "hash"
+	signatureName = "sig"
+	keysPerName   = 3
 )
 
 var (
@@ -31,76 +28,250 @@ var (
 	ErrHashMismatch = errors.New("hash mismatch")
 	// ErrInvalidInput is returned when input data is invalid.
 	ErrInvalidInput = errors.New("failed to generate: invalid input data")
+	// ErrInvalidPrefix is returned when prefix didn't match.
+	ErrInvalidPrefix = errors.New("invalid prefix")
 )
 
-// Key implements internal realization.
-type Key struct {
-	Name     string  // Object identificator.
-	Type     KeyType // Type of the object.
-	Property string  // Additional information (version/algorithm).
+//-----------------------------------------------------------------------------
+
+// Results represents Namer working result.
+type Results struct {
+	isSingle     bool             // True if result contains only one object name.
+	isSingleName string           // Cached name when isSingle=true.
+	result       map[string][]Key // Grouped keys: object name -> key list.
 }
 
-// Namer represents keys naming strategy.
-type Namer interface {
-	GenerateNames(name string) []string // Object's keys generation.
-	ParseNames(names []string) []Key    // Convert names into keys.
+// SelectSingle gets keys for single-name case (if applicable).
+func (r *Results) SelectSingle() ([]Key, bool) {
+	if r.isSingle {
+		return r.result[r.isSingleName], true
+	}
+
+	return nil, false
 }
+
+// Items return iterator over all name->keys groups.
+func (r *Results) Items() iter.Seq2[string, []Key] {
+	return func(yield func(str string, res []Key) bool) {
+		for i, v := range r.result {
+			if !yield(i, v) {
+				return
+			}
+		}
+	}
+}
+
+// Select gets keys for a specific object name.
+func (r *Results) Select(name string) ([]Key, bool) {
+	if i, ok := r.result[name]; ok {
+		return i, true
+	}
+
+	return nil, false
+}
+
+// Len returns the number of unique object names.
+func (r *Results) Len() int {
+	return len(r.result)
+}
+
+//-----------------------------------------------------------------------------
 
 // DefaultNamer represents default namer.
 type DefaultNamer struct {
-	prefix string
+	prefix         string
+	hasher         hasher.Hasher
+	signerverifier verification.SignerVerifier
+	marshaller     marshaller.Marshallable
 }
 
 // NewDefaultNamer returns new DefaultNamer object.
-func NewDefaultNamer(prefix string) *DefaultNamer {
+func NewDefaultNamer(prefix string, hasher hasher.Hasher, signerverifier verification.SignerVerifier,
+	marshaller marshaller.Marshallable,
+) *DefaultNamer {
+	prefix = strings.TrimPrefix(prefix, "/")
+
 	return &DefaultNamer{
-		prefix: prefix,
+		prefix:         prefix,
+		hasher:         hasher,
+		signerverifier: signerverifier,
+		marshaller:     marshaller,
 	}
 }
 
-// GenerateNames generates set of names from basic name.
-func (n *DefaultNamer) GenerateNames(name string) []string {
-	return []string{
-		n.prefix + "/" + name,
-		n.prefix + "/" + hashName + "/" + name,
-		n.prefix + "/" + sigName + "/" + name,
-	}
-}
+// GenerateMulti generates all keys for an object names.
+func (n *DefaultNamer) GenerateMulti(kvs []kv.KeyValue) Results {
+	var out Results
 
-// ParseNames returns set of Keys with different types.
-func (n *DefaultNamer) ParseNames(names []string) []Key {
-	keys := make([]Key, 0, namesNumber)
+	out.result = make(map[string][]Key)
 
-	for _, name := range names {
-		var key Key
-
-		// Remove prefix.
-		result, _ := strings.CutPrefix(name, n.prefix)
-
-		parts := strings.Split(result, "/")
-
-		key.Name = name
-
-		switch parts[1] {
-		case hashName:
-			{
-				key.Property = ""
-				key.Type = KeyTypeHash
-			}
-		case sigName:
-			{
-				key.Property = ""
-				key.Type = KeyTypeSignature
-			}
-		default:
-			{
-				key.Property = ""
-				key.Type = KeyTypeValue
-			}
+	for _, keyvalue := range kvs {
+		keys, err := n.Generate(keyvalue)
+		if err != nil {
+			continue
 		}
 
-		keys = append(keys, key)
+		out.result[string(keyvalue.Key)] = keys
 	}
 
-	return keys
+	if len(kvs) == 1 {
+		out.isSingle = true
+		out.isSingleName = string(kvs[0].Key)
+	}
+
+	return out
+}
+
+// Generate generates all required keys for an object name.
+func (n *DefaultNamer) Generate(keyvalue kv.KeyValue) ([]Key, error) {
+	name := string(keyvalue.Key)
+	if name == "" {
+		return nil, ErrInvalidInput
+	}
+
+	marshalled, err := n.marshaller.Marshal(keyvalue.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal: %w", err)
+	}
+
+	hash, err := n.hasher.Hash(marshalled)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash: %w", err)
+	}
+
+	signature, err := n.signerverifier.Sign(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign: %w", err)
+	}
+
+	valK := NewDefaultKey(
+		"/"+n.prefix+"/"+name,
+		KeyTypeValue,
+		"",
+		marshalled,
+	)
+	hashK := NewDefaultKey(
+		"/"+n.prefix+"/"+hashName+"/"+n.hasher.Name()+"/"+name,
+		KeyTypeHash,
+		n.hasher.Name(),
+		hash,
+	)
+	sigK := NewDefaultKey(
+		"/"+n.prefix+"/"+signatureName+"/"+name,
+		KeyTypeSignature,
+		"",
+		signature,
+	)
+
+	return []Key{valK, hashK, sigK}, nil
+}
+
+// ParseKVMulti convert set of raw KVs to set of KVs with original key/values.
+func (n *DefaultNamer) ParseKVMulti(kvs []kv.KeyValue) ([]kv.KeyValue, error) {
+	var results Results
+
+	out := make([]kv.KeyValue, 0, len(kvs)/keysPerName)
+
+	// Combine keys in threes to get complete set of data to decode the original value.
+	for _, keyvalue := range kvs {
+		key, err := n.ParseKV(keyvalue)
+		if err != nil {
+			return nil, err
+		}
+
+		results.result[key.Name()] = append(results.result[key.Name()], key)
+	}
+
+	// Decoding.
+	for _, keyset := range results.Items() {
+		keyvalue, err := n.DecodeKey(keyset)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, keyvalue)
+	}
+
+	return out, nil
+}
+
+// ParseKV converts KV to Key to combine it by `name`.
+func (n *DefaultNamer) ParseKV(keyvalue kv.KeyValue) (Key, error) {
+	var out Key
+
+	result, cut := strings.CutPrefix(string(keyvalue.Key), n.prefix)
+	if !cut {
+		return DefaultKey{}, ErrInvalidPrefix
+	}
+
+	result, _ = strings.CutPrefix(result, "/")
+
+	parts := strings.Split(result, "/")
+	partsLen := len(parts)
+
+	switch parts[0] {
+	case hashName + "/":
+		out = NewDefaultKey(
+			parts[partsLen-1],
+			KeyTypeHash,
+			parts[partsLen-2],
+			keyvalue.Value,
+		)
+	case signatureName + "/":
+		out = NewDefaultKey(
+			parts[partsLen-1],
+			KeyTypeSignature,
+			"",
+			keyvalue.Value,
+		)
+	default:
+		out = NewDefaultKey(
+			parts[partsLen-1],
+			KeyTypeValue,
+			"",
+			keyvalue.Value,
+		)
+	}
+
+	return out, nil
+}
+
+// DecodeKey converts sets of three Keys into original KV.
+func (n *DefaultNamer) DecodeKey(keyset []Key) (kv.KeyValue, error) {
+	var out kv.KeyValue
+
+	var marshalledValue, hash, signature []byte
+
+	for _, key := range keyset {
+		switch {
+		case strings.Contains(key.Name(), hashName):
+			hash = key.Raw()
+		case strings.Contains(key.Name(), signatureName):
+			signature = key.Raw()
+		default:
+			out.Key = []byte(key.Name())
+			marshalledValue = key.Raw()
+		}
+	}
+
+	if out.Key == nil || hash == nil || signature == nil {
+		return out, ErrInvalidKey
+	}
+
+	err := n.marshaller.Unmarshal(marshalledValue, &out.Value)
+	if err != nil {
+		return out, fmt.Errorf("failed to unmarshal: %w", err)
+	}
+
+	computedHash, err := n.hasher.Hash(out.Key)
+	if !bytes.Equal(computedHash, hash) || err != nil {
+		return out, ErrHashMismatch
+	}
+
+	err = n.signerverifier.Verify(out.Value, signature)
+	if err != nil {
+		return out, fmt.Errorf("signature verification failed: %w", err)
+	}
+
+	return out, nil
 }

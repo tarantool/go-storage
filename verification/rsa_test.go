@@ -1,4 +1,4 @@
-package crypto_test
+package verification_test
 
 import (
 	"crypto/rand"
@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tarantool/go-storage/crypto"
+
+	"github.com/tarantool/go-storage/verification"
 )
 
 func TestRsaWithoutKeys(t *testing.T) {
 	t.Parallel()
 
-	rsapss := crypto.NewRSAPSS(rsa.PrivateKey{}, rsa.PublicKey{}) //nolint:exhaustruct
+	rsapss := verification.NewRSAPSS(rsa.PrivateKey{}, rsa.PublicKey{}) //nolint:exhaustruct
 	require.NotNil(t, rsapss, "rsapss must be returned")
 
 	data := []byte("abc")
@@ -31,7 +32,7 @@ func TestRsaOnlyPrivateKey(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	rsapss := crypto.NewRSAPSS(*privateKey, rsa.PublicKey{}) //nolint:exhaustruct
+	rsapss := verification.NewRSAPSS(*privateKey, rsa.PublicKey{}) //nolint:exhaustruct
 	require.NotNil(t, rsapss, "rsapss must be returned")
 
 	data := []byte("abc")
@@ -50,7 +51,7 @@ func TestRsaOnlyPublicKey(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	rsapss := crypto.NewRSAPSS(rsa.PrivateKey{}, privateKey.PublicKey) //nolint:exhaustruct
+	rsapss := verification.NewRSAPSS(rsa.PrivateKey{}, privateKey.PublicKey) //nolint:exhaustruct
 	require.NotNil(t, rsapss, "rsapss must be returned")
 
 	data := []byte("abc")
@@ -60,7 +61,7 @@ func TestRsaOnlyPublicKey(t *testing.T) {
 	require.Nil(t, sig, "signature must be nil")
 
 	// Re-create to have a valid sign.
-	rsapss = crypto.NewRSAPSS(*privateKey, privateKey.PublicKey)
+	rsapss = verification.NewRSAPSS(*privateKey, privateKey.PublicKey)
 	require.NotNil(t, rsapss, "rsapss must be returned")
 
 	sign, err := rsapss.Sign(data)
@@ -77,7 +78,7 @@ func TestRsaSignVerify(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	rsapss := crypto.NewRSAPSS(*privateKey, privateKey.PublicKey)
+	rsapss := verification.NewRSAPSS(*privateKey, privateKey.PublicKey)
 	require.NotNil(t, rsapss, "rsapss must be returned")
 
 	data := []byte("abc")
