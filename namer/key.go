@@ -1,5 +1,9 @@
 package namer
 
+import (
+	"fmt"
+)
+
 // KeyType represents key types.
 type KeyType int
 
@@ -11,6 +15,19 @@ const (
 	// KeyTypeSignature represents signature of the data type.
 	KeyTypeSignature
 )
+
+func (t KeyType) String() string {
+	switch t {
+	case KeyTypeValue:
+		return "KeyTypeValue"
+	case KeyTypeHash:
+		return "KeyTypeHash"
+	case KeyTypeSignature:
+		return "KeyTypeSignature"
+	default:
+		return fmt.Sprintf("KeyType[%d]", t)
+	}
+}
 
 // Key defines the minimal interface required by keys.
 type Key interface {

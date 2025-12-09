@@ -213,8 +213,8 @@ func TestEtcdDriver_VersionEqualPredicate(t *testing.T) {
 
 	putValue(ctx, t, driver, key, value)
 
-	kv := getValue(ctx, t, driver, key)
-	initialRevision := kv.ModRevision
+	kvi := getValue(ctx, t, driver, key)
+	initialRevision := kvi.ModRevision
 
 	response, err := driver.Execute(ctx, []predicate.Predicate{
 		predicate.VersionEqual(key, initialRevision),
