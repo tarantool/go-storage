@@ -36,15 +36,15 @@ var (
 
 // Results represents Namer working result.
 type Results struct {
-	isSingle     bool             // True if result contains only one object name.
-	isSingleName string           // Cached name when isSingle=true.
-	result       map[string][]Key // Grouped keys: object name -> key list.
+	IsSingle     bool             // True if result contains only one object name.
+	IsSingleName string           // Cached name when isSingle=true.
+	Result       map[string][]Key // Grouped keys: object name -> key list.
 }
 
 // SelectSingle gets keys for single-name case (if applicable).
 func (r *Results) SelectSingle() ([]Key, bool) {
-	if r.isSingle {
-		return r.result[r.isSingleName], true
+	if r.IsSingle {
+		return r.Result[r.IsSingleName], true
 	}
 
 	return nil, false
@@ -53,7 +53,7 @@ func (r *Results) SelectSingle() ([]Key, bool) {
 // Items return iterator over all name->keys groups.
 func (r *Results) Items() iter.Seq2[string, []Key] {
 	return func(yield func(str string, res []Key) bool) {
-		for i, v := range r.result {
+		for i, v := range r.Result {
 			if !yield(i, v) {
 				return
 			}
@@ -63,7 +63,7 @@ func (r *Results) Items() iter.Seq2[string, []Key] {
 
 // Select gets keys for a specific object name.
 func (r *Results) Select(name string) ([]Key, bool) {
-	if i, ok := r.result[name]; ok {
+	if i, ok := r.Result[name]; ok {
 		return i, true
 	}
 
@@ -72,7 +72,7 @@ func (r *Results) Select(name string) ([]Key, bool) {
 
 // Len returns the number of unique object names.
 func (r *Results) Len() int {
-	return len(r.result)
+	return len(r.Result)
 }
 
 //-----------------------------------------------------------------------------
@@ -103,7 +103,7 @@ func NewDefaultNamer(prefix string, hasher hasher.Hasher, signerverifier verific
 func (n *DefaultNamer) GenerateMulti(kvs []kv.KeyValue) Results {
 	var out Results
 
-	out.result = make(map[string][]Key)
+	out.Result = make(map[string][]Key)
 
 	for _, keyvalue := range kvs {
 		keys, err := n.Generate(keyvalue)
@@ -111,12 +111,12 @@ func (n *DefaultNamer) GenerateMulti(kvs []kv.KeyValue) Results {
 			continue
 		}
 
-		out.result[string(keyvalue.Key)] = keys
+		out.Result[string(keyvalue.Key)] = keys
 	}
 
 	if len(kvs) == 1 {
-		out.isSingle = true
-		out.isSingleName = string(kvs[0].Key)
+		out.IsSingle = true
+		out.IsSingleName = string(kvs[0].Key)
 	}
 
 	return out
@@ -168,9 +168,9 @@ func (n *DefaultNamer) Generate(keyvalue kv.KeyValue) ([]Key, error) {
 
 // ParseKVMulti convert set of raw KVs to set of KVs with original key/values.
 func (n *DefaultNamer) ParseKVMulti(kvs []kv.KeyValue) ([]kv.KeyValue, error) {
-	var results Results
-
 	out := make([]kv.KeyValue, 0, len(kvs)/keysPerName)
+
+	var temp_results Results
 
 	// Combine keys in threes to get complete set of data to decode the original value.
 	for _, keyvalue := range kvs {
@@ -179,11 +179,11 @@ func (n *DefaultNamer) ParseKVMulti(kvs []kv.KeyValue) ([]kv.KeyValue, error) {
 			return nil, err
 		}
 
-		results.result[key.Name()] = append(results.result[key.Name()], key)
+		temp_results.Result[key.Name()] = append(temp_results.Result[key.Name()], key)
 	}
 
 	// Decoding.
-	for _, keyset := range results.Items() {
+	for _, keyset := range temp_results.Items() {
 		keyvalue, err := n.DecodeKey(keyset)
 		if err != nil {
 			return nil, err
