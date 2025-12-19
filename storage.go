@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/tarantool/go-option"
 
@@ -84,8 +86,41 @@ type storage struct {
 }
 
 // Watch implements the Storage interface for watching key changes.
-func (s storage) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan watch.Event {
-	panic("implement me")
+func (s storage) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event {
+	eventCh, cleanup, err := s.driver.Watch(ctx, key, opts...)
+	if err != nil {
+		// Return a closed channel on error.
+		ch := make(chan watch.Event)
+		close(ch)
+
+		return ch
+	}
+
+	if cleanup != nil {
+		var once sync.Once
+
+		wrapperChan := make(chan watch.Event, cap(eventCh))
+
+		go func() { // Forwarding goroutine.
+			defer close(wrapperChan)
+
+			for event := range eventCh {
+				wrapperChan <- event
+			}
+
+			once.Do(cleanup)
+		}()
+
+		// Cleanup goroutine on context cancellation.
+		go func() {
+			<-ctx.Done()
+			once.Do(cleanup)
+		}()
+
+		return wrapperChan
+	}
+
+	return eventCh
 }
 
 // Tx implements the Storage interface for transaction creation.
@@ -94,8 +129,35 @@ func (s storage) Tx(ctx context.Context) txPkg.Tx {
 }
 
 // Range implements the Storage interface for range queries.
-func (s storage) Range(_ context.Context, _ ...RangeOption) ([]kv.KeyValue, error) {
-	panic("implement me")
+func (s storage) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error) {
+	rangeOpts := &rangeOptions{Prefix: "", Limit: 0}
+	for _, opt := range opts {
+		opt(rangeOpts)
+	}
+
+	if rangeOpts.Prefix == "" {
+		return nil, nil
+	}
+
+	// Create a Get operation with the prefix.
+	key := rangeOpts.Prefix
+	if key != "" && !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
+
+	ops := []operation.Operation{operation.Get([]byte(key))}
+
+	response, err := s.driver.Execute(ctx, nil, ops, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute ops: %w", err)
+	}
+
+	var kvs []kv.KeyValue
+	for _, r := range response.Results {
+		kvs = append(kvs, r.Values...)
+	}
+
+	return kvs, nil
 }
 
 // NewStorage creates a new Storage instance with the specified driver.

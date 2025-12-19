@@ -25,6 +25,7 @@ linters:
     - godox # godox is disabled to allow TODO comments for unimplemented functionality.
     - gocognit # gocognit is disabled, cognitive complexity is too restrictive.
     - funlen # funlen is disabled, function length limits are too restrictive.
+    - maintidx # maintidx is disabled, purpose of this metric is unknown.
 
   exclusions:
     generated: lax
@@ -39,6 +40,7 @@ linters:
     varnamelen:
       ignore-names:
         - tt
+        - ok
       ignore-decls:
         - mc *minimock.Controller
         - t T

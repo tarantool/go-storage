@@ -84,11 +84,12 @@ func TestValidatorValidate_Success(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, value, result.Value)
-	require.NoError(t, result.Error)
-}
+	assert.True(t, result.Value.IsSome())
 
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, value, val)
+}
 func TestValidatorValidate_MissingHash(t *testing.T) {
 	t.Parallel()
 
@@ -120,8 +121,11 @@ func TestValidatorValidate_MissingHash(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "hash \"sha256\" not verified (missing)")
 }
@@ -160,8 +164,11 @@ func TestValidatorValidate_HashMismatch(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "hash mismatch for \"sha256\"")
 }
@@ -217,7 +224,7 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 	require.Len(t, validatedResults, 2)
 
 	// Find results by name.
-	var result1, result2 integrity.ValidateResult[SimpleStruct]
+	var result1, result2 integrity.ValidatedResult[SimpleStruct]
 
 	for _, res := range validatedResults {
 		switch res.Name {
@@ -229,13 +236,19 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 	}
 
 	assert.Equal(t, "object1", result1.Name)
-	assert.True(t, result1.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test1", Value: 42}, result1.Value)
+	assert.True(t, result1.Value.IsSome())
+
+	val1, ok := result1.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test1", Value: 42}, val1)
 	require.NoError(t, result1.Error)
 
 	assert.Equal(t, "object2", result2.Name)
-	assert.True(t, result2.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test2", Value: 100}, result2.Value)
+	assert.True(t, result2.Value.IsSome())
+
+	val2, ok := result2.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test2", Value: 100}, val2)
 	require.NoError(t, result2.Error)
 }
 
@@ -287,7 +300,7 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 	require.Len(t, validatedResults, 2)
 
 	// Find results.
-	var result1, result2 integrity.ValidateResult[SimpleStruct]
+	var result1, result2 integrity.ValidatedResult[SimpleStruct]
 
 	for _, res := range validatedResults {
 		switch res.Name {
@@ -300,14 +313,20 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 
 	// object1 should be valid.
 	assert.Equal(t, "object1", result1.Name)
-	assert.True(t, result1.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test1", Value: 42}, result1.Value)
+	assert.True(t, result1.Value.IsSome())
+
+	val1, ok := result1.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test1", Value: 42}, val1)
 	require.NoError(t, result1.Error)
 
 	// object2 should have hash mismatch error.
 	assert.Equal(t, "object2", result2.Name)
-	assert.True(t, result2.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test2", Value: 100}, result2.Value)
+	assert.True(t, result2.Value.IsSome())
+
+	val2, ok := result2.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test2", Value: 100}, val2)
 	require.ErrorAs(t, result2.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result2.Error, "hash mismatch for \"sha256\"")
 }
@@ -343,8 +362,11 @@ func TestValidatorValidate_MissingSignature(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "signature \"rsa\" not verified (missing)")
 }
@@ -385,8 +407,11 @@ func TestValidatorValidate_SignatureVerificationError(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "signature verification failed for \"rsa\"")
 }
@@ -430,8 +455,11 @@ func TestValidatorValidate_HashComputationError(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "failed to calculate hash \"sha256\"")
 }
@@ -500,8 +528,11 @@ func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.NoError(t, result.Error)
 }
 
@@ -546,8 +577,11 @@ func TestValidatorValidate_VerifierNotAvailable(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.NoError(t, result.Error)
 }
 
@@ -602,7 +636,7 @@ func TestValidatorValidate_MissingValueKey(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.False(t, result.HasValue)
+	assert.True(t, result.Value.IsZero())
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	// When there's no value key, the validator still tries to compute hashes on nil data.
 	require.ErrorContains(t, result.Error, "failed to calculate hash")
@@ -652,7 +686,7 @@ func TestValidatorValidate_UnmarshalError(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.False(t, result.HasValue)
+	assert.True(t, result.Value.IsZero())
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "failed to unmarshal record")
 }
@@ -696,8 +730,11 @@ func TestValidatorValidate_HashKeyNotFound(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "hash \"sha1\" not verified (missing)")
 }
@@ -742,8 +779,11 @@ func TestValidatorValidate_SignatureKeyNotFound(t *testing.T) {
 
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
-	assert.True(t, result.HasValue)
-	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, result.Value)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "signature \"ecdsa\" not verified (missing)")
 }

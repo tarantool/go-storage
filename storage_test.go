@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/internal/mocks"
+	"github.com/tarantool/go-storage/kv"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/watch"
 )
 
 func TestStorage_Tx(t *testing.T) {
@@ -333,4 +336,238 @@ func TestTx_Commit_NoOperations(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedResponse, resp)
 	mockDriver.MinimockFinish()
+}
+
+func TestStorage_Watch(t *testing.T) {
+	t.Parallel()
+
+	t.Run("driver returns error", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		expectedErr := errors.New("watch failed")
+		mockDriver.WatchMock.Expect(ctx, []byte("key")).Return((<-chan watch.Event)(nil), nil, expectedErr)
+
+		eventCh := strg.Watch(ctx, []byte("key"))
+		require.NotNil(t, eventCh)
+
+		// Channel should be closed immediately.
+		select {
+		case _, ok := <-eventCh:
+			assert.False(t, ok, "channel should be closed")
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("expected closed channel")
+		}
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("driver returns channel without cleanup", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		rawCh := make(chan watch.Event, 1)
+		defer close(rawCh)
+
+		mockDriver.WatchMock.Expect(ctx, []byte("key")).Return(rawCh, nil, nil)
+
+		eventCh := strg.Watch(ctx, []byte("key"))
+		require.NotNil(t, eventCh)
+
+		// Give forwarding goroutine a moment to start.
+		time.Sleep(20 * time.Millisecond)
+
+		// Send an event.
+		event := watch.Event{Prefix: []byte("key")}
+		rawCh <- event
+
+		select {
+		case received := <-eventCh:
+			assert.Equal(t, event, received)
+		case <-time.After(500 * time.Millisecond):
+			t.Fatal("expected event")
+		}
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("driver returns channel with cleanup", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		rawCh := make(chan watch.Event, 1)
+		cleanupCh := make(chan struct{})
+		cleanup := func() { close(cleanupCh) }
+
+		mockDriver.WatchMock.Expect(ctx, []byte("key")).Return(rawCh, cleanup, nil)
+
+		eventCh := strg.Watch(ctx, []byte("key"))
+		require.NotNil(t, eventCh)
+
+		// Give forwarding goroutine a moment to start.
+		time.Sleep(10 * time.Millisecond)
+
+		// Send an event.
+		event := watch.Event{Prefix: []byte("key")}
+		rawCh <- event
+
+		select {
+		case received := <-eventCh:
+			assert.Equal(t, event, received)
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("expected event")
+		}
+
+		// Close raw channel to trigger cleanup in forwarding goroutine.
+		close(rawCh)
+
+		// Wait for cleanup to be called.
+		select {
+		case <-cleanupCh:
+			// Cleanup called successfully.
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("cleanup should have been called")
+		}
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("context cancellation triggers cleanup", func(t *testing.T) {
+		t.Parallel()
+
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		rawCh := make(chan watch.Event, 1)
+		cleanupCh := make(chan struct{})
+		cleanup := func() { close(cleanupCh) }
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		mockDriver.WatchMock.Expect(ctx, []byte("key")).Return(rawCh, cleanup, nil)
+
+		eventCh := strg.Watch(ctx, []byte("key"))
+		require.NotNil(t, eventCh)
+
+		// Give cleanup goroutine a moment to start.
+		time.Sleep(1 * time.Millisecond)
+
+		// Cancel context.
+		cancel()
+
+		// Wait for cleanup to be called.
+		select {
+		case <-cleanupCh:
+			// Cleanup called successfully.
+		case <-time.After(200 * time.Millisecond):
+			t.Fatal("cleanup should have been called on context cancellation")
+		}
+
+		mockDriver.MinimockFinish()
+	})
+}
+
+func TestStorage_Range(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty prefix returns nil", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		kvs, err := strg.Range(ctx)
+		require.NoError(t, err)
+		assert.Nil(t, kvs)
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("with prefix", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		expectedKVs := []kv.KeyValue{
+			{Key: []byte("/test/key1"), Value: []byte("value1"), ModRevision: 0},
+			{Key: []byte("/test/key2"), Value: []byte("value2"), ModRevision: 0},
+		}
+
+		ops := []operation.Operation{operation.Get([]byte("/test/"))}
+		response := tx.Response{
+			Succeeded: true,
+			Results: []tx.RequestResponse{
+				{Values: expectedKVs},
+			},
+		}
+
+		mockDriver.ExecuteMock.Expect(ctx, nil, ops, nil).Return(response, nil)
+
+		kvs, err := strg.Range(ctx, storage.WithPrefix("/test"))
+		require.NoError(t, err)
+		assert.Equal(t, expectedKVs, kvs)
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("with prefix without trailing slash", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		expectedKVs := []kv.KeyValue{
+			{Key: []byte("/test/key1"), Value: []byte("value1"), ModRevision: 0},
+		}
+
+		ops := []operation.Operation{operation.Get([]byte("/test/"))}
+		response := tx.Response{
+			Succeeded: true,
+			Results: []tx.RequestResponse{
+				{Values: expectedKVs},
+			},
+		}
+
+		mockDriver.ExecuteMock.Expect(ctx, nil, ops, nil).Return(response, nil)
+
+		kvs, err := strg.Range(ctx, storage.WithPrefix("/test"))
+		require.NoError(t, err)
+		assert.Equal(t, expectedKVs, kvs)
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("driver execution error", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		ops := []operation.Operation{operation.Get([]byte("/test/"))}
+		expectedErr := errors.New("driver error")
+		mockDriver.ExecuteMock.Expect(ctx, nil, ops, nil).
+			Return(tx.Response{Succeeded: false, Results: nil}, expectedErr)
+
+		kvs, err := strg.Range(ctx, storage.WithPrefix("/test"))
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to execute ops")
+		assert.Nil(t, kvs)
+
+		mockDriver.MinimockFinish()
+	})
 }

@@ -247,3 +247,16 @@ func (e *FailedToValidateAggregatedError) Finalize() error {
 		return e
 	}
 }
+
+// InvalidNameError represents an error when a name is invalid.
+type InvalidNameError struct {
+	name string
+}
+
+// Error returns a string representation of the invalid name error.
+func (e InvalidNameError) Error() string {
+	return "invalid name: " + e.name
+}
+
+// ErrInvalidName is a sentinel error for invalid names.
+var ErrInvalidName = InvalidNameError{name: ""}
