@@ -1,0 +1,279 @@
+package integrity
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/tarantool/go-storage"
+	"github.com/tarantool/go-storage/internal/options"
+	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/watch"
+)
+
+// Typed provides integrity-protected storage operations for typed values.
+type Typed[T any] struct {
+	base  storage.Storage
+	gen   Generator[T]
+	val   Validator[T]
+	namer namer.Namer
+}
+
+func checkName(name string) bool {
+	switch {
+	case len(name) == 0:
+		return false
+	case strings.HasPrefix(name, "/") || strings.HasSuffix(name, "/"):
+		return false
+	default:
+		return true
+	}
+}
+
+func checkRangeName(name string) bool {
+	return !strings.HasPrefix(name, "/")
+}
+
+type getOptions struct {
+	ignoreVerificationError bool
+	ignoreMoreThanOneResult bool
+}
+
+func IgnoreVerificationError() options.OptionCallback[getOptions] {
+	return func(opts *getOptions) {
+		opts.ignoreVerificationError = true
+	}
+}
+
+func IgnoreMoreThanOneResult() options.OptionCallback[getOptions] {
+	return func(opts *getOptions) {
+		opts.ignoreMoreThanOneResult = true
+	}
+}
+
+var (
+	ErrNotFound          = errors.New("not found")
+	ErrMoreThanOneResult = errors.New("more than one result was returned")
+)
+
+func flattenResults(response tx.Response) []kv.KeyValue {
+	var kvs []kv.KeyValue
+	for _, r := range response.Results {
+		kvs = append(kvs, r.Values...)
+	}
+
+	return kvs
+}
+
+// Get retrieves and validates a single named value from storage.
+func (t *Typed[T]) Get(
+	ctx context.Context,
+	name string,
+	vOpts ...options.OptionCallback[getOptions],
+) (ValidatedResult[T], error) {
+	if !checkName(name) {
+		return ValidatedResult[T]{}, ErrInvalidName
+	}
+
+	opts := options.ApplyOptions[getOptions](nil, vOpts)
+
+	keys, err := t.namer.GenerateNames(name)
+	if err != nil {
+		return ValidatedResult[T]{}, fmt.Errorf("%w: failed to generate keys", err)
+	}
+
+	ops := make([]operation.Operation, 0, len(keys))
+	for _, key := range keys {
+		ops = append(ops, operation.Get([]byte(key.Build())))
+	}
+
+	response, err := t.base.Tx(ctx).Then(ops...).Commit()
+	if err != nil {
+		return ValidatedResult[T]{}, fmt.Errorf("%w: failed to execute", err)
+	}
+
+	kvs := flattenResults(response)
+
+	results, err := t.val.Validate(kvs)
+	switch {
+	case err != nil:
+		return ValidatedResult[T]{}, fmt.Errorf("%w: failed to validate", err)
+	case len(results) == 0:
+		return ValidatedResult[T]{}, ErrNotFound
+	case len(results) > 1 && !opts.ignoreMoreThanOneResult:
+		return ValidatedResult[T]{}, ErrMoreThanOneResult
+	}
+
+	if results[0].Error != nil {
+		// results[0].Value.IsZero() means we've failed to decode results.
+		failedToDecodeResult := results[0].Value.IsZero()
+
+		if opts.ignoreVerificationError && !failedToDecodeResult {
+			return results[0], nil
+		}
+
+		return ValidatedResult[T]{}, results[0].Error
+	}
+
+	if results[0].Value.IsZero() {
+		panic("unreachable")
+	}
+
+	return results[0], nil
+}
+
+// Put stores a named value with integrity protection.
+func (t *Typed[T]) Put(ctx context.Context, name string, val T) error {
+	if !checkName(name) {
+		return ErrInvalidName
+	}
+
+	kvs, err := t.gen.Generate(name, val)
+	if err != nil {
+		return fmt.Errorf("%w: failed to generate", err)
+	}
+
+	ops := make([]operation.Operation, 0, len(kvs))
+	for _, kv := range kvs {
+		ops = append(ops, operation.Put(kv.Key, kv.Value))
+	}
+
+	_, err = t.base.Tx(ctx).Then(ops...).Commit()
+	if err != nil {
+		return fmt.Errorf("%w: failed to execute", err)
+	}
+
+	return nil
+}
+
+// Delete removes a named value and its integrity data from storage.
+func (t *Typed[T]) Delete(ctx context.Context, name string) error {
+	if !checkName(name) {
+		return ErrInvalidName
+	}
+
+	keys, err := t.namer.GenerateNames(name)
+	if err != nil {
+		return fmt.Errorf("%w: failed to generate keys", err)
+	}
+
+	ops := make([]operation.Operation, 0, len(keys))
+	for _, key := range keys {
+		ops = append(ops, operation.Delete([]byte(key.Build())))
+	}
+
+	_, err = t.base.Tx(ctx).Then(ops...).Commit()
+	if err != nil {
+		return fmt.Errorf("%w: failed to execute", err)
+	}
+
+	return nil
+}
+
+// Range retrieves and validates all values under the given name prefix.
+func (t *Typed[T]) Range(
+	ctx context.Context,
+	name string,
+	vOpts ...options.OptionCallback[getOptions],
+) ([]ValidatedResult[T], error) {
+	if !checkRangeName(name) {
+		return nil, ErrInvalidName
+	}
+
+	prefix := t.namer.Prefix(name, true)
+
+	opts := options.ApplyOptions[getOptions](nil, vOpts)
+
+	// Get all keys under the base prefix.
+	ops := []operation.Operation{operation.Get([]byte(prefix))}
+
+	response, err := t.base.Tx(ctx).Then(ops...).Commit()
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to execute range", err)
+	}
+
+	kvs := flattenResults(response)
+
+	results, err := t.val.Validate(kvs)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []ValidatedResult[T]
+
+	for _, result := range results {
+		if result.Error == nil {
+			out = append(out, result)
+			continue
+		}
+
+		// result.Value.IsZero() means we've failed to decode results, skipping.
+		failedToDecodeResult := result.Value.IsZero()
+
+		if opts.ignoreVerificationError && !failedToDecodeResult {
+			out = append(out, result)
+		}
+	}
+
+	return out, nil
+}
+
+// Watch returns a channel for watching changes to values under the given name prefix.
+func (t *Typed[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, error) {
+	if !checkRangeName(name) {
+		return closedChan, ErrInvalidName
+	}
+
+	key := t.namer.Prefix(name, strings.HasSuffix(name, "/"))
+
+	rawCh := t.base.Watch(ctx, []byte(key))
+	filteredCh := make(chan watch.Event)
+
+	go func() {
+		defer close(filteredCh)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-rawCh:
+				if !ok {
+					return
+				}
+
+				// Parse the key from the event prefix.
+				key, err := t.namer.ParseKey(string(event.Prefix))
+				if err != nil {
+					// Skip events for non-integrity keys.
+					continue
+				}
+
+				// Filter by name prefix.
+				if !strings.HasPrefix(key.Name(), name) {
+					continue
+				}
+
+				// Forward the event.
+				select {
+				case <-ctx.Done():
+					return
+				case filteredCh <- event:
+				}
+			}
+		}
+	}()
+
+	return filteredCh, nil
+}
+
+var (
+	closedChan = make(chan watch.Event) //nolint:gochecknoglobals
+)
+
+func init() { //nolint:gochecknoinits
+	close(closedChan)
+}

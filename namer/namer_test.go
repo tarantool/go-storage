@@ -261,3 +261,68 @@ func TestDefaultNamer_ParseKeys_Fail(t *testing.T) {
 		assert.Contains(t, results.Result(), "value-1")
 	})
 }
+
+func TestDefaultNamer_Prefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		prefix   string
+		val      string
+		isPrefix bool
+		expected string
+	}{
+		{
+			name:     "value key, not prefix",
+			prefix:   "/storage",
+			val:      "my-object",
+			isPrefix: false,
+			expected: "/storage/my-object",
+		},
+		{
+			name:     "value key with trailing slash, not prefix",
+			prefix:   "/storage",
+			val:      "my-object/",
+			isPrefix: false,
+			expected: "/storage/my-object",
+		},
+		{
+			name:     "empty val, prefix true",
+			prefix:   "/storage",
+			val:      "",
+			isPrefix: true,
+			expected: "/storage//",
+		},
+		{
+			name:     "empty val, prefix false",
+			prefix:   "/storage",
+			val:      "",
+			isPrefix: false,
+			expected: "/storage/",
+		},
+		{
+			name:     "with subpath, prefix true",
+			prefix:   "/storage",
+			val:      "folder/object",
+			isPrefix: true,
+			expected: "/storage/folder/object/",
+		},
+		{
+			name:     "with subpath, prefix false",
+			prefix:   "/storage",
+			val:      "folder/object",
+			isPrefix: false,
+			expected: "/storage/folder/object",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dn := namer.NewDefaultNamer(tt.prefix, nil, nil)
+			result := dn.Prefix(tt.val, tt.isPrefix)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

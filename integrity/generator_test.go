@@ -64,6 +64,24 @@ func (m *mockSigner) Sign(data []byte) ([]byte, error) {
 	return []byte("mock-signature-" + m.name), nil
 }
 
+type mockFailingTypedMarshaller[T any] struct {
+	marshalErr   error
+	unmarshalErr error
+}
+
+func (m *mockFailingTypedMarshaller[T]) Marshal(data T) ([]byte, error) {
+	if m.marshalErr != nil {
+		return nil, m.marshalErr
+	}
+
+	return []byte("marshalled"), nil
+}
+
+func (m *mockFailingTypedMarshaller[T]) Unmarshal(data []byte) (T, error) {
+	var zero T
+	return zero, m.unmarshalErr
+}
+
 // Helper functions for creating mock instances.
 func newMockHasher(name string) *mockHasher {
 	return &mockHasher{
@@ -326,6 +344,25 @@ func TestGeneratorGenerate_ErrorSignerReturnsError(t *testing.T) {
 	_, err := generator.Generate("my-object", value)
 
 	assert.ErrorAs(t, err, &integrity.FailedToGenerateSignatureError{})
+}
+
+func TestGeneratorGenerate_ErrorMarshallerReturnsError(t *testing.T) {
+	t.Parallel()
+
+	generator := integrity.NewGenerator[SimpleStruct](
+		namer.NewDefaultNamer("test", []string{}, []string{}),
+		&mockFailingTypedMarshaller[SimpleStruct]{
+			marshalErr:   errors.New("marshal error"),
+			unmarshalErr: nil,
+		},
+		nil,
+		nil,
+	)
+
+	value := SimpleStruct{Name: "test", Value: 42}
+	_, err := generator.Generate("my-object", value)
+
+	assert.ErrorAs(t, err, &integrity.FailedToMarshalValueError{})
 }
 
 func TestGeneratorGenerate_ErrorInvalidName(t *testing.T) {

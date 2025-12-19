@@ -78,13 +78,13 @@ func createTestDriver(t *testing.T) (*etcddriver.Driver, func()) {
 func testKey(t *testing.T, prefix string) []byte {
 	t.Helper()
 
-	return []byte("/test/" + prefix + "/" + t.Name())
+	return []byte("/" + t.Name() + "/" + prefix)
 }
 
 func testNestedKey(t *testing.T, prefix, suffix string) []byte {
 	t.Helper()
 
-	return []byte(strings.Join([]string{"/test", prefix, t.Name(), suffix}, "/"))
+	return []byte("/" + strings.Join([]string{t.Name(), prefix, suffix}, "/"))
 }
 
 // putValue is a helper that puts a key-value pair and fails the test on error.
@@ -157,6 +157,27 @@ func TestEtcdDriver_Get(t *testing.T) {
 	assert.Equal(t, key, retrievedKv.Key, "Returned key should match requested key")
 	assert.Equal(t, value, retrievedKv.Value, "Returned value should match stored value")
 	assert.Positive(t, retrievedKv.ModRevision, "ModRevision should be greater than 0")
+}
+
+func TestEtcdDriver_GetPrefix(t *testing.T) {
+	ctx := context.Background()
+
+	driver, cleanup := createTestDriver(t)
+	defer cleanup()
+
+	key := testKey(t, "get")
+	value := []byte("get-test-value")
+
+	putValue(ctx, t, driver, append(key, []byte("/123")...), value)
+	putValue(ctx, t, driver, append(key, []byte("/124")...), value)
+
+	response, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Get(append(key, []byte("/")...)),
+	}, nil)
+	require.NoError(t, err, "Get operation failed")
+	assert.True(t, response.Succeeded, "Get operation should succeed")
+	require.Len(t, response.Results, 1, "Get operation should return one result")
+	require.Len(t, response.Results[0].Values, 2, "Get operation should return one value")
 }
 
 func TestEtcdDriver_Delete(t *testing.T) {

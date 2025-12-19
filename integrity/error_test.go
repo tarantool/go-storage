@@ -1,4 +1,3 @@
-// Package integrity provides integrity storage.
 package integrity //nolint:testpackage
 
 import (
@@ -440,6 +439,13 @@ func TestFailedToValidateAggregatedError_Finalize(t *testing.T) {
 		finalizedErr := aggErr.Finalize()
 		assert.Equal(t, "aggregated error: error1, error2", finalizedErr.Error())
 	})
+}
+
+func TestInvalidNameError_Error(t *testing.T) {
+	t.Parallel()
+
+	err := InvalidNameError{name: "name"}
+	require.Equal(t, "invalid name: name", err.Error())
 }
 
 func TestErrorWrapping(t *testing.T) {

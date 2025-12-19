@@ -90,3 +90,13 @@ func TestRsaSignVerify(t *testing.T) {
 	err = rsapss.Verify(data, sig)
 	require.NoError(t, err, "Verify must be successful")
 }
+
+func TestRSAPSS_Name(t *testing.T) {
+	t.Parallel()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	rsapss := crypto.NewRSAPSS(*privateKey, privateKey.PublicKey)
+	require.Equal(t, "RSASSA-PSS", rsapss.Name())
+}

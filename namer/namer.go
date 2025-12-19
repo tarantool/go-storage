@@ -2,7 +2,6 @@
 package namer
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -17,6 +16,7 @@ type Namer interface {
 	GenerateNames(name string) ([]Key, error)
 	ParseKey(name string) (DefaultKey, error)
 	ParseKeys(names []string, ignoreError bool) (Results, error)
+	Prefix(val string, isPrefix bool) string
 }
 
 // DefaultNamer represents default namer.
@@ -27,7 +27,7 @@ type DefaultNamer struct {
 }
 
 // NewDefaultNamer returns new DefaultNamer object with hash/signature names configuration.
-func NewDefaultNamer(prefix string, hashNames []string, sigNames []string) *DefaultNamer {
+func NewDefaultNamer(prefix string, hashNames []string, sigNames []string) Namer {
 	return &DefaultNamer{
 		prefix:    strings.Trim(prefix, "/"),
 		hashNames: hashNames,
@@ -53,7 +53,7 @@ func (n *DefaultNamer) GenerateNames(name string) ([]Key, error) {
 			name,
 			KeyTypeValue,
 			"",
-			fmt.Sprintf("/%s/%s", n.prefix, name),
+			n.join(name),
 		))
 
 	for _, hash := range n.hashNames {
@@ -62,7 +62,7 @@ func (n *DefaultNamer) GenerateNames(name string) ([]Key, error) {
 				name,
 				KeyTypeHash,
 				hash,
-				fmt.Sprintf("/%s/%s/%s/%s", n.prefix, hashName, hash, name),
+				n.join(hashName, hash, name),
 			),
 		)
 	}
@@ -73,7 +73,7 @@ func (n *DefaultNamer) GenerateNames(name string) ([]Key, error) {
 				name,
 				KeyTypeSignature,
 				sig,
-				fmt.Sprintf("/%s/%s/%s/%s", n.prefix, signatureName, sig, name),
+				n.join(signatureName, sig, name),
 			),
 		)
 	}
@@ -124,6 +124,41 @@ func (n *DefaultNamer) ParseKeys(names []string, ignoreError bool) (Results, err
 	}
 
 	return NewResults(out), nil
+}
+
+// Prefix returns the prefix used by this namer.
+func (n *DefaultNamer) Prefix(val string, isPrefix bool) string {
+	suffix := strings.Trim(val, "/")
+
+	var builder strings.Builder
+
+	builder.WriteByte('/')
+
+	if n.prefix != "" {
+		builder.WriteString(n.prefix)
+		builder.WriteByte('/')
+	}
+
+	builder.WriteString(suffix)
+
+	if isPrefix {
+		builder.WriteByte('/')
+	}
+
+	return builder.String()
+}
+
+func (n *DefaultNamer) join(elems ...string) string {
+	var parts []string
+
+	parts = append(parts, "")
+	if n.prefix != "" {
+		parts = append(parts, n.prefix)
+	}
+
+	parts = append(parts, elems...)
+
+	return strings.Join(parts, "/")
 }
 
 // parseSignatureKey parses a signature key from name parts.

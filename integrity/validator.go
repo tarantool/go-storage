@@ -3,6 +3,8 @@ package integrity
 import (
 	"bytes"
 
+	"github.com/tarantool/go-option"
+
 	"github.com/tarantool/go-storage/crypto"
 	"github.com/tarantool/go-storage/hasher"
 	"github.com/tarantool/go-storage/kv"
@@ -12,7 +14,7 @@ import (
 
 // Validator verifies integrity-protected key-value pairs.
 type Validator[T any] struct {
-	namer      *namer.DefaultNamer
+	namer      namer.Namer
 	marshaller marshaller.TypedMarshaller[T]
 	hashers    map[string]hasher.Hasher
 	verifiers  map[string]crypto.Verifier
@@ -20,7 +22,7 @@ type Validator[T any] struct {
 
 // NewValidator creates a new Validator instance.
 func NewValidator[T any](
-	namer *namer.DefaultNamer,
+	namer namer.Namer,
 	marshaller marshaller.TypedMarshaller[T],
 	hashers []hasher.Hasher,
 	verifiers []crypto.Verifier,
@@ -41,14 +43,6 @@ func NewValidator[T any](
 		hashers:    hasherMap,
 		verifiers:  verifierMap,
 	}
-}
-
-// ValidateResult represents the result of validating a single object.
-type ValidateResult[T any] struct {
-	Name     string
-	HasValue bool
-	Value    T
-	Error    error
 }
 
 type extendedKV struct {
@@ -96,17 +90,16 @@ func (v Validator[T]) constructVerifiers() map[string]crypto.Verifier {
 	return out
 }
 
-func (v Validator[T]) validateSingle(name string, kvs []extendedKV) ValidateResult[T] {
+func (v Validator[T]) validateSingle(name string, kvs []extendedKV) ValidatedResult[T] {
 	expectedHashers := v.constructHashers()
 	expectedVerifiers := v.constructVerifiers()
 
 	aggregatedError := &FailedToValidateAggregatedError{parent: nil}
 
-	output := ValidateResult[T]{
-		Name:     name,
-		HasValue: false,
-		Value:    zero[T](),
-		Error:    nil,
+	output := ValidatedResult[T]{
+		Name:  name,
+		Value: option.None[T](),
+		Error: nil,
 	}
 
 	var (
@@ -125,8 +118,7 @@ func (v Validator[T]) validateSingle(name string, kvs []extendedKV) ValidateResu
 			return output
 		}
 
-		output.HasValue = true
-		output.Value = val
+		output.Value = option.Some(val)
 		body = kvi.keyValue.Value
 	}
 
@@ -182,13 +174,13 @@ func (v Validator[T]) validateSingle(name string, kvs []extendedKV) ValidateResu
 }
 
 // Validate verifies integrity-protected key-value pairs and returns the validated value.
-func (v Validator[T]) Validate(kvs []kv.KeyValue) ([]ValidateResult[T], error) {
+func (v Validator[T]) Validate(kvs []kv.KeyValue) ([]ValidatedResult[T], error) {
 	parseKeyResult, err := v.aggregate(kvs)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]ValidateResult[T], 0, len(parseKeyResult))
+	out := make([]ValidatedResult[T], 0, len(parseKeyResult))
 	for name, keys := range parseKeyResult {
 		out = append(out, v.validateSingle(name, keys))
 	}
