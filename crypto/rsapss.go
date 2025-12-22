@@ -4,10 +4,17 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 
 	"github.com/tarantool/go-storage/hasher"
 )
+
+var (
+	ErrEmptyPrivateKey = errors.New("trying to sign without private key")
+)
+
+func zero[T any]() (out T) { return } //nolint:nonamedreturns
 
 // RSAPSS represents RSA PSS algo for signing/verification
 // (with SHA256 as digest calculation function).
@@ -18,11 +25,22 @@ type RSAPSS struct {
 	hasher     hasher.Hasher
 }
 
-// NewRSAPSS creates new RSAPSS object.
-func NewRSAPSS(privKey rsa.PrivateKey, pubKey rsa.PublicKey) RSAPSS {
+// NewRSAPSSSignerVerifier creates new RSAPSS object that can both sign and verify.
+// The public key is derived from the private key.
+func NewRSAPSSSignerVerifier(privKey rsa.PrivateKey) SignerVerifier {
+	return RSAPSS{
+		publicKey:  privKey.PublicKey,
+		privateKey: privKey,
+		hash:       crypto.SHA256,
+		hasher:     hasher.NewSHA256Hasher(),
+	}
+}
+
+// NewRSAPSSVerifier creates new RSAPSS object that can only verify signatures.
+func NewRSAPSSVerifier(pubKey rsa.PublicKey) Verifier {
 	return RSAPSS{
 		publicKey:  pubKey,
-		privateKey: privKey,
+		privateKey: zero[rsa.PrivateKey](),
 		hash:       crypto.SHA256,
 		hasher:     hasher.NewSHA256Hasher(),
 	}
@@ -30,11 +48,15 @@ func NewRSAPSS(privKey rsa.PrivateKey, pubKey rsa.PublicKey) RSAPSS {
 
 // Name implements SignerVerifier interface.
 func (r RSAPSS) Name() string {
-	return "RSASSA-PSS"
+	return "rsapss"
 }
 
 // Sign generates SHA-256 digest and signs it using RSASSA-PSS.
 func (r RSAPSS) Sign(data []byte) ([]byte, error) {
+	if r.privateKey.N == nil {
+		return nil, ErrEmptyPrivateKey
+	}
+
 	digest, err := r.hasher.Hash(data)
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to get hash: %w", err)
