@@ -3,6 +3,7 @@ package integrity_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -1752,4 +1753,44 @@ func TestTypedWatch(t *testing.T) {
 
 		driverMock.MinimockFinish()
 	})
+}
+
+func TestTypedDeletePrefix_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("my-object")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+
+	expectedOps := make([]operation.Operation, 0, len(keys))
+	for _, key := range keys {
+		fmt.Println(key.Build())
+		expectedOps = append(expectedOps, operation.Delete([]byte(key.Build())))
+	}
+
+	response := tx.Response{
+		Succeeded: true,
+		Results:   []tx.RequestResponse{},
+	}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		nil,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Delete(ctx, "/", integrity.WithPrefix)
+	require.NoError(t, err)
+
+	driverMock.MinimockFinish()
 }

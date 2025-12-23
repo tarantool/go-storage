@@ -23,6 +23,16 @@ type Typed[T any] struct {
 	namer namer.Namer
 }
 
+type deleteOptions struct {
+	prefixDelete bool
+}
+
+type OptionDelete func(*deleteOptions)
+
+func WithPrefix(deleteOpts *deleteOptions) {
+	deleteOpts.prefixDelete = true
+}
+
 func checkName(name string) bool {
 	switch {
 	case len(name) == 0:
@@ -151,8 +161,13 @@ func (t *Typed[T]) Put(ctx context.Context, name string, val T) error {
 }
 
 // Delete removes a named value and its integrity data from storage.
-func (t *Typed[T]) Delete(ctx context.Context, name string) error {
-	if !checkName(name) {
+func (t *Typed[T]) Delete(ctx context.Context, name string, opts ...OptionDelete) error {
+	optsDelete := &deleteOptions{}
+	for _, op := range opts {
+		op(optsDelete)
+	}
+
+	if !optsDelete.prefixDelete && !checkName(name) {
 		return ErrInvalidName
 	}
 

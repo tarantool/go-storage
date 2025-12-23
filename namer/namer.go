@@ -40,8 +40,6 @@ func (n *DefaultNamer) GenerateNames(name string) ([]Key, error) {
 	switch {
 	case name == "":
 		return nil, errInvalidName(name, "should not be empty")
-	case strings.HasSuffix(name, "/"):
-		return nil, errInvalidName(name, "should not be prefix")
 	}
 
 	name = strings.TrimPrefix(name, "/")
