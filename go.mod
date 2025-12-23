@@ -10,6 +10,7 @@ require (
 	github.com/tarantool/go-tarantool/v2 v2.4.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	go.etcd.io/etcd/api/v3 v3.6.5
+	go.etcd.io/etcd/client/pkg/v3 v3.6.5
 	go.etcd.io/etcd/client/v3 v3.6.5
 	go.etcd.io/etcd/tests/v3 v3.6.5
 	gopkg.in/yaml.v3 v3.0.1
@@ -65,7 +66,6 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.6.5 // indirect
 	go.etcd.io/etcd/etcdctl/v3 v3.6.5 // indirect
 	go.etcd.io/etcd/pkg/v3 v3.6.5 // indirect
 	go.etcd.io/etcd/server/v3 v3.6.5 // indirect

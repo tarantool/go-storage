@@ -15,10 +15,10 @@ import (
 
 	etcdclient "go.etcd.io/etcd/client/v3"
 	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
-	etcdintegration "go.etcd.io/etcd/tests/v3/integration"
 
 	"github.com/tarantool/go-storage/driver/etcd"
 	testingUtils "github.com/tarantool/go-storage/internal/testing"
+	etcdtestingUtils "github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 )
@@ -32,9 +32,9 @@ const (
 func createEtcdDriver(tb testing.TB) (*etcd.Driver, func()) {
 	tb.Helper()
 
-	etcdfintegration.BeforeTest(tb, etcdfintegration.WithoutGoLeakDetection())
+	etcdfintegration.BeforeTest(etcdtestingUtils.NewSilentTB(tb), etcdfintegration.WithoutGoLeakDetection())
 
-	cluster := etcdintegration.NewLazyCluster()
+	cluster := etcdtestingUtils.NewLazyCluster()
 
 	tb.Cleanup(func() { cluster.Terminate() })
 
