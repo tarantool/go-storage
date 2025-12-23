@@ -1,6 +1,8 @@
 package integrity
 
 import (
+	"fmt"
+
 	"github.com/tarantool/go-storage/crypto"
 	"github.com/tarantool/go-storage/hasher"
 	"github.com/tarantool/go-storage/kv"
@@ -27,6 +29,8 @@ func NewGenerator[T any](
 	for _, h := range hashers {
 		hasherMap[h.Name()] = h
 	}
+
+	fmt.Println(1)
 
 	signerMap := make(map[string]crypto.Signer)
 	for _, s := range signers {

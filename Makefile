@@ -21,13 +21,16 @@ testrace:
 coverage:
 	@echo "Running tests with coveralls"
 	go test -tags "$(TAGS)" $(shell go list ./... | grep -v test_helpers) \
-		-v -p 1 -covermode=atomic -coverprofile=$(COVERAGE_FILE) -count=1
+		-v -p 1 -covermode=atomic -coverprofile=$(COVERAGE_FILE).tmp -count=1
+	cat $(COVERAGE_FILE).tmp | grep -v 'internal/mocks/' | grep -v 'internal/testing' > $(COVERAGE_FILE)
 	go tool cover -func=$(COVERAGE_FILE)
 
 .PHONY: coveralls
 coveralls:
 	@echo "uploading coverage to coveralls"
-	@goveralls -coverprofile=$(COVERAGE_FILE) -service=github
+	@goveralls -coverprofile=$(COVERAGE_FILE) -service=github \
+		-ignore='internal/testing/*' -ignore='internal/mocks/*' -show \
+		-covermode=atomic
 
 .PHONY: coveralls-deps
 coveralls-deps:
