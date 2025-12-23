@@ -54,13 +54,15 @@ func TestValidatorValidate_Success(t *testing.T) {
 		verifiers,
 	)
 
+	var expectedModRevision int64 = 0x123
+
 	// Create plain []KeyValue without generator.
 	value := SimpleStruct{Name: "test", Value: 42}
 	kvs := []kv.KeyValue{
 		{
 			Key:         []byte("/test/my-object"),
 			Value:       []byte("name: test\nvalue: 42\n"),
-			ModRevision: 0,
+			ModRevision: expectedModRevision,
 		},
 		{
 			Key: []byte("/test/hash/sha256/my-object"),
@@ -68,12 +70,12 @@ func TestValidatorValidate_Success(t *testing.T) {
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
 			},
-			ModRevision: 0,
+			ModRevision: expectedModRevision,
 		},
 		{
 			Key:         []byte("/test/sig/rsa/my-object"),
 			Value:       []byte("mock-signature-rsa"),
-			ModRevision: 0,
+			ModRevision: expectedModRevision,
 		},
 	}
 
@@ -85,6 +87,7 @@ func TestValidatorValidate_Success(t *testing.T) {
 	result := validatedResults[0]
 	assert.Equal(t, "my-object", result.Name)
 	assert.True(t, result.Value.IsSome())
+	assert.Equal(t, expectedModRevision, result.ModRevision)
 
 	val, ok := result.Value.Get()
 	require.True(t, ok)

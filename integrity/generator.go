@@ -92,7 +92,7 @@ func (g Generator[T]) Generate(name string, value T) ([]kv.KeyValue, error) {
 		results = append(results, kv.KeyValue{
 			Key:         []byte(key.Build()),
 			Value:       valueData,
-			ModRevision: 0,
+			ModRevision: ModRevisionEmpty,
 		})
 	}
 
