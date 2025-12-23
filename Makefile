@@ -21,7 +21,8 @@ testrace:
 coverage:
 	@echo "Running tests with coveralls"
 	go test -tags "$(TAGS)" $(shell go list ./... | grep -v test_helpers) \
-		-v -p 1 -covermode=atomic -coverprofile=$(COVERAGE_FILE) -count=1
+		-v -coverprofile=$(COVERAGE_FILE).tmp -count=1 -covermode=atomic
+	cat $(COVERAGE_FILE).tmp | grep -v 'internal/mocks/' | grep -v 'internal/testing/' > $(COVERAGE_FILE)
 	go tool cover -func=$(COVERAGE_FILE)
 
 .PHONY: coveralls
