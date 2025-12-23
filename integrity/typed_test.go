@@ -204,6 +204,7 @@ func TestTypedGet_Success(t *testing.T) {
 	namedValue, err := typed.Get(ctx, "my-object")
 	require.NoError(t, err)
 	assert.Equal(t, "my-object", namedValue.Name)
+	assert.Equal(t, int64(integrity.ModRevisionEmpty), namedValue.ModRevision)
 	assert.True(t, namedValue.Value.IsSome())
 
 	val, ok := namedValue.Value.Get()
@@ -832,6 +833,7 @@ func TestTypedRange_Success(t *testing.T) {
 
 	for _, result := range results {
 		require.NoError(t, result.Error)
+		require.Equal(t, int64(integrity.ModRevisionEmpty), result.ModRevision)
 		require.True(t, result.Value.IsSome())
 
 		val, ok := result.Value.Get()
@@ -1752,4 +1754,61 @@ func TestTypedWatch(t *testing.T) {
 
 		driverMock.MinimockFinish()
 	})
+}
+
+func TestTypedGet_PassingModRevision(t *testing.T) {
+	t.Parallel()
+
+	var expectedModRevision int64 = 67
+
+	value := SimpleStruct{Name: "test", Value: 42}
+
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("my-object")
+	require.NoError(t, err)
+
+	generator := integrity.NewGenerator[SimpleStruct](
+		namerInstance,
+		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		nil,
+		nil,
+	)
+
+	expectedKVs, err := generator.Generate("my-object", value)
+	require.NoError(t, err)
+
+	expectedKVs[0].ModRevision = expectedModRevision
+
+	expectedOps := []operation.Operation{
+		operation.Get([]byte(keys[0].Build())),
+	}
+	response := tx.Response{
+		Succeeded: true,
+		Results: []tx.RequestResponse{
+			{
+				Values: []kv.KeyValue{expectedKVs[0]},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		nil,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	namedValue, err := typed.Get(ctx, "my-object")
+	require.NoError(t, err)
+	assert.Equal(t, expectedModRevision, namedValue.ModRevision)
+
+	driverMock.MinimockFinish()
 }

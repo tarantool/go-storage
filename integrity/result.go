@@ -6,7 +6,8 @@ import (
 
 // ValidatedResult represents a validated named value.
 type ValidatedResult[T any] struct {
-	Name  string
-	Value option.Generic[T]
-	Error error
+	Name        string
+	Value       option.Generic[T]
+	ModRevision int64
+	Error       error
 }
