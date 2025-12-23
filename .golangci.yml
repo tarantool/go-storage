@@ -41,6 +41,7 @@ linters:
       ignore-names:
         - tt
         - ok
+        - tb
       ignore-decls:
         - mc *minimock.Controller
         - t T
@@ -78,6 +79,9 @@ linters:
             - "github.com/vmihailenco/msgpack/v5"
             - "go.etcd.io/etcd/client/v3"
             - "gopkg.in/yaml.v3"
+            # for etcd LazyCluster reimplementation
+            - "go.etcd.io/etcd/client/pkg/v3"
+            - "go.etcd.io/etcd/tests/v3/"
         test:
           files:
             - "$test"

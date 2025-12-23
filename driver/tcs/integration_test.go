@@ -36,6 +36,10 @@ func createTestDriver(ctx context.Context, t *testing.T) (*tcs.Driver, func()) {
 		t.Skip("TCS is unsupported or Tarantool isn't found")
 	}
 
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
 	// Create connection pool.
 	instances := make([]pool.Instance, 0, len(tcsEndpoints))
 	for i, addr := range tcsEndpoints {

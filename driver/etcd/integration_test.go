@@ -18,9 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 	etcdclient "go.etcd.io/etcd/client/v3"
 	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
-	etcdintegration "go.etcd.io/etcd/tests/v3/integration"
 
 	etcddriver "github.com/tarantool/go-storage/driver/etcd"
+	"github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/kv"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
@@ -36,9 +36,13 @@ const (
 func createTestDriver(t *testing.T) (*etcddriver.Driver, func()) {
 	t.Helper()
 
-	etcdfintegration.BeforeTest(t, etcdfintegration.WithoutGoLeakDetection())
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
 
-	cluster := etcdintegration.NewLazyCluster()
+	etcdfintegration.BeforeTest(etcd.NewSilentTB(t), etcdfintegration.WithoutGoLeakDetection())
+
+	cluster := etcd.NewLazyCluster()
 
 	t.Cleanup(func() { cluster.Terminate() })
 
