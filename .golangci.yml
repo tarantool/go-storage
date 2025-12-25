@@ -90,6 +90,7 @@ linters:
             - "github.com/gojuno/minimock/v3"
             - "github.com/stretchr/testify"
             - "github.com/tarantool/go-iproto"
+            - "github.com/tarantool/go-option"
             - "github.com/tarantool/go-storage"
             - "github.com/tarantool/go-tarantool/v2"
             - "github.com/vmihailenco/msgpack/v5"

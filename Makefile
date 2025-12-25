@@ -10,7 +10,7 @@ codespell:
 .PHONY: test
 test:
 	@echo "Running tests"
-	@go test ./... -count=1 -v
+	@go test ./... -count=1 -v -tags=integration
 
 .PHONY: testrace
 testrace:
