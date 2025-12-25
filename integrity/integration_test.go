@@ -3,10 +3,14 @@ package integrity_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"flag"
 	"fmt"
+	"math/big"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,11 +23,17 @@ import (
 	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 
 	"github.com/tarantool/go-storage"
+	"github.com/tarantool/go-storage/crypto"
 	"github.com/tarantool/go-storage/driver"
 	etcddriver "github.com/tarantool/go-storage/driver/etcd"
 	tcsdriver "github.com/tarantool/go-storage/driver/tcs"
+	"github.com/tarantool/go-storage/hasher"
 	"github.com/tarantool/go-storage/integrity"
 	"github.com/tarantool/go-storage/internal/testing/etcd"
+	"github.com/tarantool/go-storage/marshaller"
+	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/watch"
 )
 
 // IntegrationStruct is a simple structure used for integration tests.
@@ -37,11 +47,32 @@ const (
 	testDialTimeout    = 5 * time.Second
 )
 
+const (
+	megabyte = 1048576
+	iterNums = 1000
+)
+
 var (
 	// TCS availability flags.
 	haveTCS      bool     //nolint:gochecknoglobals
 	tcsEndpoints []string //nolint:gochecknoglobals
 )
+
+func generateRandomString(t *testing.T, length int) string {
+	t.Helper()
+
+	charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	byteString := make([]byte, length)
+
+	for i := range length {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		require.NoError(t, err)
+
+		byteString[i] = charset[n.Int64()]
+	}
+
+	return string(byteString)
+}
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -183,14 +214,63 @@ func executeOnStorage(t *testing.T, testCallback func(t *testing.T, driver drive
 	}
 }
 
+type FillDataOptions struct {
+	Prefix  string
+	Names   []string
+	Records []IntegrationStruct
+	Hashers []hasher.Hasher
+	Signers []crypto.Signer
+}
+
+func fillData(t *testing.T, driverInstance driver.Driver, opts FillDataOptions) {
+	t.Helper()
+
+	ctx := t.Context()
+
+	require.Len(t, opts.Names, len(opts.Records))
+
+	hashersNames := make([]string, 0, len(opts.Hashers))
+	for _, h := range opts.Hashers {
+		hashersNames = append(hashersNames, h.Name())
+	}
+
+	signersNames := make([]string, 0, len(opts.Signers))
+	for _, s := range opts.Signers {
+		signersNames = append(signersNames, s.Name())
+	}
+
+	namerInstance := namer.NewDefaultNamer(opts.Prefix, hashersNames, signersNames)
+
+	generator := integrity.NewGenerator[IntegrationStruct](
+		namerInstance,
+		marshaller.NewTypedYamlMarshaller[IntegrationStruct](),
+		opts.Hashers,
+		opts.Signers,
+	)
+
+	putOps := make([]operation.Operation, 0)
+
+	for i, record := range opts.Records {
+		kvs, err := generator.Generate(opts.Names[i], record)
+		require.NoError(t, err)
+
+		for _, kv := range kvs {
+			putOps = append(putOps, operation.Put(kv.Key, kv.Value))
+		}
+	}
+
+	_, err := driverInstance.Execute(ctx, nil, putOps, nil)
+	require.NoError(t, err)
+}
+
 func TestTypedIntegration_GetPut(t *testing.T) {
 	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
 		t.Helper()
 
 		ctx := t.Context()
 
-		st := storage.NewStorage(driverInstance)
-		typed := integrity.NewTypedBuilder[IntegrationStruct](st).
+		stor := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
 			WithPrefix("/test").
 			Build()
 
@@ -207,5 +287,493 @@ func TestTypedIntegration_GetPut(t *testing.T) {
 		val, ok := result.Value.Get()
 		require.True(t, ok)
 		assert.Equal(t, value, val)
+	})
+}
+
+func TestTypedIntegration_Delete(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"my-object"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "test",
+					Value: 42,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		fillData(t, driverInstance, fillDataOptions)
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			Build()
+
+		err := typed.Delete(ctx, "my-object")
+		require.NoError(t, err, "Delete should succeed")
+
+		_, err = typed.Get(ctx, "my-object")
+		require.Error(t, err, "Get should fail")
+	})
+}
+
+func TestTypedIntegration_Get(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			Build()
+
+		_, err := typed.Get(ctx, "my-object")
+		require.Error(t, err, "Get should fail")
+	})
+}
+
+func TestTypedIntegration_Range(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"object1", "object2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+				{
+					Name:  "obj2",
+					Value: 200,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		fillData(t, driverInstance, fillDataOptions)
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			Build()
+
+		results, err := typed.Range(ctx, "")
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		foundObj1 := false
+		foundObj2 := false
+
+		for _, result := range results {
+			require.NoError(t, result.Error)
+			require.True(t, result.Value.IsSome())
+
+			val, ok := result.Value.Get()
+			require.True(t, ok)
+
+			if val.Name == "obj1" && val.Value == 100 {
+				foundObj1 = true
+
+				assert.Equal(t, "object1", result.Name)
+			} else if val.Name == "obj2" && val.Value == 200 {
+				foundObj2 = true
+
+				assert.Equal(t, "object2", result.Name)
+			}
+		}
+
+		assert.True(t, foundObj1, "object1 not found in results")
+		assert.True(t, foundObj2, "object2 not found in results")
+	})
+}
+
+func TestTypedIntegration_Watch(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"object1"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		fillData(t, driverInstance, fillDataOptions)
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			Build()
+
+		eventCh, err := typed.Watch(ctx, "object1")
+		require.NoError(t, err)
+
+		expectedEvents := []watch.Event{
+			{Prefix: []byte("/test/object1")},
+		}
+
+		err = typed.Delete(ctx, "object1")
+		require.NoError(t, err)
+
+		var receivedEvents []watch.Event
+
+	loop:
+		for range 1 {
+			select {
+			case e := <-eventCh:
+				receivedEvents = append(receivedEvents, e)
+			case <-time.After(100 * time.Millisecond):
+				break loop
+			}
+		}
+
+		require.Len(t, receivedEvents, 1)
+		assert.Equal(t, expectedEvents[0], receivedEvents[0])
+	})
+}
+
+func TestTypedIntegration_HashVerification(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+		typedSHA256Hasher := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithHasher(hasher.NewSHA256Hasher()).
+			Build()
+
+		typedSHA1Hasher := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithHasher(hasher.NewSHA1Hasher()).
+			Build()
+
+		value := IntegrationStruct{Name: "object1", Value: 100}
+
+		err := typedSHA256Hasher.Put(ctx, "obj1", value)
+		require.NoError(t, err)
+
+		// Same hasher.
+		result, err := typedSHA256Hasher.Get(ctx, "obj1")
+		require.NoError(t, err)
+		assert.Equal(t, "obj1", result.Name)
+		assert.True(t, result.Value.IsSome())
+
+		val, ok := result.Value.Get()
+		require.True(t, ok)
+		assert.Equal(t, value, val)
+
+		// Another hasher.
+		_, err = typedSHA1Hasher.Get(ctx, "obj1")
+		require.Error(t, err)
+	})
+}
+
+func TestTypedIntegration_SignatureVerification(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+
+		privateKey1, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		privateKey2, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		typed1 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey1)).
+			Build()
+
+		typed2 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey2)).
+			Build()
+
+		value := IntegrationStruct{Name: "object1", Value: 100}
+
+		err = typed1.Put(ctx, "obj1", value)
+		require.NoError(t, err)
+
+		// Same SignerVerifier.
+		result, err := typed1.Get(ctx, "obj1")
+		require.NoError(t, err)
+		assert.Equal(t, "obj1", result.Name)
+		assert.True(t, result.Value.IsSome())
+
+		val, ok := result.Value.Get()
+		require.True(t, ok)
+		assert.Equal(t, value, val)
+
+		// Another SignerVerifier.
+		_, err = typed2.Get(ctx, "obj1")
+		require.Error(t, err)
+	})
+}
+
+func TestTypedIntegration_CorruptedData(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+
+		privateKey1, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		privateKey2, err := rsa.GenerateKey(rand.Reader, 4096)
+		require.NoError(t, err)
+
+		typed1 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey1)).
+			WithHasher(hasher.NewSHA256Hasher()).
+			Build()
+
+		typed2 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey2)).
+			WithHasher(hasher.NewSHA1Hasher()).
+			Build()
+
+		value := IntegrationStruct{Name: "object1", Value: 100}
+
+		err = typed1.Put(ctx, "obj1", value)
+		require.NoError(t, err)
+
+		// Same SignerVerifier and Hasher.
+		result, err := typed1.Get(ctx, "obj1")
+		require.NoError(t, err)
+		assert.Equal(t, "obj1", result.Name)
+		assert.True(t, result.Value.IsSome())
+
+		val, ok := result.Value.Get()
+		require.True(t, ok)
+		assert.Equal(t, value, val)
+
+		// Another SignerVerifier and Hasher.
+		_, err = typed2.Get(ctx, "obj1")
+		require.Error(t, err)
+	})
+}
+
+func TestTypedIntegration_MissingHashOrSignature(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+
+		privateKey1, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		typed1 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey1)).
+			WithHasher(hasher.NewSHA256Hasher()).
+			Build()
+
+		typed2 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithHasher(hasher.NewSHA256Hasher()).
+			Build()
+
+		value := IntegrationStruct{Name: "object1", Value: 100}
+
+		err = typed2.Put(ctx, "obj1", value)
+		require.NoError(t, err)
+
+		_, err = typed1.Get(ctx, "obj1")
+		require.Error(t, err)
+	})
+}
+
+func TestTypedIntegration_ConcurrentAccess(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			Build()
+
+		const (
+			writers = 5
+			readers = 5
+			iters   = 1000
+		)
+
+		key := "shared-key"
+
+		var waitGr sync.WaitGroup
+
+		for range writers {
+			waitGr.Add(1)
+
+			go func() {
+				defer waitGr.Done()
+
+				for i := range iters {
+					value := IntegrationStruct{
+						Name:  fmt.Sprintf("object-%d", i),
+						Value: i,
+					}
+					err := typed.Put(ctx, key, value)
+					assert.NoError(t, err)
+				}
+			}()
+		}
+
+		for range readers {
+			waitGr.Add(1)
+
+			go func() {
+				defer waitGr.Done()
+
+				for range iters {
+					_, err := typed.Get(ctx, key)
+					if err != nil {
+						assert.ErrorIs(t, err, integrity.ErrNotFound)
+					}
+				}
+			}()
+		}
+
+		waitGr.Wait()
+	})
+}
+
+func TestTypedIntegration_ManyRequests(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+
+		privateKey1, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		typed1 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey1)).
+			WithHasher(hasher.NewSHA256Hasher()).
+			Build()
+
+		for iter := range iterNums {
+			value := IntegrationStruct{Name: fmt.Sprintf("object_%d", iter), Value: iter}
+			err := typed1.Put(ctx, fmt.Sprintf("obj_%d", iter), value)
+			require.NoError(t, err)
+		}
+
+		for iter := range iterNums {
+			value := IntegrationStruct{Name: fmt.Sprintf("object_%d", iter), Value: iter}
+			result, err := typed1.Get(ctx, fmt.Sprintf("obj_%d", iter))
+			require.NoError(t, err)
+
+			require.NoError(t, err)
+			assert.Equal(t, fmt.Sprintf("obj_%d", iter), result.Name)
+			assert.True(t, result.Value.IsSome())
+
+			val, ok := result.Value.Get()
+			require.True(t, ok)
+			assert.Equal(t, value, val)
+		}
+	})
+}
+
+func TestTypedIntegration_LargeValue(t *testing.T) {
+	testTypedLargeValue := func(t *testing.T, driverInstance driver.Driver, maxMemory int) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+
+		privateKey1, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		typed1 := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privateKey1)).
+			WithHasher(hasher.NewSHA256Hasher()).
+			Build()
+
+		value := IntegrationStruct{Name: generateRandomString(t, maxMemory), Value: 10}
+
+		err = typed1.Put(ctx, "big-object", value)
+		require.NoError(t, err)
+
+		result, err := typed1.Get(ctx, "big-object")
+		require.NoError(t, err)
+		assert.Equal(t, "big-object", result.Name)
+		assert.True(t, result.Value.IsSome())
+
+		val, ok := result.Value.Get()
+		require.True(t, ok)
+		assert.Equal(t, value, val)
+	}
+
+	t.Run("TCS", func(t *testing.T) {
+		driver, cleanup := createTcsTestDriver(t.Context(), t)
+		defer cleanup()
+
+		testTypedLargeValue(t, driver, megabyte/2)
+	})
+	t.Run("etcd", func(t *testing.T) {
+		driver, cleanup := createEtcdTestDriver(t.Context(), t)
+		defer cleanup()
+
+		testTypedLargeValue(t, driver, megabyte)
+	})
+}
+
+func TestTypedIntegration_SpecialNames(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		stor := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](stor).
+			WithPrefix("/test").
+			Build()
+
+		value := IntegrationStruct{Name: "obj", Value: 10}
+		names := []string{"ȵ_ț-object", "¼-Õ-object", "$%#!-object"}
+
+		for _, name := range names {
+			err := typed.Put(ctx, name, value)
+			require.NoError(t, err)
+		}
+
+		for _, name := range names {
+			result, err := typed.Get(ctx, name)
+			require.NoError(t, err)
+			assert.Equal(t, name, result.Name)
+			assert.True(t, result.Value.IsSome())
+
+			val, ok := result.Value.Get()
+			require.True(t, ok)
+			assert.Equal(t, value, val)
+		}
 	})
 }
