@@ -1027,7 +1027,7 @@ func TestTypedRange_WithIgnoreVerificationErrorButFailedToDecode(t *testing.T) {
 		ModRevision: 0,
 	}
 
-	expectedPrefix := "/test//"
+	expectedPrefix := "/test/"
 	expectedOps := []operation.Operation{
 		operation.Get([]byte(expectedPrefix)),
 	}

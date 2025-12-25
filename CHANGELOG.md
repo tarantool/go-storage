@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- namer.Namer: Fixed a bug where a double slash was placed at the end of a prefix (#41).
+
 ## [v1.0.0] - 2025-12-22
 
 The release introduces the initial version of the library.
