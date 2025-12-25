@@ -61,7 +61,7 @@ var (
 )
 
 func flattenResults(response tx.Response) []kv.KeyValue {
-	var kvs []kv.KeyValue
+	kvs := make([]kv.KeyValue, 0, len(response.Results))
 	for _, r := range response.Results {
 		kvs = append(kvs, r.Values...)
 	}
