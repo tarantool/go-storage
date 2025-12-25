@@ -291,7 +291,7 @@ func TestDefaultNamer_Prefix(t *testing.T) {
 			prefix:   "/storage",
 			val:      "",
 			isPrefix: true,
-			expected: "/storage//",
+			expected: "/storage/",
 		},
 		{
 			name:     "empty val, prefix false",

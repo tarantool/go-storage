@@ -139,10 +139,12 @@ func (n *DefaultNamer) Prefix(val string, isPrefix bool) string {
 		builder.WriteByte('/')
 	}
 
-	builder.WriteString(suffix)
+	if suffix != "" {
+		builder.WriteString(suffix)
 
-	if isPrefix {
-		builder.WriteByte('/')
+		if isPrefix {
+			builder.WriteByte('/')
+		}
 	}
 
 	return builder.String()
