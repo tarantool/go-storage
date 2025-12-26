@@ -11,6 +11,36 @@ $ cd go-storage
 $ go mod tidy
 ```
 
+## Branch naming conventions
+
+When creating feature branches, follow these naming patterns:
+
+- `<user.name>/gh-<issue-id>-short-description` (for GitHub issues)
+- `<user.name>/gh-no-short-description` (for work not tied to an issue)
+- `<user.name>/tntp-<issue-id>-short-description` (for TNTP issues)
+
+For release branches, use:
+
+- `<user.name>/release-v<version>`
+
+Replace `<user.name>` with your Git username, `<issue-id>` with the issue
+number, and `<short-description>` with a brief description using lowercase,
+hyphen-separated words, do not use any symbols except numbers, letters and
+dashes.
+
+Examples from existing branches:
+
+- `bigbes/gh-22-redo-rsapsa-api`
+- `bigbes/tntp-4191-implement-storage`
+- `elhimov/tntp-4169-base-ci`
+- `patapenka-alexey/tntp-4190-namer`
+- `bigbes/release-v1.0.0`
+
+For more examples, look at existing branches by running `git branch`.
+
+Although working on features without opened issue is possible - avoid that at
+all costs.
+
 ## Running tests
 
 ```bash
@@ -24,6 +54,22 @@ make testrace
 go test ./driver/etcd
 ```
 
+### Test naming conventions
+
+Follow these patterns when naming test functions:
+
+```go
+// Unit test naming patterns
+Test<FunctionName>_<Description>
+Test<StructName>_<Method>_<Description>
+Test<StructName><Method>_<Description>
+
+// Integration test naming patterns (all above plus)
+Test<Description>
+```
+
+Examples from the codebase: `TestTypedGet_PassingModRevision`,
+`TestEtcdDriver_Put`, `TestTCSDriver_ValueEqualPredicate`.
 
 ### Integration tests
 
@@ -129,6 +175,20 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) style:
 - `chore:` for maintenance tasks
 
 Example: `feat: add support for etcd lease operations`
+
+### Referencing issues in commit messages
+
+When referencing issues in commit messages, use the appropriate prefix:
+
+- For GitHub issues: Use `Closes #<issue-no>`, `Relates to #<issue-no>`,
+  `Related to #<issue-no>`, or `Part of #<issue-no>` in the commit body
+  to automatically link the commit to the issue.
+- For TNTP issues: Use `Closes TNTP-<issue-no>`, `Relates to TNTP-<issue-no>`,
+  `Related to TNTP-<issue-no>`, or `Part of TNTP-<issue-no>`
+  (note: use `TNTP-` prefix instead of `#`).
+
+Place these references in the commit body, not the subject line. These
+references are used by automation to track issue status.
 
 ## Pull request process
 
