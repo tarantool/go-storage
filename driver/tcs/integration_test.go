@@ -177,6 +177,51 @@ func TestTCSDriver_Delete(t *testing.T) {
 	assert.Positive(t, response.Results[0].Values[0].ModRevision, "ModRevision should be greater than 0")
 }
 
+func TestTCSDriver_DeletePrefix(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	driver, done := createTestDriver(ctx, t)
+	defer done()
+
+	key := testKey(t, "delete")
+	defer cleanupTestKey(ctx, driver, key)
+
+	value := []byte("delete-test-value")
+
+	_, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Put(append(key, []byte("/obj1")...), value),
+	}, nil)
+	require.NoError(t, err)
+
+	_, err = driver.Execute(ctx, nil, []operation.Operation{
+		operation.Put(append(key, []byte("/obj2")...), value),
+	}, nil)
+	require.NoError(t, err)
+
+	response, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Delete(append(key, []byte("/")...), operation.Option{WithPrefix: true}),
+	}, nil)
+
+	require.NoError(t, err, "Delete operation failed")
+	assert.True(t, response.Succeeded, "Delete operation should succeed")
+
+	response, err = driver.Execute(ctx, nil, []operation.Operation{
+		operation.Get(append(key, []byte("/obj1")...)),
+	}, nil)
+
+	require.NoError(t, err, "Get operation failed")
+	require.Empty(t, response.Results[0].Values, "Get operation have any result")
+
+	response, err = driver.Execute(ctx, nil, []operation.Operation{
+		operation.Get(append(key, []byte("/obj2")...)),
+	}, nil)
+
+	require.NoError(t, err, "Get operation failed")
+	require.Empty(t, response.Results[0].Values, "Get operation have any result")
+}
+
 func TestTCSDriver_GetAfterDelete(t *testing.T) {
 	t.Parallel()
 

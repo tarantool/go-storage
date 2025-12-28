@@ -182,7 +182,7 @@ func TestTypedGet_Success(t *testing.T) {
 	require.Len(t, expectedKVs, 1)
 
 	expectedOps := []operation.Operation{
-		operation.Get([]byte(keys[0].Build())),
+		operation.Get([]byte(keys[0].Build()), operation.Option{WithPrefix: false}),
 	}
 	response := tx.Response{
 		Succeeded: true,
@@ -214,6 +214,65 @@ func TestTypedGet_Success(t *testing.T) {
 	driverMock.MinimockFinish()
 }
 
+func TestTypedGetPrefix_Success(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("my-object")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+
+	generator := integrity.NewGenerator[SimpleStruct](
+		namerInstance,
+		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		nil,
+		nil,
+	)
+	value := SimpleStruct{Name: "test", Value: 42}
+	expectedKVs, err := generator.Generate("my-object", value)
+	require.NoError(t, err)
+	require.Len(t, expectedKVs, 1)
+
+	expectedOps := []operation.Operation{
+		operation.Get([]byte("/test/"), operation.Option{WithPrefix: true}),
+	}
+	response := tx.Response{
+		Succeeded: true,
+		Results: []tx.RequestResponse{
+			{
+				Values: []kv.KeyValue{expectedKVs[0]},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		nil,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	namedValue, err := typed.Get(ctx, "", integrity.WithPrefixGet())
+	require.NoError(t, err)
+	assert.Equal(t, "my-object", namedValue.Name)
+	assert.Equal(t, int64(integrity.ModRevisionEmpty), namedValue.ModRevision)
+	assert.True(t, namedValue.Value.IsSome())
+
+	val, ok := namedValue.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, value, val)
+
+	driverMock.MinimockFinish()
+}
+
 func TestTypedGet_ExecutionError(t *testing.T) {
 	t.Parallel()
 
@@ -232,7 +291,7 @@ func TestTypedGet_ExecutionError(t *testing.T) {
 
 	expectedOps := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		expectedOps = append(expectedOps, operation.Get([]byte(key.Build())))
+		expectedOps = append(expectedOps, operation.Get([]byte(key.Build()), operation.Option{WithPrefix: false}))
 	}
 
 	expectedError := errors.New("driver execution failed")
@@ -269,7 +328,7 @@ func TestTypedGet_NotFound(t *testing.T) {
 
 	expectedOps := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		expectedOps = append(expectedOps, operation.Get([]byte(key.Build())))
+		expectedOps = append(expectedOps, operation.Get([]byte(key.Build()), operation.Option{WithPrefix: false}))
 	}
 
 	response := tx.Response{
@@ -325,7 +384,7 @@ func TestTypedGet_VerificationError(t *testing.T) {
 
 	expectedOps := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		expectedOps = append(expectedOps, operation.Get([]byte(key.Build())))
+		expectedOps = append(expectedOps, operation.Get([]byte(key.Build()), operation.Option{WithPrefix: false}))
 	}
 
 	response := tx.Response{
@@ -385,7 +444,7 @@ func TestTypedGet_WithIgnoreVerificationError(t *testing.T) {
 
 	expectedOps := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		expectedOps = append(expectedOps, operation.Get([]byte(key.Build())))
+		expectedOps = append(expectedOps, operation.Get([]byte(key.Build()), operation.Option{WithPrefix: false}))
 	}
 
 	response := tx.Response{
@@ -481,7 +540,7 @@ func TestTypedDelete_Success(t *testing.T) {
 
 	expectedOps := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		expectedOps = append(expectedOps, operation.Delete([]byte(key.Build())))
+		expectedOps = append(expectedOps, operation.Delete([]byte(key.Build()), operation.Option{WithPrefix: false}))
 	}
 
 	response := tx.Response{
@@ -497,6 +556,45 @@ func TestTypedDelete_Success(t *testing.T) {
 	).Return(response, nil)
 
 	err = typed.Delete(ctx, "my-object")
+	require.NoError(t, err)
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedDeletePrefix_Success(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("my-object")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+
+	expectedOps := make([]operation.Operation, 0, len(keys))
+	for range keys {
+		expectedOps = append(expectedOps, operation.Delete([]byte("/test/"), operation.Option{WithPrefix: true}))
+	}
+
+	response := tx.Response{
+		Succeeded: true,
+		Results:   []tx.RequestResponse{},
+	}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		nil,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Delete(ctx, "", integrity.WithPrefixDelete())
 	require.NoError(t, err)
 
 	driverMock.MinimockFinish()
@@ -529,7 +627,7 @@ func TestTypedGet_WithIgnoreMoreThanOneResult(t *testing.T) {
 	require.Len(t, expectedKVs, 1)
 
 	expectedOps := []operation.Operation{
-		operation.Get([]byte(keys[0].Build())),
+		operation.Get([]byte(keys[0].Build()), operation.Option{WithPrefix: false}),
 	}
 	response := tx.Response{
 		Succeeded: true,
@@ -730,7 +828,7 @@ func TestTypedDelete_TransactionExecutionError(t *testing.T) {
 
 	expectedOps := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		expectedOps = append(expectedOps, operation.Delete([]byte(key.Build())))
+		expectedOps = append(expectedOps, operation.Delete([]byte(key.Build()), operation.Option{WithPrefix: false}))
 	}
 
 	expectedError := errors.New("driver execution failed")
@@ -1098,7 +1196,7 @@ func TestTypedGet_WithHasher(t *testing.T) {
 	for _, key := range keys {
 		keyStr := key.Build()
 
-		expectedOps = append(expectedOps, operation.Get([]byte(keyStr)))
+		expectedOps = append(expectedOps, operation.Get([]byte(keyStr), operation.Option{WithPrefix: false}))
 
 		kvPair, ok := kvMap[keyStr]
 		require.True(t, ok, "missing expected KV for key %s", keyStr)
@@ -1174,7 +1272,7 @@ func TestTypedGet_WithHasherAndNamer(t *testing.T) {
 	for _, key := range keys {
 		keyStr := key.Build()
 
-		expectedOps = append(expectedOps, operation.Get([]byte(keyStr)))
+		expectedOps = append(expectedOps, operation.Get([]byte(keyStr), operation.Option{WithPrefix: false}))
 
 		kvPair, ok := kvMap[keyStr]
 		require.True(t, ok, "missing expected KV for key %s", keyStr)
@@ -1304,7 +1402,7 @@ func TestTypedGet_WithVerifier(t *testing.T) {
 	for _, key := range keys {
 		keyStr := key.Build()
 
-		expectedOps = append(expectedOps, operation.Get([]byte(keyStr)))
+		expectedOps = append(expectedOps, operation.Get([]byte(keyStr), operation.Option{WithPrefix: false}))
 
 		kvPair, ok := kvMap[keyStr]
 		require.True(t, ok, "missing expected KV for key %s", keyStr)
@@ -1787,7 +1885,7 @@ func TestTypedGet_PassingModRevision(t *testing.T) {
 	expectedKVs[0].ModRevision = expectedModRevision
 
 	expectedOps := []operation.Operation{
-		operation.Get([]byte(keys[0].Build())),
+		operation.Get([]byte(keys[0].Build()), operation.Option{WithPrefix: false}),
 	}
 	response := tx.Response{
 		Succeeded: true,

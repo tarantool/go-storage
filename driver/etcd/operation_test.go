@@ -11,6 +11,40 @@ import (
 	"github.com/tarantool/go-storage/operation"
 )
 
+func TestOptionsToEtcdOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		opts         []operation.Option
+		expectedOpts int
+	}{
+		{
+			name: "delete options with prefix",
+			opts: []operation.Option{
+				{
+					WithPrefix: true,
+				},
+			},
+			expectedOpts: 1,
+		},
+		{
+			name:         "empty options",
+			opts:         []operation.Option{},
+			expectedOpts: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			etcdOpts := optionsToEtcdOptions(tt.opts)
+			require.Len(t, etcdOpts, tt.expectedOpts)
+		})
+	}
+}
+
 func TestOperationsToEtcdOps(t *testing.T) {
 	t.Parallel()
 

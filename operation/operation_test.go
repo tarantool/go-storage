@@ -24,7 +24,7 @@ func TestGetWithOptions(t *testing.T) {
 	t.Parallel()
 
 	key := []byte("test-key")
-	op := operation.Get(key, operation.Option{}, operation.Option{})
+	op := operation.Get(key, operation.Option{WithPrefix: false}, operation.Option{WithPrefix: false})
 
 	assert.Equal(t, operation.TypeGet, op.Type())
 	assert.Equal(t, key, op.Key())
@@ -50,7 +50,7 @@ func TestPutWithOptions(t *testing.T) {
 
 	key := []byte("test-key")
 	value := []byte("test-value")
-	op := operation.Put(key, value, operation.Option{}, operation.Option{})
+	op := operation.Put(key, value, operation.Option{WithPrefix: false}, operation.Option{WithPrefix: false})
 
 	assert.Equal(t, operation.TypePut, op.Type())
 	assert.Equal(t, key, op.Key())
@@ -74,7 +74,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	t.Parallel()
 
 	key := []byte("test-key")
-	op := operation.Delete(key, operation.Option{}, operation.Option{})
+	op := operation.Delete(key, operation.Option{WithPrefix: false}, operation.Option{WithPrefix: false})
 
 	assert.Equal(t, operation.TypeDelete, op.Type())
 	assert.Equal(t, key, op.Key())

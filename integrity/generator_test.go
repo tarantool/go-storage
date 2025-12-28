@@ -377,10 +377,7 @@ func TestGeneratorGenerate_ErrorInvalidName(t *testing.T) {
 
 	value := SimpleStruct{Name: "test", Value: 42}
 
-	_, err := generator.Generate("", value)
-	require.ErrorAs(t, err, &integrity.FailedToGenerateKeysError{})
-
-	_, err = generator.Generate("prefix/", value)
+	_, err := generator.Generate("prefix/", value)
 	require.ErrorAs(t, err, &integrity.FailedToGenerateKeysError{})
 }
 

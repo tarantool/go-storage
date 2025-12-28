@@ -8,6 +8,18 @@ import (
 	"github.com/tarantool/go-storage/operation"
 )
 
+func optionsToEtcdOptions(opts []operation.Option) []etcd.OpOption {
+	etcdOpts := make([]etcd.OpOption, 0, len(opts))
+
+	for _, opt := range opts {
+		if opt.WithPrefix {
+			etcdOpts = append(etcdOpts, etcd.WithPrefix())
+		}
+	}
+
+	return etcdOpts
+}
+
 // operationsToEtcdOps converts operations to etcd operations.
 func operationsToEtcdOps(ops []operation.Operation) ([]etcd.Op, error) {
 	etcdOps := make([]etcd.Op, 0, len(ops))
@@ -27,10 +39,7 @@ func operationsToEtcdOps(ops []operation.Operation) ([]etcd.Op, error) {
 func operationToEtcdOp(storageOperation operation.Operation) (etcd.Op, error) {
 	key := string(storageOperation.Key())
 
-	var ops []etcd.OpOption
-	if storageOperation.IsPrefix() {
-		ops = append(ops, etcd.WithPrefix())
-	}
+	ops := optionsToEtcdOptions(storageOperation.Options())
 
 	switch storageOperation.Type() {
 	case operation.TypeGet:

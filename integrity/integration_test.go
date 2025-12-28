@@ -209,3 +209,102 @@ func TestTypedIntegration_GetPut(t *testing.T) {
 		assert.Equal(t, value, val)
 	})
 }
+
+// Etcd return ErrNotFound if value was deleted.
+func TestTypedIntegrationEtcd_DeletePrefix(t *testing.T) {
+	ctx := t.Context()
+
+	driverInstance, cleanup := createEtcdTestDriver(ctx, t)
+	defer cleanup()
+
+	st := storage.NewStorage(driverInstance)
+	typed := integrity.NewTypedBuilder[IntegrationStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	value := IntegrationStruct{Name: "test", Value: 42}
+	err := typed.Put(ctx, "object-1", value)
+	require.NoError(t, err, "Put should succeed")
+
+	err = typed.Put(ctx, "kbject-2", value)
+	require.NoError(t, err, "Put should succeed")
+
+	err = typed.Delete(ctx, "o", integrity.WithPrefixDelete())
+	require.NoError(t, err, "Delete should succeed")
+
+	_, err = typed.Get(ctx, "object-1")
+	require.ErrorIs(t, err, integrity.ErrNotFound, "Get should return not found error after Delete")
+
+	result, err := typed.Get(ctx, "kbject-2")
+	require.NoError(t, err, "Get should succeed after Put")
+	assert.Equal(t, "kbject-2", result.Name)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, value, val)
+}
+
+// TCS return nil if value was deleted.
+func TestTypedIntegrationTCS_DeletePrefix(t *testing.T) {
+	ctx := t.Context()
+
+	driverInstance, cleanup := createTcsTestDriver(ctx, t)
+	defer cleanup()
+
+	st := storage.NewStorage(driverInstance)
+	typed := integrity.NewTypedBuilder[IntegrationStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	value := IntegrationStruct{Name: "test", Value: 42}
+	err := typed.Put(ctx, "object-1", value)
+	require.NoError(t, err, "Put should succeed")
+
+	err = typed.Put(ctx, "kbject-2", value)
+	require.NoError(t, err, "Put should succeed")
+
+	err = typed.Delete(ctx, "o", integrity.WithPrefixDelete())
+	require.NoError(t, err, "Delete should succeed")
+
+	_, err = typed.Get(ctx, "object-1")
+	require.NoError(t, err, "Get should return nil after Delete")
+
+	result, err := typed.Get(ctx, "kbject-2")
+	require.NoError(t, err, "Get should succeed after Put")
+	assert.Equal(t, "kbject-2", result.Name)
+	assert.True(t, result.Value.IsSome())
+
+	val, ok := result.Value.Get()
+	require.True(t, ok)
+	assert.Equal(t, value, val)
+}
+
+func TestTypedIntegration_GetPrefix(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+
+		st := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](st).
+			WithPrefix("/test").
+			Build()
+
+		value := IntegrationStruct{Name: "test", Value: 42}
+
+		err := typed.Put(ctx, "object-1", value)
+		require.NoError(t, err, "Put should succeed")
+
+		err = typed.Put(ctx, "object-2", value)
+		require.NoError(t, err, "Put should succeed")
+
+		result, err := typed.Get(ctx, "", integrity.WithPrefixGet())
+		require.ErrorIs(t, err, integrity.ErrMoreThanOneResult, "Get should succeed after Put")
+
+		require.Empty(t, result.Name)
+		require.Equal(t, int64(integrity.ModRevisionEmpty), result.ModRevision)
+		require.NoError(t, result.Error)
+		require.False(t, result.Value.IsSome())
+	})
+}

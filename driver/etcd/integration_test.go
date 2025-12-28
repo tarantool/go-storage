@@ -176,7 +176,7 @@ func TestEtcdDriver_GetPrefix(t *testing.T) {
 	putValue(ctx, t, driver, append(key, []byte("/124")...), value)
 
 	response, err := driver.Execute(ctx, nil, []operation.Operation{
-		operation.Get(append(key, []byte("/")...)),
+		operation.Get(append(key, []byte("/")...), operation.Option{WithPrefix: true}),
 	}, nil)
 	require.NoError(t, err, "Get operation failed")
 	assert.True(t, response.Succeeded, "Get operation should succeed")
@@ -200,6 +200,40 @@ func TestEtcdDriver_Delete(t *testing.T) {
 	assert.Equal(t, key, deletedKv.Key, "Returned key should match deleted key")
 	assert.Equal(t, value, deletedKv.Value, "Returned value should match deleted value")
 	assert.Positive(t, deletedKv.ModRevision, "ModRevision should be greater than 0")
+}
+
+func TestEtcdDriver_DeletePrefix(t *testing.T) {
+	ctx := context.Background()
+
+	driver, cleanup := createTestDriver(t)
+	defer cleanup()
+
+	key := testKey(t, "delete")
+	value := []byte("delete-test-value")
+
+	putValue(ctx, t, driver, append(key, []byte("/obj1")...), value)
+	putValue(ctx, t, driver, append(key, []byte("/obj2")...), value)
+
+	response, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Delete(append(key, []byte("/")...), operation.Option{WithPrefix: true}),
+	}, nil)
+
+	require.NoError(t, err, "Delete operation failed")
+	assert.True(t, response.Succeeded, "Delete operation should succeed")
+
+	response, err = driver.Execute(ctx, nil, []operation.Operation{
+		operation.Get(append(key, []byte("/obj1")...)),
+	}, nil)
+
+	require.NoError(t, err, "Get operation failed")
+	require.Empty(t, response.Results[0].Values, "Get operation have any result")
+
+	response, err = driver.Execute(ctx, nil, []operation.Operation{
+		operation.Get(append(key, []byte("/obj2")...)),
+	}, nil)
+
+	require.NoError(t, err, "Get operation failed")
+	require.Empty(t, response.Results[0].Values, "Get operation have any result")
 }
 
 func TestEtcdDriver_ValueEqualPredicate(t *testing.T) {

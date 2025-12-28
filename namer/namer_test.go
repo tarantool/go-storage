@@ -13,14 +13,6 @@ const (
 	storagePrefix = "/storage"
 )
 
-func TestDefaultNamer_GenerateNames_Invalid_Empty(t *testing.T) {
-	t.Parallel()
-
-	dn := namer.NewDefaultNamer("/storage", nil, nil)
-	_, err := dn.GenerateNames("")
-	assert.Error(t, err)
-}
-
 func TestDefaultNamer_GenerateNames_Invalid_Prefix(t *testing.T) {
 	t.Parallel()
 

@@ -23,6 +23,38 @@ type Typed[T any] struct {
 	namer namer.Namer
 }
 
+func deleteOptionsToOption(deleteOps deleteOptions) operation.Option {
+	option := operation.Option{
+		WithPrefix: false,
+	}
+	if deleteOps.withPrefix {
+		option.WithPrefix = true
+	}
+
+	return option
+}
+
+func getOptionsToOption(getOps getOptions) operation.Option {
+	option := operation.Option{
+		WithPrefix: false,
+	}
+	if getOps.withPrefix {
+		option.WithPrefix = true
+	}
+
+	return option
+}
+
+type deleteOptions struct {
+	withPrefix bool
+}
+
+func WithPrefixDelete() options.OptionCallback[deleteOptions] {
+	return func(opts *deleteOptions) {
+		opts.withPrefix = true
+	}
+}
+
 func checkName(name string) bool {
 	switch {
 	case len(name) == 0:
@@ -41,6 +73,7 @@ func checkRangeName(name string) bool {
 type getOptions struct {
 	ignoreVerificationError bool
 	ignoreMoreThanOneResult bool
+	withPrefix              bool
 }
 
 func IgnoreVerificationError() options.OptionCallback[getOptions] {
@@ -52,6 +85,12 @@ func IgnoreVerificationError() options.OptionCallback[getOptions] {
 func IgnoreMoreThanOneResult() options.OptionCallback[getOptions] {
 	return func(opts *getOptions) {
 		opts.ignoreMoreThanOneResult = true
+	}
+}
+
+func WithPrefixGet() options.OptionCallback[getOptions] {
+	return func(opts *getOptions) {
+		opts.withPrefix = true
 	}
 }
 
@@ -75,11 +114,11 @@ func (t *Typed[T]) Get(
 	name string,
 	vOpts ...options.OptionCallback[getOptions],
 ) (ValidatedResult[T], error) {
-	if !checkName(name) {
+	opts := options.ApplyOptions[getOptions](nil, vOpts)
+
+	if !checkName(name) && !opts.withPrefix {
 		return ValidatedResult[T]{}, ErrInvalidName
 	}
-
-	opts := options.ApplyOptions[getOptions](nil, vOpts)
 
 	keys, err := t.namer.GenerateNames(name)
 	if err != nil {
@@ -88,7 +127,7 @@ func (t *Typed[T]) Get(
 
 	ops := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		ops = append(ops, operation.Get([]byte(key.Build())))
+		ops = append(ops, operation.Get([]byte(key.Build()), getOptionsToOption(opts)))
 	}
 
 	response, err := t.base.Tx(ctx).Then(ops...).Commit()
@@ -151,8 +190,10 @@ func (t *Typed[T]) Put(ctx context.Context, name string, val T) error {
 }
 
 // Delete removes a named value and its integrity data from storage.
-func (t *Typed[T]) Delete(ctx context.Context, name string) error {
-	if !checkName(name) {
+func (t *Typed[T]) Delete(ctx context.Context, name string, vOpts ...options.OptionCallback[deleteOptions]) error {
+	opts := options.ApplyOptions[deleteOptions](nil, vOpts)
+
+	if !opts.withPrefix && !checkName(name) {
 		return ErrInvalidName
 	}
 
@@ -163,7 +204,7 @@ func (t *Typed[T]) Delete(ctx context.Context, name string) error {
 
 	ops := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
-		ops = append(ops, operation.Delete([]byte(key.Build())))
+		ops = append(ops, operation.Delete([]byte(key.Build()), deleteOptionsToOption(opts)))
 	}
 
 	_, err = t.base.Tx(ctx).Then(ops...).Commit()
