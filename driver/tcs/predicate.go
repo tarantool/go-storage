@@ -86,7 +86,14 @@ func (p predicate) EncodeMsgpack(encoder *msgpack.Encoder) error {
 		return NewPredicateEncodingError("encode operator", err)
 	}
 
-	err = encoder.Encode(p.Value())
+	value := p.Value()
+	// TCS compares stored values as Lua strings; encoding []byte as msgpack bin
+	// causes a type mismatch in comparisons, so we encode it as string.
+	if b, ok := value.([]byte); ok {
+		value = string(b)
+	}
+
+	err = encoder.Encode(value)
 	if err != nil {
 		return NewPredicateEncodingError("encode value", err)
 	}

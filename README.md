@@ -215,10 +215,22 @@ func main() {
         WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privKey)). // adds RSA‑PSS signatures.
         Build()
 
-    // 4. Store a configuration object with automatic integrity data.
     ctx := context.Background()
+
+    // 4. Store a configuration object with automatic integrity data.
     config := MyConfig{Environment: "production", Timeout: 30}
     if err := typed.Put(ctx, "app/settings", config); err != nil {
+        log.Fatal(err)
+    }
+
+    // 4.5 Store an object using predicates.
+    p, _ := typed.ValueEqual(config)
+
+    if err := typed.Put(ctx,
+        "app/settings",
+        config,
+        integrity.WithPutPredicates(p),
+    ); err != nil {
         log.Fatal(err)
     }
 
@@ -258,7 +270,7 @@ type MyConfig struct {
   signatures; invalid data is reported.
 - Configurable Algorithms: Plug in any hasher (`hasher.Hasher`) and
   signer/verifier (`crypto.SignerVerifier`).
-- Prefix Isolation**: Each typed storage uses a configurable key prefix,
+- **Prefix Isolation**: Each typed storage uses a configurable key prefix,
   avoiding collisions.
 - **Watch Support**: `Watch` method filters events for the typed namespace.
 

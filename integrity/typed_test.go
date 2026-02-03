@@ -18,6 +18,7 @@ import (
 	"github.com/tarantool/go-storage/marshaller"
 	"github.com/tarantool/go-storage/namer"
 	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
@@ -25,6 +26,23 @@ import (
 type mockNamer struct {
 	generateNamesErr error
 	prefixVal        string
+}
+
+func valueKeyFromKVs(t *testing.T, nm namer.Namer, kvs []kv.KeyValue) []byte {
+	t.Helper()
+
+	for _, kvPair := range kvs {
+		key, err := nm.ParseKey(string(kvPair.Key))
+		require.NoError(t, err)
+
+		if key.Type() == namer.KeyTypeValue {
+			return kvPair.Key
+		}
+	}
+
+	t.Fatal("value key not found in generated KVs")
+
+	return nil
 }
 
 func (m *mockNamer) GenerateNames(name string) ([]namer.Key, error) {
@@ -463,6 +481,230 @@ func TestTypedPut_Success(t *testing.T) {
 	driverMock.MinimockFinish()
 }
 
+func TestTypedPut_WithPutPredicates(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	generator := integrity.NewGenerator[SimpleStruct](
+		namerInstance,
+		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		nil,
+		nil,
+	)
+
+	value := SimpleStruct{Name: "test", Value: 42}
+	expectedKVs, err := generator.Generate("my-object", value)
+	require.NoError(t, err)
+	require.Len(t, expectedKVs, 1)
+
+	vKey := valueKeyFromKVs(t, namerInstance, expectedKVs)
+
+	valueEqualPredicate, err := typed.ValueEqual(value)
+	require.NoError(t, err)
+
+	versionGreaterPredicate := typed.VersionGreater(10)
+
+	expectedPredicates := []predicate.Predicate{valueEqualPredicate(vKey), versionGreaterPredicate(vKey)}
+
+	expectedOps := make([]operation.Operation, 0, len(expectedKVs))
+	for _, expectedKV := range expectedKVs {
+		expectedOps = append(expectedOps, operation.Put(expectedKV.Key, expectedKV.Value))
+	}
+
+	response := tx.Response{Succeeded: true, Results: []tx.RequestResponse{}}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		expectedPredicates,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Put(ctx, "my-object", value, integrity.WithPutPredicates(valueEqualPredicate, versionGreaterPredicate))
+	require.NoError(t, err)
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedPut_WithPredicates_Failed(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	generator := integrity.NewGenerator[SimpleStruct](
+		namerInstance,
+		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		nil,
+		nil,
+	)
+
+	value := SimpleStruct{Name: "test", Value: 42}
+	expectedKVs, err := generator.Generate("my-object", value)
+	require.NoError(t, err)
+	require.Len(t, expectedKVs, 1)
+
+	vKey := valueKeyFromKVs(t, namerInstance, expectedKVs)
+
+	valueEqualPredicate, err := typed.ValueEqual(value)
+	require.NoError(t, err)
+
+	expectedPredicates := []predicate.Predicate{valueEqualPredicate(vKey)}
+
+	expectedOps := make([]operation.Operation, 0, len(expectedKVs))
+	for _, expectedKV := range expectedKVs {
+		expectedOps = append(expectedOps, operation.Put(expectedKV.Key, expectedKV.Value))
+	}
+
+	response := tx.Response{Succeeded: false, Results: []tx.RequestResponse{}}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		expectedPredicates,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Put(ctx, "my-object", value, integrity.WithPutPredicates(valueEqualPredicate))
+	require.ErrorIs(t, err, integrity.ErrPredicateFailed)
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedPredicates_ValueOps(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	key := []byte("/test/my-object")
+	value := SimpleStruct{Name: "test", Value: 42}
+	expectedValue, err := marshaller.NewTypedYamlMarshaller[SimpleStruct]().Marshal(value)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		buildPredicate func() (integrity.Predicate, error)
+		expectedOp     predicate.Op
+	}{
+		{
+			name: "ValueEqual",
+			buildPredicate: func() (integrity.Predicate, error) {
+				return typed.ValueEqual(value)
+			},
+			expectedOp: predicate.OpEqual,
+		},
+		{
+			name: "ValueNotEqual",
+			buildPredicate: func() (integrity.Predicate, error) {
+				return typed.ValueNotEqual(value)
+			},
+			expectedOp: predicate.OpNotEqual,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			predFn, err := testCase.buildPredicate()
+			require.NoError(t, err)
+
+			p := predFn(key)
+			require.NotNil(t, p)
+			assert.Equal(t, key, p.Key())
+			assert.Equal(t, predicate.TargetValue, p.Target())
+			assert.Equal(t, testCase.expectedOp, p.Operation())
+			assert.Equal(t, expectedValue, p.Value())
+		})
+	}
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedPredicates_VersionOps(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	key := []byte("/test/my-object")
+	version := int64(67)
+
+	tests := []struct {
+		name           string
+		buildPredicate func() integrity.Predicate
+		expectedOp     predicate.Op
+	}{
+		{
+			name: "VersionEqual",
+			buildPredicate: func() integrity.Predicate {
+				return typed.VersionEqual(version)
+			},
+			expectedOp: predicate.OpEqual,
+		},
+		{
+			name: "VersionNotEqual",
+			buildPredicate: func() integrity.Predicate {
+				return typed.VersionNotEqual(version)
+			},
+			expectedOp: predicate.OpNotEqual,
+		},
+		{
+			name: "VersionGreater",
+			buildPredicate: func() integrity.Predicate {
+				return typed.VersionGreater(version)
+			},
+			expectedOp: predicate.OpGreater,
+		},
+		{
+			name: "VersionLess",
+			buildPredicate: func() integrity.Predicate {
+				return typed.VersionLess(version)
+			},
+			expectedOp: predicate.OpLess,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			predFn := testCase.buildPredicate()
+			p := predFn(key)
+			require.NotNil(t, p)
+			assert.Equal(t, key, p.Key())
+			assert.Equal(t, predicate.TargetVersion, p.Target())
+			assert.Equal(t, testCase.expectedOp, p.Operation())
+			assert.Equal(t, version, p.Value())
+		})
+	}
+
+	driverMock.MinimockFinish()
+}
+
 func TestTypedDelete_Success(t *testing.T) {
 	t.Parallel()
 
@@ -498,6 +740,81 @@ func TestTypedDelete_Success(t *testing.T) {
 
 	err = typed.Delete(ctx, "my-object")
 	require.NoError(t, err)
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedDelete_WithDeletePredicates(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("my-object")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+
+	// Delete uses value-key built from GenerateNames.
+	vKey := []byte(keys[0].Build())
+
+	versionEqualPredicate := typed.VersionEqual(5)
+	expectedPredicates := []predicate.Predicate{versionEqualPredicate(vKey)}
+
+	expectedOps := []operation.Operation{operation.Delete([]byte(keys[0].Build()))}
+	response := tx.Response{Succeeded: true, Results: []tx.RequestResponse{}}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		expectedPredicates,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Delete(ctx, "my-object", integrity.WithDeletePredicates(versionEqualPredicate))
+	require.NoError(t, err)
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedDelete_WithDeletePredicates_Failed(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("my-object")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+
+	vKey := []byte(keys[0].Build())
+
+	versionEqualPredicate := typed.VersionEqual(5)
+	expectedPredicates := []predicate.Predicate{versionEqualPredicate(vKey)}
+
+	expectedOps := []operation.Operation{operation.Delete([]byte(keys[0].Build()))}
+	response := tx.Response{Succeeded: false, Results: []tx.RequestResponse{}}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		expectedPredicates,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Delete(ctx, "my-object", integrity.WithDeletePredicates(versionEqualPredicate))
+	require.ErrorIs(t, err, integrity.ErrPredicateFailed)
 
 	driverMock.MinimockFinish()
 }

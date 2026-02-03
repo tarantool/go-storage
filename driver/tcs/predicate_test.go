@@ -32,6 +32,17 @@ func TestPredicate_EncodeMsgpack(t *testing.T) {
 			},
 		},
 		{
+			name:        "value equal predicate with bytes value encoded as string",
+			predicate:   goPredicate.ValueEqual([]byte("test-key"), []byte("test-value")),
+			expectError: false,
+			// Expected to match the string-value encoding.
+			expected: []byte{
+				0x94, 0xa5, 0x76, 0x61, 0x6c, 0x75, 0x65, 0xa2, 0x3d, 0x3d,
+				0xaa, 0x74, 0x65, 0x73, 0x74, 0x2d, 0x76, 0x61, 0x6c, 0x75,
+				0x65, 0xa8, 0x74, 0x65, 0x73, 0x74, 0x2d, 0x6b, 0x65, 0x79,
+			},
+		},
+		{
 			name:        "value not equal predicate with int value",
 			predicate:   goPredicate.ValueNotEqual([]byte("test-key"), 42),
 			expectError: false,
