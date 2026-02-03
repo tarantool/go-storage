@@ -34,8 +34,32 @@ func checkName(name string) bool {
 	}
 }
 
+func checkPrefix(prefix string) bool {
+	switch {
+	case len(prefix) == 0:
+		return false
+	case strings.HasPrefix(prefix, "/") && len(prefix) > 1:
+		return false
+	case !strings.HasSuffix(prefix, "/"):
+		return false
+	default:
+		return true
+	}
+}
+
 func checkRangeName(name string) bool {
 	return !strings.HasPrefix(name, "/")
+}
+
+type deleteOptions struct {
+	withPrefix bool
+}
+
+// WithPrefix configures the ability to delete keys by a prefix.
+func WithPrefix() options.OptionCallback[deleteOptions] {
+	return func(opts *deleteOptions) {
+		opts.withPrefix = true
+	}
 }
 
 type getOptions struct {
@@ -151,8 +175,14 @@ func (t *Typed[T]) Put(ctx context.Context, name string, val T) error {
 }
 
 // Delete removes a named value and its integrity data from storage.
-func (t *Typed[T]) Delete(ctx context.Context, name string) error {
-	if !checkName(name) {
+func (t *Typed[T]) Delete(ctx context.Context, name string, vOpts ...options.OptionCallback[deleteOptions]) error {
+	opts := options.ApplyOptions[deleteOptions](nil, vOpts)
+
+	if !opts.withPrefix && !checkName(name) {
+		return ErrInvalidName
+	}
+
+	if opts.withPrefix && !checkPrefix(name) {
 		return ErrInvalidName
 	}
 

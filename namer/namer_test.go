@@ -21,14 +21,6 @@ func TestDefaultNamer_GenerateNames_Invalid_Empty(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestDefaultNamer_GenerateNames_Invalid_Prefix(t *testing.T) {
-	t.Parallel()
-
-	dn := namer.NewDefaultNamer("/storage", nil, nil)
-	_, err := dn.GenerateNames("123/")
-	assert.Error(t, err)
-}
-
 func TestDefaultNamer_GenerateNames_Success(t *testing.T) {
 	t.Parallel()
 
@@ -62,6 +54,32 @@ func TestDefaultNamer_GenerateNames_Success(t *testing.T) {
 					namer.KeyTypeSignature,
 					"RSAPSS",
 					"/storage/sig/RSAPSS/all",
+				),
+			},
+		},
+		{
+			"/storage",
+			"all_keys/",
+			[]string{"sha256"},
+			[]string{"RSAPSS"},
+			[]namer.Key{
+				namer.NewDefaultKey(
+					"all_keys/",
+					namer.KeyTypeValue,
+					"",
+					"/storage/all_keys/",
+				),
+				namer.NewDefaultKey(
+					"all_keys/",
+					namer.KeyTypeHash,
+					"sha256",
+					"/storage/hash/sha256/all_keys/",
+				),
+				namer.NewDefaultKey(
+					"all_keys/",
+					namer.KeyTypeSignature,
+					"RSAPSS",
+					"/storage/sig/RSAPSS/all_keys/",
 				),
 			},
 		},

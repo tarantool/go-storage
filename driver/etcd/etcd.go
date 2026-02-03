@@ -91,6 +91,7 @@ func (f *etcdWatcherFactory) NewWatcher(client Client) Watcher {
 			watcher: etcd.NewWatcher(adapter.client),
 		}
 	}
+
 	// For other implementations, return a no-op watcher.
 	return &noopWatcher{}
 }

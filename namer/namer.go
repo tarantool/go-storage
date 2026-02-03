@@ -37,11 +37,8 @@ func NewDefaultNamer(prefix string, hashNames []string, sigNames []string) Namer
 
 // GenerateNames all keys for an object name.
 func (n *DefaultNamer) GenerateNames(name string) ([]Key, error) {
-	switch {
-	case name == "":
+	if name == "" {
 		return nil, errInvalidName(name, "should not be empty")
-	case strings.HasSuffix(name, "/"):
-		return nil, errInvalidName(name, "should not be prefix")
 	}
 
 	name = strings.TrimPrefix(name, "/")

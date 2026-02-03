@@ -90,7 +90,7 @@ func cleanupTestKey(ctx context.Context, driver *tcs.Driver, key []byte) {
 func testKey(t *testing.T, prefix string) []byte {
 	t.Helper()
 
-	return []byte("/test/" + prefix + "/" + t.Name())
+	return []byte("/" + t.Name() + "/" + prefix)
 }
 
 func TestTCSDriver_Put(t *testing.T) {
@@ -175,6 +175,49 @@ func TestTCSDriver_Delete(t *testing.T) {
 	assert.Equal(t, key, response.Results[0].Values[0].Key, "Returned key should match deleted key")
 	assert.Equal(t, value, response.Results[0].Values[0].Value, "Returned value should match deleted value")
 	assert.Positive(t, response.Results[0].Values[0].ModRevision, "ModRevision should be greater than 0")
+}
+
+func TestTCSDriver_Delete_Prefix(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	driver, done := createTestDriver(ctx, t)
+	defer done()
+
+	keys := make([][]byte, 0, 3)
+
+	prefixKey := testKey(t, "delete/")
+	value := []byte("delete-test-value")
+
+	for i := range 3 {
+		key := testKey(t, fmt.Sprintf("delete/%d", i))
+		_, err := driver.Execute(ctx, nil, []operation.Operation{
+			operation.Put(key, value),
+		}, nil)
+		require.NoError(t, err)
+
+		keys = append(keys, key)
+	}
+
+	response, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Delete(prefixKey),
+	}, nil)
+	require.NoError(t, err)
+	require.True(t, response.Succeeded)
+	require.Len(t, response.Results, 1, "TX should return one result")
+	require.Len(t, response.Results[0].Values, 3, "Delete by prefix operation should return three value in response")
+
+	for i, val := range response.Results[0].Values {
+		require.Equal(t, keys[i], val.Key, "Returned key should match deleted key")
+		require.Equal(t, value, val.Value, "Returned value should match stored value")
+		require.Positive(t, val.ModRevision, "ModRevision should be greater than 0")
+	}
+
+	// Cleanup.
+	for _, key := range keys {
+		cleanupTestKey(ctx, driver, key)
+	}
 }
 
 func TestTCSDriver_GetAfterDelete(t *testing.T) {

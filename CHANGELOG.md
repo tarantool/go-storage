@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - integrity.Validator: Ability to get ModRevision from a validated result (#23).
 - integrity: Integration tests have been implemented (#30).
+- integrity.Typed: The possibility of prefix deletion (#24).
 
 ### Changed
 
