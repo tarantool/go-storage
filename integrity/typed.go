@@ -15,6 +15,7 @@ import (
 	"github.com/tarantool/go-storage/kv"
 	"github.com/tarantool/go-storage/namer"
 	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
@@ -55,8 +56,89 @@ func checkRangeName(name string) bool {
 	return !strings.HasPrefix(name, "/")
 }
 
+type Predicate func(key []byte) predicate.Predicate
+
+// ValueEqual creates a predicate that checks if a key's value equals the specified value.
+func (t *Typed[T]) ValueEqual(value T) (Predicate, error) {
+	return t.valuePredicate(value, predicate.ValueEqual)
+}
+
+// ValueNotEqual creates a predicate that checks if a key's value is not equal to the specified value.
+func (t *Typed[T]) ValueNotEqual(value T) (Predicate, error) {
+	return t.valuePredicate(value, predicate.ValueNotEqual)
+}
+
+// VersionEqual creates a predicate that checks if a key's version equals the specified version.
+func (t *Typed[T]) VersionEqual(value int64) Predicate {
+	return t.versionPredicate(value, predicate.VersionEqual)
+}
+
+// VersionNotEqual creates a predicate that checks if a key's version is not equal to the specified version.
+func (t *Typed[T]) VersionNotEqual(value int64) Predicate {
+	return t.versionPredicate(value, predicate.VersionNotEqual)
+}
+
+// VersionGreater creates a predicate that checks if a key's version is greater than the specified version.
+func (t *Typed[T]) VersionGreater(value int64) Predicate {
+	return t.versionPredicate(value, predicate.VersionGreater)
+}
+
+// VersionLess creates a predicate that checks if a key's version is less than the specified version.
+func (t *Typed[T]) VersionLess(value int64) Predicate {
+	return t.versionPredicate(value, predicate.VersionLess)
+}
+
+// valuePredicate uses for predicate that need a marshaller.
+func (t *Typed[T]) valuePredicate(value T,
+	predFunc func(key []byte, value any) predicate.Predicate) (Predicate, error) {
+	mValue, err := t.gen.marshaller.Marshal(value)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to marshal predicate value", err)
+	}
+
+	return func(key []byte) predicate.Predicate {
+		return predFunc(key, mValue)
+	}, nil
+}
+
+// versionPredicate uses for predicate with int64 type value,
+// so they don't need an error to be returned.
+func (t *Typed[T]) versionPredicate(
+	value int64,
+	predFunc func(key []byte, value int64) predicate.Predicate) Predicate {
+	return func(key []byte) predicate.Predicate { return predFunc(key, value) }
+}
+
+type getOptions struct {
+	ignoreVerificationError bool
+	ignoreMoreThanOneResult bool
+}
+
+type putOptions struct {
+	Predicates []Predicate
+}
+
 type deleteOptions struct {
 	withPrefix bool
+	Predicates []Predicate
+}
+
+// WithPutPredicates configures predicates for conditional Put operations.
+// The Put operation will only succeed if all predicates evaluate to true.
+// If predicates are specified but fail, [ErrPredicateFailed] is returned.
+func WithPutPredicates(predicates ...Predicate) options.OptionCallback[putOptions] {
+	return func(opts *putOptions) {
+		opts.Predicates = append(opts.Predicates, predicates...)
+	}
+}
+
+// WithDeletePredicates configures predicates for conditional Delete operations.
+// The Delete operation will only succeed if all predicates evaluate to true.
+// If predicates are specified but fail, [ErrPredicateFailed] is returned.
+func WithDeletePredicates(predicates ...Predicate) options.OptionCallback[deleteOptions] {
+	return func(opts *deleteOptions) {
+		opts.Predicates = append(opts.Predicates, predicates...)
+	}
 }
 
 // WithPrefix configures the ability to delete keys by a prefix.
@@ -64,11 +146,6 @@ func WithPrefix() options.OptionCallback[deleteOptions] {
 	return func(opts *deleteOptions) {
 		opts.withPrefix = true
 	}
-}
-
-type getOptions struct {
-	ignoreVerificationError bool
-	ignoreMoreThanOneResult bool
 }
 
 // IgnoreVerificationError returns an option that allows Get and Range operations
@@ -90,8 +167,14 @@ func IgnoreMoreThanOneResult() options.OptionCallback[getOptions] {
 }
 
 var (
-	ErrNotFound          = errors.New("not found")
-	ErrMoreThanOneResult = errors.New("more than one result was returned")
+	ErrNotFound                  = errors.New("not found")
+	ErrMoreThanOneResult         = errors.New("more than one result was returned")
+	ErrInvalidPredicateValueType = errors.New("invalid predicate value type")
+	ErrNoValueKey                = errors.New("no value key found in generated keys")
+	// ErrPredicateFailed is returned by Put or Delete when predicates are specified
+	// but the transaction predicate check fails (i.e., the conditions are not met).
+	// Use [WithPutPredicates] or [WithDeletePredicates] to specify predicates.
+	ErrPredicateFailed = errors.New("predicate check failed")
 )
 
 func flattenResults(response tx.Response) []kv.KeyValue {
@@ -161,7 +244,9 @@ func (t *Typed[T]) Get(
 }
 
 // Put stores a named value with integrity protection.
-func (t *Typed[T]) Put(ctx context.Context, name string, val T) error {
+// Use [WithPutPredicates] to specify conditions that must be met for the operation to succeed.
+// If predicates are specified but fail, [ErrPredicateFailed] is returned.
+func (t *Typed[T]) Put(ctx context.Context, name string, val T, vOpts ...options.OptionCallback[putOptions]) error {
 	if !checkName(name) {
 		return ErrInvalidName
 	}
@@ -171,20 +256,61 @@ func (t *Typed[T]) Put(ctx context.Context, name string, val T) error {
 		return fmt.Errorf("%w: failed to generate", err)
 	}
 
+	opts := options.ApplyOptions[putOptions](nil, vOpts)
+
+	var predicates []predicate.Predicate
+
+	if len(opts.Predicates) > 0 {
+		var vKey []byte
+
+		for _, kValue := range kvs {
+			key, err := t.namer.ParseKey(string(kValue.Key))
+			if err != nil {
+				return fmt.Errorf("%w: failed to parse key", err)
+			}
+
+			if key.Type() == namer.KeyTypeValue {
+				vKey = kValue.Key
+				break
+			}
+		}
+
+		if vKey == nil {
+			return ErrNoValueKey
+		}
+
+		predicates = make([]predicate.Predicate, 0, len(opts.Predicates))
+		for _, p := range opts.Predicates {
+			predicates = append(predicates, p(vKey))
+		}
+	}
+
 	ops := make([]operation.Operation, 0, len(kvs))
 	for _, kv := range kvs {
 		ops = append(ops, operation.Put(kv.Key, kv.Value))
 	}
 
-	_, err = t.base.Tx(ctx).Then(ops...).Commit()
+	txn := t.base.Tx(ctx)
+	if len(predicates) > 0 {
+		txn = txn.If(predicates...)
+	}
+
+	resp, err := txn.Then(ops...).Commit()
 	if err != nil {
 		return fmt.Errorf("%w: failed to execute", err)
+	}
+
+	if len(predicates) > 0 && !resp.Succeeded {
+		return ErrPredicateFailed
 	}
 
 	return nil
 }
 
-// Delete removes a named value and its integrity data from storage.
+// Delete removes a named value with integrity protection.
+// Use [WithPrefix] to delete all values under a prefix.
+// Use [WithDeletePredicates] to specify conditions that must be met for the operation to succeed.
+// If predicates are specified but fail, [ErrPredicateFailed] is returned.
 func (t *Typed[T]) Delete(ctx context.Context, name string, vOpts ...options.OptionCallback[deleteOptions]) error {
 	opts := options.ApplyOptions[deleteOptions](nil, vOpts)
 
@@ -201,14 +327,45 @@ func (t *Typed[T]) Delete(ctx context.Context, name string, vOpts ...options.Opt
 		return fmt.Errorf("%w: failed to generate keys", err)
 	}
 
+	var predicates []predicate.Predicate
+
+	if len(opts.Predicates) > 0 {
+		var vKey []byte
+
+		for _, key := range keys {
+			if key.Type() == namer.KeyTypeValue {
+				vKey = []byte(key.Build())
+				break
+			}
+		}
+
+		if vKey == nil {
+			return ErrNoValueKey
+		}
+
+		predicates = make([]predicate.Predicate, 0, len(opts.Predicates))
+		for _, p := range opts.Predicates {
+			predicates = append(predicates, p(vKey))
+		}
+	}
+
 	ops := make([]operation.Operation, 0, len(keys))
 	for _, key := range keys {
 		ops = append(ops, operation.Delete([]byte(key.Build())))
 	}
 
-	_, err = t.base.Tx(ctx).Then(ops...).Commit()
+	txn := t.base.Tx(ctx)
+	if len(predicates) > 0 {
+		txn = txn.If(predicates...)
+	}
+
+	resp, err := txn.Then(ops...).Commit()
 	if err != nil {
 		return fmt.Errorf("%w: failed to execute", err)
+	}
+
+	if len(predicates) > 0 && !resp.Succeeded {
+		return ErrPredicateFailed
 	}
 
 	return nil

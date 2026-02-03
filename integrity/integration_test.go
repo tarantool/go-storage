@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -298,6 +299,131 @@ func TestTypedIntegration_GetPut(t *testing.T) {
 	})
 }
 
+func TestTypedIntegration_Put_WithPredicates(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+
+		prefix := "/test/" + strings.ReplaceAll(t.Name(), "/", "-")
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix(prefix).
+			Build()
+
+		initial := IntegrationStruct{Name: "init", Value: 1}
+		updated := IntegrationStruct{Name: "updated", Value: 2}
+
+		type testCase struct {
+			name         string
+			build        func(modRev int64) (integrity.Predicate, error)
+			expectUpdate bool
+		}
+
+		cases := []testCase{
+			{
+				name: "ValueEqual_true",
+				build: func(_ int64) (integrity.Predicate, error) {
+					return typed.ValueEqual(initial)
+				},
+				expectUpdate: true,
+			},
+			{
+				name: "ValueNotEqual_false",
+				build: func(_ int64) (integrity.Predicate, error) {
+					return typed.ValueNotEqual(initial)
+				},
+				expectUpdate: false,
+			},
+			{
+				name: "VersionEqual_true",
+				build: func(modRev int64) (integrity.Predicate, error) {
+					return typed.VersionEqual(modRev), nil
+				},
+				expectUpdate: true,
+			},
+			{
+				name: "VersionNotEqual_false",
+				build: func(modRev int64) (integrity.Predicate, error) {
+					return typed.VersionNotEqual(modRev), nil
+				},
+				expectUpdate: false,
+			},
+			{
+				name: "VersionGreater_true",
+				build: func(modRev int64) (integrity.Predicate, error) {
+					return typed.VersionGreater(modRev - 1), nil
+				},
+				expectUpdate: true,
+			},
+			{
+				name: "VersionLess_true",
+				build: func(modRev int64) (integrity.Predicate, error) {
+					return typed.VersionLess(modRev + 100), nil
+				},
+				expectUpdate: true,
+			},
+			{
+				name: "ValueEqual_false",
+				build: func(_ int64) (integrity.Predicate, error) {
+					return typed.ValueEqual(updated)
+				},
+				expectUpdate: false,
+			},
+			{
+				name: "VersionGreater_false",
+				build: func(modRev int64) (integrity.Predicate, error) {
+					return typed.VersionGreater(modRev + 1), nil
+				},
+				expectUpdate: false,
+			},
+		}
+
+		namesToCleanup := make([]string, 0, len(cases))
+
+		for i, testCase := range cases {
+			objName := fmt.Sprintf("pred-put-%d-%s", i, testCase.name)
+
+			namesToCleanup = append(namesToCleanup, objName)
+
+			err := typed.Put(ctx, objName, initial)
+			require.NoError(t, err)
+
+			before, err := typed.Get(ctx, objName)
+			require.NoError(t, err)
+			require.True(t, before.Value.IsSome())
+
+			beforeValue, _ := before.Value.Get()
+			require.Equal(t, initial, beforeValue)
+
+			pred, err := testCase.build(before.ModRevision)
+			require.NoError(t, err)
+
+			err = typed.Put(ctx, objName, updated, integrity.WithPutPredicates(pred))
+
+			if testCase.expectUpdate {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, integrity.ErrPredicateFailed)
+			}
+
+			after, err := typed.Get(ctx, objName)
+			require.NoError(t, err)
+			require.True(t, after.Value.IsSome())
+
+			afterValue, _ := after.Value.Get()
+
+			if testCase.expectUpdate {
+				assert.Equal(t, updated, afterValue)
+			} else {
+				assert.Equal(t, initial, afterValue)
+			}
+		}
+
+		cleanupTyped(t, typed, namesToCleanup...)
+	})
+}
+
 func TestTypedIntegration_Delete(t *testing.T) {
 	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
 		t.Helper()
@@ -328,6 +454,59 @@ func TestTypedIntegration_Delete(t *testing.T) {
 
 		_, err = typed.Get(ctx, "my-object")
 		require.Error(t, err)
+	})
+}
+
+func TestTypedIntegration_Delete_WithPredicates(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+
+		prefix := "/test/" + strings.ReplaceAll(t.Name(), "/", "-")
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix(prefix).
+			Build()
+
+		nameAllow := "pred-del-allow"
+		nameDeny := "pred-del-deny"
+		value := IntegrationStruct{Name: "test", Value: 42}
+
+		// Allow case: value predicate matches.
+		err := typed.Put(ctx, nameAllow, value)
+		require.NoError(t, err)
+
+		pAllow, err := typed.ValueEqual(value)
+		require.NoError(t, err)
+
+		err = typed.Delete(ctx, nameAllow, integrity.WithDeletePredicates(pAllow))
+		require.NoError(t, err)
+
+		_, err = typed.Get(ctx, nameAllow)
+		require.Error(t, err)
+
+		// Deny case: version predicate doesn't match.
+		err = typed.Put(ctx, nameDeny, value)
+		require.NoError(t, err)
+
+		before, err := typed.Get(ctx, nameDeny)
+		require.NoError(t, err)
+		require.Positive(t, before.ModRevision)
+
+		pDeny := typed.VersionEqual(before.ModRevision - 1)
+
+		err = typed.Delete(ctx, nameDeny, integrity.WithDeletePredicates(pDeny))
+		require.ErrorIs(t, err, integrity.ErrPredicateFailed)
+
+		after, err := typed.Get(ctx, nameDeny)
+		require.NoError(t, err)
+		require.True(t, after.Value.IsSome())
+
+		got, _ := after.Value.Get()
+		assert.Equal(t, value, got)
+
+		cleanupTyped(t, typed, nameDeny)
 	})
 }
 
