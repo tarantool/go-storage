@@ -28,6 +28,7 @@ func operationToEtcdOp(storageOperation operation.Operation) (etcd.Op, error) {
 	key := string(storageOperation.Key())
 
 	var ops []etcd.OpOption
+
 	if storageOperation.IsPrefix() {
 		ops = append(ops, etcd.WithPrefix())
 	}

@@ -706,3 +706,128 @@ func TestTypedIntegration_MissingHash(t *testing.T) {
 		cleanupTyped(t, typed2, "obj1")
 	})
 }
+
+func TestTypedIntegration_Delete_NoPrefix(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"objs/1", "objs/2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "test",
+					Value: 42,
+				},
+				{
+					Name:  "test",
+					Value: 43,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		fillData(t, driverInstance, fillDataOptions)
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			Build()
+
+		err := typed.Delete(ctx, "objs")
+		require.NoError(t, err)
+
+		for iter, name := range fillDataOptions.Names {
+			result, err := typed.Get(ctx, name)
+			require.NoError(t, err)
+
+			value := result.Value.Unwrap()
+
+			require.Equal(t, fillDataOptions.Records[iter], value)
+		}
+	})
+}
+
+func TestTypedIntegration_Delete_Prefix(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"objs/1", "objs/2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "test",
+					Value: 42,
+				},
+				{
+					Name:  "test",
+					Value: 42,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		fillData(t, driverInstance, fillDataOptions)
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			Build()
+
+		err := typed.Delete(ctx, "objs/", integrity.WithPrefix())
+		require.NoError(t, err)
+
+		for _, name := range fillDataOptions.Names {
+			_, err = typed.Get(ctx, name)
+			require.Error(t, err)
+		}
+	})
+}
+
+func TestTypedIntegration_Delete_PrefixAllKeys(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"objs/1", "objs/2", "other/1"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "test",
+					Value: 42,
+				},
+				{
+					Name:  "test",
+					Value: 42,
+				},
+				{
+					Name:  "test",
+					Value: 42,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		fillData(t, driverInstance, fillDataOptions)
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			Build()
+
+		err := typed.Delete(ctx, "/", integrity.WithPrefix())
+		require.NoError(t, err)
+
+		for _, name := range fillDataOptions.Names {
+			_, err = typed.Get(ctx, name)
+			require.Error(t, err)
+		}
+	})
+}

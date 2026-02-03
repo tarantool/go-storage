@@ -1812,3 +1812,87 @@ func TestTypedGet_PassingModRevision(t *testing.T) {
 
 	driverMock.MinimockFinish()
 }
+
+func TestTypedDelete_Prefix(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	st := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](st).
+		WithPrefix("/test").
+		Build()
+
+	namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
+	keys, err := namerInstance.GenerateNames("test/")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+
+	expectedOps := make([]operation.Operation, 0, len(keys))
+	for _, key := range keys {
+		expectedOps = append(expectedOps, operation.Delete([]byte(key.Build())))
+	}
+
+	response := tx.Response{
+		Succeeded: true,
+		Results:   []tx.RequestResponse{},
+	}
+
+	driverMock.ExecuteMock.Expect(
+		ctx,
+		nil,
+		expectedOps,
+		nil,
+	).Return(response, nil)
+
+	err = typed.Delete(ctx, "test/", integrity.WithPrefix())
+	require.NoError(t, err)
+
+	driverMock.MinimockFinish()
+}
+
+func TestTypedDelete_PrefixEmptyKey(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	store := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](store).
+		WithPrefix("/test").
+		Build()
+
+	err := typed.Delete(ctx, "", integrity.WithPrefix())
+	require.Error(t, err)
+}
+
+func TestTypedDelete_PrefixHasPrefix(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	store := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](store).
+		WithPrefix("/test").
+		Build()
+
+	err := typed.Delete(ctx, "/objs/", integrity.WithPrefix())
+	require.Error(t, err)
+}
+
+func TestTypedDelete_PrefixNoSuffix(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	driverMock := mocks.NewDriverMock(t)
+	store := storage.NewStorage(driverMock)
+
+	typed := integrity.NewTypedBuilder[SimpleStruct](store).
+		WithPrefix("/test").
+		Build()
+
+	err := typed.Delete(ctx, "/objs", integrity.WithPrefix())
+	require.Error(t, err)
+}

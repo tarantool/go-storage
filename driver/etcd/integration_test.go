@@ -10,12 +10,14 @@ package etcd_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tarantool/go-storage/tx"
 	etcdclient "go.etcd.io/etcd/client/v3"
 	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 
@@ -133,6 +135,19 @@ func deleteValue(ctx context.Context, t *testing.T, driver *etcddriver.Driver, k
 	return response.Results[0].Values[0]
 }
 
+func deletePrefix(ctx context.Context, t *testing.T, driver *etcddriver.Driver, prefix []byte) tx.RequestResponse {
+	t.Helper()
+
+	response, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Delete(prefix),
+	}, nil)
+
+	require.NoError(t, err, "Delete operation failed")
+	assert.True(t, response.Succeeded, "Delete operation should succeed")
+
+	return response.Results[0]
+}
+
 func TestEtcdDriver_Put(t *testing.T) {
 	ctx := context.Background()
 
@@ -200,6 +215,35 @@ func TestEtcdDriver_Delete(t *testing.T) {
 	assert.Equal(t, key, deletedKv.Key, "Returned key should match deleted key")
 	assert.Equal(t, value, deletedKv.Value, "Returned value should match deleted value")
 	assert.Positive(t, deletedKv.ModRevision, "ModRevision should be greater than 0")
+}
+
+func TestEtcdDriver_Delete_Prefix(t *testing.T) {
+	ctx := context.Background()
+
+	driver, cleanup := createTestDriver(t)
+	defer cleanup()
+
+	keys := make([][]byte, 0, 3)
+
+	prefixKey := testKey(t, "delete/")
+	value := []byte("delete-test-value")
+
+	for i := range 3 {
+		key := testKey(t, fmt.Sprintf("delete/%d", i))
+		putValue(ctx, t, driver, key, value)
+
+		keys = append(keys, key)
+	}
+
+	deletedKv := deletePrefix(ctx, t, driver, prefixKey)
+	require.Len(t, deletedKv.Values, 3, "Delete by prefix operation should return three value in response")
+
+	for i, val := range deletedKv.Values {
+		expectedKey := keys[i]
+		require.Equal(t, expectedKey, val.Key, "Returned key should match requested key")
+		require.Equal(t, value, val.Value, "Returned value should match stored value")
+		require.Positive(t, val.ModRevision, "ModRevision should be greater than 0")
+	}
 }
 
 func TestEtcdDriver_ValueEqualPredicate(t *testing.T) {

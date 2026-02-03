@@ -379,9 +379,6 @@ func TestGeneratorGenerate_ErrorInvalidName(t *testing.T) {
 
 	_, err := generator.Generate("", value)
 	require.ErrorAs(t, err, &integrity.FailedToGenerateKeysError{})
-
-	_, err = generator.Generate("prefix/", value)
-	require.ErrorAs(t, err, &integrity.FailedToGenerateKeysError{})
 }
 
 func TestGeneratorGenerate_OutputStructure(t *testing.T) {
