@@ -1,3 +1,7 @@
+// Package integrity provides typed storage with built-in data integrity protection.
+// It automatically computes and verifies hashes and signatures for stored values.
+//
+// See [TypedBuilder] for configuration options and [Typed] for available operations.
 package integrity
 
 import (
@@ -67,12 +71,18 @@ type getOptions struct {
 	ignoreMoreThanOneResult bool
 }
 
+// IgnoreVerificationError returns an option that allows Get and Range operations
+// to return results even if hash or signature verification fails.
+// The returned result will still contain the Error field with verification details.
 func IgnoreVerificationError() options.OptionCallback[getOptions] {
 	return func(opts *getOptions) {
 		opts.ignoreVerificationError = true
 	}
 }
 
+// IgnoreMoreThanOneResult returns an option that allows Get operation
+// to succeed when multiple results are returned for a single name.
+// By default, Get returns ErrMoreThanOneResult in such cases.
 func IgnoreMoreThanOneResult() options.OptionCallback[getOptions] {
 	return func(opts *getOptions) {
 		opts.ignoreMoreThanOneResult = true
