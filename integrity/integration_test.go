@@ -25,6 +25,7 @@ import (
 	"github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/crypto"
 	"github.com/tarantool/go-storage/driver"
+	"github.com/tarantool/go-storage/driver/dummy"
 	etcddriver "github.com/tarantool/go-storage/driver/etcd"
 	tcsdriver "github.com/tarantool/go-storage/driver/tcs"
 	"github.com/tarantool/go-storage/hasher"
@@ -92,6 +93,13 @@ func TestMain(m *testing.M) {
 
 		return m.Run()
 	}())
+}
+
+// createDummyDriver creates a dummy driver for testing.
+func createDummyDriver(_ context.Context, t *testing.T) (driver.Driver, func()) {
+	t.Helper()
+
+	return dummy.New(), func() {}
 }
 
 // createEtcdTestDriver creates an etcd driver for testing using the integration framework.
@@ -187,8 +195,9 @@ func createTcsTestDriver(ctx context.Context, t *testing.T) (driver.Driver, func
 type preparationCallback func(ctx context.Context, t *testing.T) (driver.Driver, func())
 
 var storages = map[string]preparationCallback{ //nolint:gochecknoglobals
-	"tcs":  createTcsTestDriver,
-	"etcd": createEtcdTestDriver,
+	"tcs":   createTcsTestDriver,
+	"etcd":  createEtcdTestDriver,
+	"dummy": createDummyDriver,
 }
 
 func executeOnStorage(t *testing.T, testCallback func(t *testing.T, driver driver.Driver)) {
