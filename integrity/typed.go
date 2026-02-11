@@ -381,12 +381,28 @@ func (t *Typed[T]) Range(
 		return nil, ErrInvalidName
 	}
 
-	prefix := t.namer.Prefix(name, true)
-
 	opts := options.ApplyOptions[getOptions](nil, vOpts)
 
-	// Get all keys under the base prefix.
-	ops := []operation.Operation{operation.Get([]byte(prefix))}
+	var ops []operation.Operation
+
+	switch name {
+	case "":
+		prefix := t.namer.Prefix(name, true)
+
+		ops = []operation.Operation{operation.Get([]byte(prefix))}
+	default:
+		keys, err := t.namer.GenerateNames(name)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed to generate keys", err)
+		}
+
+		ops = make([]operation.Operation, 0, len(keys))
+		for _, key := range keys {
+			// GenerateNames makes names without suffix "/", so, due to
+			// our need in directory we add "/".
+			ops = append(ops, operation.Get([]byte(key.Build()+"/")))
+		}
+	}
 
 	response, err := t.base.Tx(ctx).Then(ops...).Commit()
 	if err != nil {

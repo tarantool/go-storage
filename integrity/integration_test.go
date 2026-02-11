@@ -218,7 +218,7 @@ type FillDataOptions struct {
 	Signers []crypto.Signer
 }
 
-func fillData(t *testing.T, driverInstance driver.Driver, opts FillDataOptions) {
+func fillData(t *testing.T, driverInstance driver.Driver, opts FillDataOptions) func() {
 	t.Helper()
 
 	ctx := t.Context()
@@ -245,6 +245,7 @@ func fillData(t *testing.T, driverInstance driver.Driver, opts FillDataOptions) 
 	)
 
 	putOps := make([]operation.Operation, 0, (len(hashersNames)+len(signersNames)+1)*len(opts.Records))
+	delOps := make([]operation.Operation, 0, (len(hashersNames)+len(signersNames)+1)*len(opts.Records))
 
 	for i, record := range opts.Records {
 		kvs, err := generator.Generate(opts.Names[i], record)
@@ -252,11 +253,17 @@ func fillData(t *testing.T, driverInstance driver.Driver, opts FillDataOptions) 
 
 		for _, kv := range kvs {
 			putOps = append(putOps, operation.Put(kv.Key, kv.Value))
+			delOps = append(delOps, operation.Delete(kv.Key))
 		}
 	}
 
 	_, err := driverInstance.Execute(ctx, nil, putOps, nil)
 	require.NoError(t, err)
+
+	return func() {
+		_, err := driverInstance.Execute(ctx, nil, delOps, nil)
+		require.NoError(t, err)
+	}
 }
 
 func cleanupTyped[T any](t *testing.T, typed *integrity.Typed[T], names ...string) {
@@ -441,7 +448,8 @@ func TestTypedIntegration_Delete(t *testing.T) {
 			Signers: nil,
 		}
 
-		fillData(t, driverInstance, fillDataOptions)
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
 
 		ctx := t.Context()
 		storageInstance := storage.NewStorage(driverInstance)
@@ -525,7 +533,7 @@ func TestTypedIntegration_Get_EmptyStorage(t *testing.T) {
 	})
 }
 
-func TestTypedIntegration_Range(t *testing.T) {
+func TestTypedIntegration_EmptyRange(t *testing.T) {
 	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
 		t.Helper()
 
@@ -546,7 +554,8 @@ func TestTypedIntegration_Range(t *testing.T) {
 			Signers: nil,
 		}
 
-		fillData(t, driverInstance, fillDataOptions)
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
 
 		ctx := t.Context()
 		storageInstance := storage.NewStorage(driverInstance)
@@ -584,9 +593,227 @@ func TestTypedIntegration_Range(t *testing.T) {
 				Error:       nil,
 			},
 		})
+	})
+}
 
-		// Cleanup.
-		cleanupTyped(t, typed, "object1", "object2")
+func TestTypedIntegration_NonEmptyRange(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"recorddb/1", "recorddb/2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+				{
+					Name:  "obj2",
+					Value: 200,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			Build()
+
+		results, err := typed.Range(ctx, "recorddb")
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		// TCS and Etcd return different ModRevision values,
+		// so they must be normalized.
+		for i := range results {
+			results[i].ModRevision = 0
+		}
+
+		require.ElementsMatch(t, results, []integrity.ValidatedResult[IntegrationStruct]{
+			{
+				Name: "recorddb/1",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "obj1",
+					Value: 100,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+			{
+				Name: "recorddb/2",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "obj2",
+					Value: 200,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+		})
+	})
+}
+
+func TestTypedIntegration_NonEmptyRangeWithVerification(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		shaHash := hasher.NewSHA256Hasher()
+		rsaVer := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"recorddb/1", "recorddb/2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+				{
+					Name:  "obj2",
+					Value: 200,
+				},
+			},
+			Hashers: []hasher.Hasher{shaHash},
+			Signers: []crypto.Signer{rsaVer},
+		}
+
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			WithHasher(shaHash).
+			WithSignerVerifier(rsaVer).
+			Build()
+
+		results, err := typed.Range(ctx, "recorddb")
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		// TCS and Etcd return different ModRevision values,
+		// so they must be normalized.
+		for i := range results {
+			results[i].ModRevision = 0
+		}
+
+		require.ElementsMatch(t, results, []integrity.ValidatedResult[IntegrationStruct]{
+			{
+				Name: "recorddb/1",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "obj1",
+					Value: 100,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+			{
+				Name: "recorddb/2",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "obj2",
+					Value: 200,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+		})
+	})
+}
+
+func TestTypedIntegration_NonEmptyRangeWithDiffVerification(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		shaHash := hasher.NewSHA256Hasher()
+		rsaVer := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+		rsaVerDiff := crypto.NewRSAPSSSignerVerifier(*rsaPK4096)
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"recorddb/1", "recorddb/2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+				{
+					Name:  "obj2",
+					Value: 200,
+				},
+			},
+			Hashers: []hasher.Hasher{shaHash},
+			Signers: []crypto.Signer{rsaVer},
+		}
+
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			WithHasher(shaHash).
+			WithSignerVerifier(rsaVerDiff).
+			Build()
+
+		results, err := typed.Range(ctx, "recorddb")
+		require.NoError(t, err)
+
+		// When calls Range with verification error,
+		// the erroneous elements are not added to the response.
+		require.Empty(t, results)
+	})
+}
+
+func TestTypedIntegration_NonEmptyRangeWithDiffHashIgnore(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		shaHash := hasher.NewSHA256Hasher()
+		shaHashDiff := hasher.NewSHA1Hasher()
+		rsaVer := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"recorddb/1", "recorddb/2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+				{
+					Name:  "obj2",
+					Value: 200,
+				},
+			},
+			Hashers: []hasher.Hasher{shaHash},
+			Signers: []crypto.Signer{rsaVer},
+		}
+
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			WithHasher(shaHashDiff).
+			WithSignerVerifier(rsaVer).
+			Build()
+
+		results, err := typed.Range(ctx, "recorddb", integrity.IgnoreVerificationError())
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		require.Error(t, results[0].Error)
+		require.Error(t, results[1].Error)
 	})
 }
 
@@ -607,7 +834,8 @@ func TestTypedIntegration_Watch(t *testing.T) {
 			Signers: nil,
 		}
 
-		fillData(t, driverInstance, fillDataOptions)
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
 
 		ctx := t.Context()
 		storageInstance := storage.NewStorage(driverInstance)
@@ -907,7 +1135,8 @@ func TestTypedIntegration_Delete_NoPrefix(t *testing.T) {
 			Signers: nil,
 		}
 
-		fillData(t, driverInstance, fillDataOptions)
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
 
 		ctx := t.Context()
 		storageInstance := storage.NewStorage(driverInstance)
@@ -950,7 +1179,8 @@ func TestTypedIntegration_Delete_Prefix(t *testing.T) {
 			Signers: nil,
 		}
 
-		fillData(t, driverInstance, fillDataOptions)
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
 
 		ctx := t.Context()
 		storageInstance := storage.NewStorage(driverInstance)
@@ -993,7 +1223,8 @@ func TestTypedIntegration_Delete_PrefixAllKeys(t *testing.T) {
 			Signers: nil,
 		}
 
-		fillData(t, driverInstance, fillDataOptions)
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
 
 		ctx := t.Context()
 		storageInstance := storage.NewStorage(driverInstance)
