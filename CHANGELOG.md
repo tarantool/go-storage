@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 
 - namer.Namer: Fixed a bug where a double slash was placed at the end of a prefix (#41).
+- integrity.Typed: Fixed an ability to use Range with verification
+  using non-empty names (#26).
 
 ## [v1.0.0] - 2025-12-22
 
