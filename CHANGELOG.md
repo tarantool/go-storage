@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - integrity: Integration tests have been implemented (#30).
 - integrity.Typed: The possibility of prefix deletion (#24).
 - integrity.Typed: Ability to use predicates (#25).
+- driver: Added dummy driver implementation.
 
 ### Changed
 
