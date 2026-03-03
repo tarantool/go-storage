@@ -9,17 +9,28 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- integrity.Validator: Ability to get ModRevision from a validated result (#23).
-- integrity: Integration tests have been implemented (#30).
-- integrity.Typed: The possibility of prefix deletion (#24).
-- integrity.Typed: Ability to use predicates (#25).
-- driver: Added dummy driver implementation.
-
 ### Changed
 
 ### Fixed
 
-- namer.Namer: Fixed a bug where a double slash was placed at the end of a prefix (#41).
+## [v1.1.0] - 2026-03-03
+
+This release adds prefix deletion, predicates support for integrity.Typed,
+and a dummy driver for testing purposes.
+
+### Added
+
+- integrity.Validator: Ability to get ModRevision from a validated result
+  (#23).
+- integrity: Integration tests have been implemented (#30).
+- integrity.Typed: The possibility of prefix deletion (#24).
+- integrity.Typed: Ability to use predicates (#25).
+- driver: Added dummy driver implementation (#47).
+
+### Fixed
+
+- namer.Namer: Fixed a bug where a double slash was placed at the end of a
+  prefix (#41).
 - integrity.Typed: Fixed an ability to use Range with verification
   using non-empty names (#26).
 
@@ -43,8 +54,7 @@ The release introduces the initial version of the library.
 - integrity.Typed: high-level interface for integrity-protected storage
   operations with Get, Put, Delete, Range, and Watch methods.
 
-### Changed
-
 ### Fixed
 
+[v1.1.0]: https://github.com/tarantool/go-storage/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/tarantool/go-storage/releases/tag/v1.0.0
