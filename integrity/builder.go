@@ -19,7 +19,7 @@ type TypedBuilder[T any] struct {
 	hashers    []hasher.Hasher
 	signers    []crypto.Signer
 	verifiers  []crypto.Verifier
-	marshaller marshaller.TypedYamlMarshaller[T]
+	marshaller marshaller.TypedMarshaller[T]
 
 	prefix    string
 	namerFunc NamerConstructor
@@ -90,7 +90,7 @@ func (s TypedBuilder[T]) WithVerifier(verifier crypto.Verifier) TypedBuilder[T] 
 }
 
 // WithMarshaller sets the marshaller for the builder.
-func (s TypedBuilder[T]) WithMarshaller(marshaller marshaller.TypedYamlMarshaller[T]) TypedBuilder[T] {
+func (s TypedBuilder[T]) WithMarshaller(marshaller marshaller.TypedMarshaller[T]) TypedBuilder[T] {
 	out := s.copy()
 
 	out.marshaller = marshaller
