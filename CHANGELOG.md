@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+## [v1.1.1] - 2026-03-06
+
+This release updates the TypedBuilder to use a generic marshaller interface
+for more flexibility.
+
+### Changed
+
+- integrity.Typed: TypedBuilder uses generic TypedMarshaller interface
+  instead of TypedYamlMarshaller (#51).
+
 ## [v1.1.0] - 2026-03-03
 
 This release adds prefix deletion, predicates support for integrity.Typed,
@@ -40,7 +50,7 @@ The release introduces the initial version of the library.
 
 ### Added
 
-- storage.Storage: middle-level interface with Watch, Tx, and Range operations.
+- storage.Storage: Middle-level interface with Watch, Tx, and Range operations.
 - tx.Tx: Conditional transaction execution with predicates and operations.
 - operation.Operation: Get, Put, Delete operations with typed interfaces.
 - predicate.Predicate: Value and version comparisons for conditional logic.
@@ -51,10 +61,11 @@ The release introduces the initial version of the library.
 - hasher: SHA1 and SHA256 hash implementations.
 - integrity: Signer and verifier for data integrity checking.
 - namer.Namer: Key naming and metadata management.
-- integrity.Typed: high-level interface for integrity-protected storage
+- integrity.Typed: High-level interface for integrity-protected storage
   operations with Get, Put, Delete, Range, and Watch methods.
 
 ### Fixed
 
+[v1.1.1]: https://github.com/tarantool/go-storage/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/tarantool/go-storage/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/tarantool/go-storage/releases/tag/v1.0.0
