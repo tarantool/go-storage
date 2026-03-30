@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- integrity.Typed: Range returns empty results when name has trailing slash.
+
 ## [v1.1.1] - 2026-03-06
 
 This release updates the TypedBuilder to use a generic marshaller interface

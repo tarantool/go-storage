@@ -605,6 +605,81 @@ func TestTypedIntegration_EmptyRange(t *testing.T) {
 	})
 }
 
+func TestTypedIntegration_RangeWithTrailingSlash(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/shared",
+			Names:  []string{"config/key1", "config/key2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "cfg1",
+					Value: 10,
+				},
+				{
+					Name:  "cfg2",
+					Value: 20,
+				},
+			},
+			Hashers: nil,
+			Signers: nil,
+		}
+
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/shared").
+			Build()
+
+		// Range with trailing slash should return the same results as without.
+		resultsWithSlash, err := typed.Range(ctx, "config/")
+		require.NoError(t, err)
+
+		resultsWithoutSlash, err := typed.Range(ctx, "config")
+		require.NoError(t, err)
+
+		// Normalize ModRevision for comparison.
+		for i := range resultsWithSlash {
+			resultsWithSlash[i].ModRevision = 0
+		}
+
+		for i := range resultsWithoutSlash {
+			resultsWithoutSlash[i].ModRevision = 0
+		}
+
+		expected := []integrity.ValidatedResult[IntegrationStruct]{
+			{
+				Name: "config/key1",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "cfg1",
+					Value: 10,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+			{
+				Name: "config/key2",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "cfg2",
+					Value: 20,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+		}
+
+		require.Len(t, resultsWithoutSlash, 2, "Range without trailing slash should return results")
+		require.ElementsMatch(t, resultsWithoutSlash, expected)
+
+		require.Len(t, resultsWithSlash, 2, "Range with trailing slash should also return results")
+		require.ElementsMatch(t, resultsWithSlash, expected)
+	})
+}
+
 func TestTypedIntegration_NonEmptyRange(t *testing.T) {
 	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
 		t.Helper()
