@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+## [v1.1.2] - 2026-03-30
+
+This release fixes an issue where Range returned empty results for names
+with a trailing slash.
+
+### Fixed
+
 - integrity.Typed: Range returns empty results when name has trailing slash.
 
 ## [v1.1.1] - 2026-03-06
@@ -68,6 +75,7 @@ The release introduces the initial version of the library.
 
 ### Fixed
 
+[v1.1.2]: https://github.com/tarantool/go-storage/releases/tag/v1.1.2
 [v1.1.1]: https://github.com/tarantool/go-storage/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/tarantool/go-storage/releases/tag/v1.1.0
 [v1.0.0]: https://github.com/tarantool/go-storage/releases/tag/v1.0.0
