@@ -398,9 +398,9 @@ func (t *Typed[T]) Range(
 
 		ops = make([]operation.Operation, 0, len(keys))
 		for _, key := range keys {
-			// GenerateNames makes names without suffix "/", so, due to
-			// our need in directory we add "/".
-			ops = append(ops, operation.Get([]byte(key.Build()+"/")))
+			keyStr := strings.TrimSuffix(key.Build(), "/") + "/"
+
+			ops = append(ops, operation.Get([]byte(keyStr)))
 		}
 	}
 
