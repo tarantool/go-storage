@@ -23,6 +23,13 @@ type EtcdClientMock struct {
 	afterTxnCounter  uint64
 	beforeTxnCounter uint64
 	TxnMock          mEtcdClientMockTxn
+
+	funcWatch          func(ctx context.Context, key string, opts ...etcd.OpOption) (w1 etcd.WatchChan)
+	funcWatchOrigin    string
+	inspectFuncWatch   func(ctx context.Context, key string, opts ...etcd.OpOption)
+	afterWatchCounter  uint64
+	beforeWatchCounter uint64
+	WatchMock          mEtcdClientMockWatch
 }
 
 // NewEtcdClientMock returns a mock for mm_etcd.Client
@@ -35,6 +42,9 @@ func NewEtcdClientMock(t minimock.Tester) *EtcdClientMock {
 
 	m.TxnMock = mEtcdClientMockTxn{mock: m}
 	m.TxnMock.callArgs = []*EtcdClientMockTxnParams{}
+
+	m.WatchMock = mEtcdClientMockWatch{mock: m}
+	m.WatchMock.callArgs = []*EtcdClientMockWatchParams{}
 
 	t.Cleanup(m.MinimockFinish)
 
@@ -352,11 +362,386 @@ func (m *EtcdClientMock) MinimockTxnInspect() {
 	}
 }
 
+type mEtcdClientMockWatch struct {
+	optional           bool
+	mock               *EtcdClientMock
+	defaultExpectation *EtcdClientMockWatchExpectation
+	expectations       []*EtcdClientMockWatchExpectation
+
+	callArgs []*EtcdClientMockWatchParams
+	mutex    sync.RWMutex
+
+	expectedInvocations       uint64
+	expectedInvocationsOrigin string
+}
+
+// EtcdClientMockWatchExpectation specifies expectation struct of the Client.Watch
+type EtcdClientMockWatchExpectation struct {
+	mock               *EtcdClientMock
+	params             *EtcdClientMockWatchParams
+	paramPtrs          *EtcdClientMockWatchParamPtrs
+	expectationOrigins EtcdClientMockWatchExpectationOrigins
+	results            *EtcdClientMockWatchResults
+	returnOrigin       string
+	Counter            uint64
+}
+
+// EtcdClientMockWatchParams contains parameters of the Client.Watch
+type EtcdClientMockWatchParams struct {
+	ctx  context.Context
+	key  string
+	opts []etcd.OpOption
+}
+
+// EtcdClientMockWatchParamPtrs contains pointers to parameters of the Client.Watch
+type EtcdClientMockWatchParamPtrs struct {
+	ctx  *context.Context
+	key  *string
+	opts *[]etcd.OpOption
+}
+
+// EtcdClientMockWatchResults contains results of the Client.Watch
+type EtcdClientMockWatchResults struct {
+	w1 etcd.WatchChan
+}
+
+// EtcdClientMockWatchOrigins contains origins of expectations of the Client.Watch
+type EtcdClientMockWatchExpectationOrigins struct {
+	origin     string
+	originCtx  string
+	originKey  string
+	originOpts string
+}
+
+// Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
+// the test will fail minimock's automatic final call check if the mocked method was not called at least once.
+// Optional() makes method check to work in '0 or more' mode.
+// It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
+// catch the problems when the expected method call is totally skipped during test run.
+func (mmWatch *mEtcdClientMockWatch) Optional() *mEtcdClientMockWatch {
+	mmWatch.optional = true
+	return mmWatch
+}
+
+// Expect sets up expected params for Client.Watch
+func (mmWatch *mEtcdClientMockWatch) Expect(ctx context.Context, key string, opts ...etcd.OpOption) *mEtcdClientMockWatch {
+	if mmWatch.mock.funcWatch != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Set")
+	}
+
+	if mmWatch.defaultExpectation == nil {
+		mmWatch.defaultExpectation = &EtcdClientMockWatchExpectation{}
+	}
+
+	if mmWatch.defaultExpectation.paramPtrs != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by ExpectParams functions")
+	}
+
+	mmWatch.defaultExpectation.params = &EtcdClientMockWatchParams{ctx, key, opts}
+	mmWatch.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
+	for _, e := range mmWatch.expectations {
+		if minimock.Equal(e.params, mmWatch.defaultExpectation.params) {
+			mmWatch.mock.t.Fatalf("Expectation set by When has same params: %#v", *mmWatch.defaultExpectation.params)
+		}
+	}
+
+	return mmWatch
+}
+
+// ExpectCtxParam1 sets up expected param ctx for Client.Watch
+func (mmWatch *mEtcdClientMockWatch) ExpectCtxParam1(ctx context.Context) *mEtcdClientMockWatch {
+	if mmWatch.mock.funcWatch != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Set")
+	}
+
+	if mmWatch.defaultExpectation == nil {
+		mmWatch.defaultExpectation = &EtcdClientMockWatchExpectation{}
+	}
+
+	if mmWatch.defaultExpectation.params != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Expect")
+	}
+
+	if mmWatch.defaultExpectation.paramPtrs == nil {
+		mmWatch.defaultExpectation.paramPtrs = &EtcdClientMockWatchParamPtrs{}
+	}
+	mmWatch.defaultExpectation.paramPtrs.ctx = &ctx
+	mmWatch.defaultExpectation.expectationOrigins.originCtx = minimock.CallerInfo(1)
+
+	return mmWatch
+}
+
+// ExpectKeyParam2 sets up expected param key for Client.Watch
+func (mmWatch *mEtcdClientMockWatch) ExpectKeyParam2(key string) *mEtcdClientMockWatch {
+	if mmWatch.mock.funcWatch != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Set")
+	}
+
+	if mmWatch.defaultExpectation == nil {
+		mmWatch.defaultExpectation = &EtcdClientMockWatchExpectation{}
+	}
+
+	if mmWatch.defaultExpectation.params != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Expect")
+	}
+
+	if mmWatch.defaultExpectation.paramPtrs == nil {
+		mmWatch.defaultExpectation.paramPtrs = &EtcdClientMockWatchParamPtrs{}
+	}
+	mmWatch.defaultExpectation.paramPtrs.key = &key
+	mmWatch.defaultExpectation.expectationOrigins.originKey = minimock.CallerInfo(1)
+
+	return mmWatch
+}
+
+// ExpectOptsParam3 sets up expected param opts for Client.Watch
+func (mmWatch *mEtcdClientMockWatch) ExpectOptsParam3(opts ...etcd.OpOption) *mEtcdClientMockWatch {
+	if mmWatch.mock.funcWatch != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Set")
+	}
+
+	if mmWatch.defaultExpectation == nil {
+		mmWatch.defaultExpectation = &EtcdClientMockWatchExpectation{}
+	}
+
+	if mmWatch.defaultExpectation.params != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Expect")
+	}
+
+	if mmWatch.defaultExpectation.paramPtrs == nil {
+		mmWatch.defaultExpectation.paramPtrs = &EtcdClientMockWatchParamPtrs{}
+	}
+	mmWatch.defaultExpectation.paramPtrs.opts = &opts
+	mmWatch.defaultExpectation.expectationOrigins.originOpts = minimock.CallerInfo(1)
+
+	return mmWatch
+}
+
+// Inspect accepts an inspector function that has same arguments as the Client.Watch
+func (mmWatch *mEtcdClientMockWatch) Inspect(f func(ctx context.Context, key string, opts ...etcd.OpOption)) *mEtcdClientMockWatch {
+	if mmWatch.mock.inspectFuncWatch != nil {
+		mmWatch.mock.t.Fatalf("Inspect function is already set for EtcdClientMock.Watch")
+	}
+
+	mmWatch.mock.inspectFuncWatch = f
+
+	return mmWatch
+}
+
+// Return sets up results that will be returned by Client.Watch
+func (mmWatch *mEtcdClientMockWatch) Return(w1 etcd.WatchChan) *EtcdClientMock {
+	if mmWatch.mock.funcWatch != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Set")
+	}
+
+	if mmWatch.defaultExpectation == nil {
+		mmWatch.defaultExpectation = &EtcdClientMockWatchExpectation{mock: mmWatch.mock}
+	}
+	mmWatch.defaultExpectation.results = &EtcdClientMockWatchResults{w1}
+	mmWatch.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
+	return mmWatch.mock
+}
+
+// Set uses given function f to mock the Client.Watch method
+func (mmWatch *mEtcdClientMockWatch) Set(f func(ctx context.Context, key string, opts ...etcd.OpOption) (w1 etcd.WatchChan)) *EtcdClientMock {
+	if mmWatch.defaultExpectation != nil {
+		mmWatch.mock.t.Fatalf("Default expectation is already set for the Client.Watch method")
+	}
+
+	if len(mmWatch.expectations) > 0 {
+		mmWatch.mock.t.Fatalf("Some expectations are already set for the Client.Watch method")
+	}
+
+	mmWatch.mock.funcWatch = f
+	mmWatch.mock.funcWatchOrigin = minimock.CallerInfo(1)
+	return mmWatch.mock
+}
+
+// When sets expectation for the Client.Watch which will trigger the result defined by the following
+// Then helper
+func (mmWatch *mEtcdClientMockWatch) When(ctx context.Context, key string, opts ...etcd.OpOption) *EtcdClientMockWatchExpectation {
+	if mmWatch.mock.funcWatch != nil {
+		mmWatch.mock.t.Fatalf("EtcdClientMock.Watch mock is already set by Set")
+	}
+
+	expectation := &EtcdClientMockWatchExpectation{
+		mock:               mmWatch.mock,
+		params:             &EtcdClientMockWatchParams{ctx, key, opts},
+		expectationOrigins: EtcdClientMockWatchExpectationOrigins{origin: minimock.CallerInfo(1)},
+	}
+	mmWatch.expectations = append(mmWatch.expectations, expectation)
+	return expectation
+}
+
+// Then sets up Client.Watch return parameters for the expectation previously defined by the When method
+func (e *EtcdClientMockWatchExpectation) Then(w1 etcd.WatchChan) *EtcdClientMock {
+	e.results = &EtcdClientMockWatchResults{w1}
+	return e.mock
+}
+
+// Times sets number of times Client.Watch should be invoked
+func (mmWatch *mEtcdClientMockWatch) Times(n uint64) *mEtcdClientMockWatch {
+	if n == 0 {
+		mmWatch.mock.t.Fatalf("Times of EtcdClientMock.Watch mock can not be zero")
+	}
+	mm_atomic.StoreUint64(&mmWatch.expectedInvocations, n)
+	mmWatch.expectedInvocationsOrigin = minimock.CallerInfo(1)
+	return mmWatch
+}
+
+func (mmWatch *mEtcdClientMockWatch) invocationsDone() bool {
+	if len(mmWatch.expectations) == 0 && mmWatch.defaultExpectation == nil && mmWatch.mock.funcWatch == nil {
+		return true
+	}
+
+	totalInvocations := mm_atomic.LoadUint64(&mmWatch.mock.afterWatchCounter)
+	expectedInvocations := mm_atomic.LoadUint64(&mmWatch.expectedInvocations)
+
+	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
+}
+
+// Watch implements mm_etcd.Client
+func (mmWatch *EtcdClientMock) Watch(ctx context.Context, key string, opts ...etcd.OpOption) (w1 etcd.WatchChan) {
+	mm_atomic.AddUint64(&mmWatch.beforeWatchCounter, 1)
+	defer mm_atomic.AddUint64(&mmWatch.afterWatchCounter, 1)
+
+	mmWatch.t.Helper()
+
+	if mmWatch.inspectFuncWatch != nil {
+		mmWatch.inspectFuncWatch(ctx, key, opts...)
+	}
+
+	mm_params := EtcdClientMockWatchParams{ctx, key, opts}
+
+	// Record call args
+	mmWatch.WatchMock.mutex.Lock()
+	mmWatch.WatchMock.callArgs = append(mmWatch.WatchMock.callArgs, &mm_params)
+	mmWatch.WatchMock.mutex.Unlock()
+
+	for _, e := range mmWatch.WatchMock.expectations {
+		if minimock.Equal(*e.params, mm_params) {
+			mm_atomic.AddUint64(&e.Counter, 1)
+			return e.results.w1
+		}
+	}
+
+	if mmWatch.WatchMock.defaultExpectation != nil {
+		mm_atomic.AddUint64(&mmWatch.WatchMock.defaultExpectation.Counter, 1)
+		mm_want := mmWatch.WatchMock.defaultExpectation.params
+		mm_want_ptrs := mmWatch.WatchMock.defaultExpectation.paramPtrs
+
+		mm_got := EtcdClientMockWatchParams{ctx, key, opts}
+
+		if mm_want_ptrs != nil {
+
+			if mm_want_ptrs.ctx != nil && !minimock.Equal(*mm_want_ptrs.ctx, mm_got.ctx) {
+				mmWatch.t.Errorf("EtcdClientMock.Watch got unexpected parameter ctx, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmWatch.WatchMock.defaultExpectation.expectationOrigins.originCtx, *mm_want_ptrs.ctx, mm_got.ctx, minimock.Diff(*mm_want_ptrs.ctx, mm_got.ctx))
+			}
+
+			if mm_want_ptrs.key != nil && !minimock.Equal(*mm_want_ptrs.key, mm_got.key) {
+				mmWatch.t.Errorf("EtcdClientMock.Watch got unexpected parameter key, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmWatch.WatchMock.defaultExpectation.expectationOrigins.originKey, *mm_want_ptrs.key, mm_got.key, minimock.Diff(*mm_want_ptrs.key, mm_got.key))
+			}
+
+			if mm_want_ptrs.opts != nil && !minimock.Equal(*mm_want_ptrs.opts, mm_got.opts) {
+				mmWatch.t.Errorf("EtcdClientMock.Watch got unexpected parameter opts, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmWatch.WatchMock.defaultExpectation.expectationOrigins.originOpts, *mm_want_ptrs.opts, mm_got.opts, minimock.Diff(*mm_want_ptrs.opts, mm_got.opts))
+			}
+
+		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
+			mmWatch.t.Errorf("EtcdClientMock.Watch got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+				mmWatch.WatchMock.defaultExpectation.expectationOrigins.origin, *mm_want, mm_got, minimock.Diff(*mm_want, mm_got))
+		}
+
+		mm_results := mmWatch.WatchMock.defaultExpectation.results
+		if mm_results == nil {
+			mmWatch.t.Fatal("No results are set for the EtcdClientMock.Watch")
+		}
+		return (*mm_results).w1
+	}
+	if mmWatch.funcWatch != nil {
+		return mmWatch.funcWatch(ctx, key, opts...)
+	}
+	mmWatch.t.Fatalf("Unexpected call to EtcdClientMock.Watch. %v %v %v", ctx, key, opts)
+	return
+}
+
+// WatchAfterCounter returns a count of finished EtcdClientMock.Watch invocations
+func (mmWatch *EtcdClientMock) WatchAfterCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmWatch.afterWatchCounter)
+}
+
+// WatchBeforeCounter returns a count of EtcdClientMock.Watch invocations
+func (mmWatch *EtcdClientMock) WatchBeforeCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmWatch.beforeWatchCounter)
+}
+
+// Calls returns a list of arguments used in each call to EtcdClientMock.Watch.
+// The list is in the same order as the calls were made (i.e. recent calls have a higher index)
+func (mmWatch *mEtcdClientMockWatch) Calls() []*EtcdClientMockWatchParams {
+	mmWatch.mutex.RLock()
+
+	argCopy := make([]*EtcdClientMockWatchParams, len(mmWatch.callArgs))
+	copy(argCopy, mmWatch.callArgs)
+
+	mmWatch.mutex.RUnlock()
+
+	return argCopy
+}
+
+// MinimockWatchDone returns true if the count of the Watch invocations corresponds
+// the number of defined expectations
+func (m *EtcdClientMock) MinimockWatchDone() bool {
+	if m.WatchMock.optional {
+		// Optional methods provide '0 or more' call count restriction.
+		return true
+	}
+
+	for _, e := range m.WatchMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	return m.WatchMock.invocationsDone()
+}
+
+// MinimockWatchInspect logs each unmet expectation
+func (m *EtcdClientMock) MinimockWatchInspect() {
+	for _, e := range m.WatchMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Errorf("Expected call to EtcdClientMock.Watch at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
+		}
+	}
+
+	afterWatchCounter := mm_atomic.LoadUint64(&m.afterWatchCounter)
+	// if default expectation was set then invocations count should be greater than zero
+	if m.WatchMock.defaultExpectation != nil && afterWatchCounter < 1 {
+		if m.WatchMock.defaultExpectation.params == nil {
+			m.t.Errorf("Expected call to EtcdClientMock.Watch at\n%s", m.WatchMock.defaultExpectation.returnOrigin)
+		} else {
+			m.t.Errorf("Expected call to EtcdClientMock.Watch at\n%s with params: %#v", m.WatchMock.defaultExpectation.expectationOrigins.origin, *m.WatchMock.defaultExpectation.params)
+		}
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcWatch != nil && afterWatchCounter < 1 {
+		m.t.Errorf("Expected call to EtcdClientMock.Watch at\n%s", m.funcWatchOrigin)
+	}
+
+	if !m.WatchMock.invocationsDone() && afterWatchCounter > 0 {
+		m.t.Errorf("Expected %d calls to EtcdClientMock.Watch at\n%s but found %d calls",
+			mm_atomic.LoadUint64(&m.WatchMock.expectedInvocations), m.WatchMock.expectedInvocationsOrigin, afterWatchCounter)
+	}
+}
+
 // MinimockFinish checks that all mocked methods have been called the expected number of times
 func (m *EtcdClientMock) MinimockFinish() {
 	m.finishOnce.Do(func() {
 		if !m.minimockDone() {
 			m.MinimockTxnInspect()
+
+			m.MinimockWatchInspect()
 		}
 	})
 }
@@ -380,5 +765,6 @@ func (m *EtcdClientMock) MinimockWait(timeout mm_time.Duration) {
 func (m *EtcdClientMock) minimockDone() bool {
 	done := true
 	return done &&
-		m.MinimockTxnDone()
+		m.MinimockTxnDone() &&
+		m.MinimockWatchDone()
 }
