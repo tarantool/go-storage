@@ -41,6 +41,11 @@ lint-deps:
 	@echo "Installing lint deps"
 	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.10.1
 
+.PHONY: generate
+generate:
+	@echo "Running go generate"
+	@go generate ./...
+
 .PHONY: lint
 lint:
 	@echo "Running go-linter"
