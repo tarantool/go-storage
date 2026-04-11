@@ -441,3 +441,44 @@ func TestEtcdDriver_Watch_CancelWatch(t *testing.T) {
 		assert.Fail(t, "Event channel should be closed after cancelling watch")
 	}
 }
+
+func TestEtcdDriver_Watch_CancelDoesNotAffectOtherWatchers(t *testing.T) {
+	ctx := context.Background()
+
+	driver, cleanup := createTestDriver(t)
+	defer cleanup()
+
+	key1 := testKey(t, "watch-1")
+	key2 := testKey(t, "watch-2")
+	value := []byte("value")
+
+	putValue(ctx, t, driver, key1, value)
+	putValue(ctx, t, driver, key2, value)
+
+	eventCh1, cancelWatch1, err := driver.Watch(ctx, key1)
+	require.NoError(t, err)
+
+	eventCh2, cancelWatch2, err := driver.Watch(ctx, key2)
+	require.NoError(t, err)
+
+	defer cancelWatch2()
+
+	cancelWatch1()
+
+	select {
+	case _, ok := <-eventCh1:
+		assert.False(t, ok, "first event channel should be closed after cancel")
+	case <-time.After(defaultWaitTimeout):
+		assert.Fail(t, "first event channel should be closed after cancel")
+	}
+
+	updatedValue := []byte("updated")
+	putValue(ctx, t, driver, key2, updatedValue)
+
+	select {
+	case event := <-eventCh2:
+		assert.Equal(t, key2, event.Prefix, "second watcher should still receive events")
+	case <-time.After(defaultWaitTimeout):
+		assert.Fail(t, "second watcher should still receive events after first watcher is cancelled")
+	}
+}

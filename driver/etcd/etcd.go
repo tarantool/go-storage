@@ -18,33 +18,21 @@ import (
 	"github.com/tarantool/go-storage/watch"
 )
 
-// Client defines the minimal interface needed for etcd operations.
+// Client defines the minimal interface needed for etcd operations. It
+// is compatible with etcdclientv3.Client.
+//
 // This allows for easier testing and mock implementations.
 type Client interface {
-	// Txn creates a new transaction.
-	Txn(ctx context.Context) etcd.Txn
-}
-
-// Watcher defines the interface for watching etcd changes.
-// This extends the etcd.Watcher interface to match our usage pattern.
-type Watcher interface {
 	// Watch watches for changes on a key (using etcd's signature).
 	Watch(ctx context.Context, key string, opts ...etcd.OpOption) etcd.WatchChan
-	// Close closes the watcher.
-	Close() error
-}
-
-// WatcherFactory creates new watchers from a client.
-type WatcherFactory interface {
-	// NewWatcher creates a new watcher.
-	NewWatcher(client Client) Watcher
+	// Txn creates a new transaction.
+	Txn(ctx context.Context) etcd.Txn
 }
 
 // Driver is an etcd implementation of the storage driver interface.
 // It uses etcd as the underlying key-value storage backend.
 type Driver struct {
-	client         Client         // etcd client interface.
-	watcherFactory WatcherFactory // factory for creating watchers.
+	client Client // etcd client interface.
 }
 
 var (
@@ -59,63 +47,11 @@ var (
 	errUnsupportedOperationType    = errors.New("unsupported operation type")
 )
 
-// etcdClientAdapter wraps etcd.Client to implement our Client interface.
-type etcdClientAdapter struct {
-	client *etcd.Client
-}
-
-func (a *etcdClientAdapter) Txn(ctx context.Context) etcd.Txn {
-	return a.client.Txn(ctx)
-}
-
-// etcdWatcherAdapter wraps etcd.Watcher to implement our Watcher interface.
-type etcdWatcherAdapter struct {
-	watcher etcd.Watcher
-}
-
-func (a *etcdWatcherAdapter) Watch(ctx context.Context, key string, opts ...etcd.OpOption) etcd.WatchChan {
-	return a.watcher.Watch(ctx, key, opts...)
-}
-
-func (a *etcdWatcherAdapter) Close() error {
-	return fmt.Errorf("failed to close: %w", a.watcher.Close())
-}
-
-// etcdWatcherFactory implements WatcherFactory for etcd clients.
-type etcdWatcherFactory struct{}
-
-func (f *etcdWatcherFactory) NewWatcher(client Client) Watcher {
-	// For etcd clients, we need access to the underlying client.
-	if adapter, ok := client.(*etcdClientAdapter); ok {
-		return &etcdWatcherAdapter{
-			watcher: etcd.NewWatcher(adapter.client),
-		}
-	}
-
-	// For other implementations, return a no-op watcher.
-	return &noopWatcher{}
-}
-
-// noopWatcher is a no-op implementation of Watcher for non-etcd clients.
-type noopWatcher struct{}
-
-func (w *noopWatcher) Watch(_ context.Context, _ string, _ ...etcd.OpOption) etcd.WatchChan {
-	ch := make(chan etcd.WatchResponse)
-	close(ch)
-
-	return ch
-}
-
-func (w *noopWatcher) Close() error {
-	return nil
-}
-
 // New creates a new etcd driver instance using an existing etcd client.
 // The client should be properly configured and connected to an etcd cluster.
-func New(client *etcd.Client) *Driver {
+func New(client Client) *Driver {
 	return &Driver{
-		client:         &etcdClientAdapter{client: client},
-		watcherFactory: &etcdWatcherFactory{},
+		client: client,
 	}
 }
 
@@ -167,14 +103,14 @@ const (
 func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
 	eventCh := make(chan watch.Event, eventChannelSize)
 
-	parentWatcher := d.watcherFactory.NewWatcher(d.client)
+	ctx, cancel := context.WithCancel(ctx)
 
 	var opts []etcd.OpOption
 	if bytes.HasSuffix(key, []byte("/")) {
 		opts = append(opts, etcd.WithPrefix())
 	}
 
-	watchChan := parentWatcher.Watch(ctx, string(key), opts...)
+	watchChan := d.client.Watch(ctx, string(key), opts...)
 
 	go func() {
 		defer close(eventCh)
@@ -205,9 +141,7 @@ func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-cha
 		}
 	}()
 
-	return eventCh, func() {
-		_ = parentWatcher.Close()
-	}, nil
+	return eventCh, cancel, nil
 }
 
 // etcdResponseToTxResponse converts an etcd transaction response to tx.Response.

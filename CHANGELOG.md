@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- driver.etcd: etcd.New now accepts an interface that is compatible with
+  `*etcdclientv3.Client` instead of the concrete type, which should not cause
+  any issues when upgrading the version.
+
 ### Fixed
 
 ## [v1.1.2] - 2026-03-30
