@@ -100,20 +100,36 @@ func (s storage) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-
 		var once sync.Once
 
 		wrapperChan := make(chan watch.Event, cap(eventCh))
+		done := make(chan struct{})
 
-		go func() { // Forwarding goroutine.
+		go func() {
 			defer close(wrapperChan)
+			defer close(done)
 
-			for event := range eventCh {
-				wrapperChan <- event
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case event, ok := <-eventCh:
+					if !ok {
+						return
+					}
+
+					select {
+					case <-ctx.Done():
+						return
+					case wrapperChan <- event:
+					}
+				}
 			}
-
-			once.Do(cleanup)
 		}()
 
-		// Cleanup goroutine on context cancellation.
 		go func() {
-			<-ctx.Done()
+			select {
+			case <-ctx.Done():
+			case <-done:
+			}
+
 			once.Do(cleanup)
 		}()
 
