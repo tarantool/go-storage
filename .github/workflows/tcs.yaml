@@ -27,6 +27,7 @@ jobs:
       matrix:
         sdk-version:
           - "3.5.0-0-r70.linux.x86_64"
+        tags: ['integration', 'integration,go_storage_ssl']
       fail-fast: false
     steps:
       # `ref` as merge request is needed for pull_request_target because this
@@ -49,9 +50,6 @@ jobs:
           sdk-download-token: '${{ secrets.SDK_DOWNLOAD_TOKEN }}'
 
       - name: Integration tests
-        run:
-          go test ./... -count=1 -v
-
-      - name: Integration tests
-        run:
-          go test ./... -count=100 -v -race
+        env:
+          TAGS: ${{ matrix.tags }}
+        run: make test

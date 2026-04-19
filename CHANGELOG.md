@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- connect: Added a convenience package to create `Storage` instances from
+  configuration for etcd and Tarantool Config Storage backends. TLS support
+  for TCS is available via the `go_storage_ssl` build tag (requires CGO) (#55).
+
 ### Changed
 
 ### Fixed
