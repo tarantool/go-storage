@@ -1,5 +1,5 @@
 GOTEST := go test
-TAGS :=
+TAGS ?= integration
 COVERAGE_FILE := coverage.out
 
 .PHONY: codespell
@@ -9,8 +9,8 @@ codespell:
 
 .PHONY: test
 test:
-	@echo "Running tests"
-	@go test ./... -count=1 -v -tags=integration
+	@echo "Running tests with tags: $(TAGS)"
+	@go test ./... -count=1 -v -tags="$(TAGS)"
 
 .PHONY: testrace
 testrace:
@@ -19,7 +19,7 @@ testrace:
 
 .PHONY: coverage
 coverage:
-	@echo "Running tests with coveralls"
+	@echo "Running tests with coverage and tags: $(TAGS)"
 	go test -tags "$(TAGS)" $(shell go list ./... | grep -v test_helpers) \
 		-v -coverprofile=$(COVERAGE_FILE).tmp -count=1 -covermode=atomic
 	cat $(COVERAGE_FILE).tmp | grep -v 'internal/mocks/' | grep -v 'internal/testing/' > $(COVERAGE_FILE)
