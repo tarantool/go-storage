@@ -131,6 +131,74 @@ The `driver/tcs` package provides a driver for Tarantool Config Storage (TCS),
 a distributed key‑value storage built on Tarantool. It offers high performance
 and strong consistency.
 
+### Connection Utilities
+
+The `connect` package provides a simplified way to connect to storage backends
+using a unified configuration. It handles connection establishment, SSL/TLS
+setup, and authentication.
+
+> **Note**: Connecting to Tarantool Config Storage (TCS) with SSL requires the
+> `go_storage_ssl` build tag. Without this tag, SSL support is disabled and
+> attempting to connect with `SSL.Enable = true` will return `ErrSSLDisabled`.
+
+#### Quick Start with Connect
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    "github.com/tarantool/go-storage/connect"
+)
+
+func main() {
+    ctx := context.Background()
+
+    cfg := connect.Config{
+        Endpoints: []string{"localhost:2379"},
+        Username:  "user",
+        Password:  "pass",
+    }
+
+    // Automatically tries etcd first, then TCS.
+    stor, cleanup, err := connect.NewStorage(ctx, cfg)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer cleanup()
+
+    // Use the storage...
+    _ = stor
+}
+```
+
+#### Explicit Backend Selection
+
+```go
+// Connect to etcd specifically.
+stor, cleanup, err := connect.NewEtcdStorage(ctx, cfg)
+
+// Connect to TCS specifically.
+stor, cleanup, err := connect.NewTCSStorage(ctx, cfg)
+```
+
+#### SSL/TLS Configuration
+
+```go
+cfg := connect.Config{
+    Endpoints: []string{"localhost:2379"},
+    SSL: connect.SSLConfig{
+        Enable:     true,
+        CaFile:     "/path/to/ca.crt",
+        CertFile:   "/path/to/client.crt",
+        KeyFile:    "/path/to/client.key",
+        VerifyPeer: true,
+    },
+}
+```
+
 ### API Overview
 
 #### Storage Interface
@@ -286,6 +354,26 @@ Comprehensive examples are available in the driver packages:
 - **TCS examples**: [`driver/tcs/examples_test.go`](driver/tcs/examples_test.go)
 
 Run them with `go test -v -run Example ./driver/etcd` or `./driver/tcs`.
+
+### Build Tags
+
+The library supports the following build tags:
+
+#### `go_storage_ssl`
+
+Enables SSL/TLS support for Tarantool Config Storage connections. This tag
+requires the [`go-tlsdialer`](https://github.com/tarantool/go-tlsdialer)
+dependency.
+
+```bash
+# Build with SSL support for TCS
+go build -tags go_storage_ssl ./...
+```
+
+Without this tag:
+- SSL support for TCS is disabled
+- Connecting to TCS with `SSL.Enable = true` returns `ErrSSLDisabled`
+- The `go-tlsdialer` dependency and CGO is not required on build-time
 
 ### Contributing
 
