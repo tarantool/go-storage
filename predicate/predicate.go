@@ -65,6 +65,11 @@ func ValueEqual(key []byte, value any) Predicate {
 }
 
 // VersionEqual creates a predicate that checks if a key's version equals the specified version.
+//
+// Note: passing version == 0 is the canonical "key absent" check (etcd idiom).
+// The TCS driver transparently rewrites this shape to its native count == 0
+// predicate on the wire, since TCS errors when mod_revision references a
+// non-existent key. On etcd it stays as ModRevision == 0.
 func VersionEqual(key []byte, version int64) Predicate {
 	return &predicate{
 		key:    key,
@@ -75,6 +80,11 @@ func VersionEqual(key []byte, version int64) Predicate {
 }
 
 // VersionNotEqual creates a predicate that checks if a key's version is not equal to the specified version.
+//
+// Note: passing version == 0 is the canonical "key present" check (etcd idiom).
+// The TCS driver transparently rewrites this shape to its native count != 0
+// predicate on the wire, since TCS errors when mod_revision references a
+// non-existent key. On etcd it stays as ModRevision != 0.
 func VersionNotEqual(key []byte, version int64) Predicate {
 	return &predicate{
 		key:    key,

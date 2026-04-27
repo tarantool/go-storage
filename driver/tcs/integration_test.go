@@ -386,6 +386,107 @@ func TestTCSDriver_VersionGreaterPredicate(t *testing.T) {
 	assert.True(t, response.Succeeded, "Should succeed when version is greater than specified version")
 }
 
+// TestTCSDriver_VersionEqualZero_AbsentKey verifies the encoder rewrite of
+// VersionEqual(key, 0) to count == 0 — the etcd "key absent" idiom — succeeds
+// against TCS. Without the rewrite, TCS errors because mod_revision is
+// undefined for missing keys.
+func TestTCSDriver_VersionEqualZero_AbsentKey(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	driver, done := createTestDriver(ctx, t)
+	defer done()
+
+	key := testKey(t, "ver-eq-zero-absent")
+	defer cleanupTestKey(ctx, driver, key)
+
+	response, err := driver.Execute(ctx, []predicate.Predicate{
+		predicate.VersionEqual(key, 0),
+	}, []operation.Operation{
+		operation.Put(key, []byte("created")),
+	}, nil)
+	require.NoError(t, err)
+	assert.True(t, response.Succeeded, "VersionEqual(absentKey, 0) should evaluate true")
+}
+
+// TestTCSDriver_VersionEqualZero_PresentKey verifies the negative path: when
+// the key already exists, VersionEqual(key, 0) must evaluate false.
+func TestTCSDriver_VersionEqualZero_PresentKey(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	driver, done := createTestDriver(ctx, t)
+	defer done()
+
+	key := testKey(t, "ver-eq-zero-present")
+	defer cleanupTestKey(ctx, driver, key)
+
+	_, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Put(key, []byte("exists")),
+	}, nil)
+	require.NoError(t, err)
+
+	response, err := driver.Execute(ctx, []predicate.Predicate{
+		predicate.VersionEqual(key, 0),
+	}, []operation.Operation{
+		operation.Put(key, []byte("should-not-be-written")),
+	}, nil)
+	require.NoError(t, err)
+	assert.False(t, response.Succeeded, "VersionEqual(presentKey, 0) should evaluate false")
+}
+
+// TestTCSDriver_VersionNotEqualZero_PresentKey verifies VersionNotEqual(key, 0)
+// — the "key present" idiom — succeeds when the key exists.
+func TestTCSDriver_VersionNotEqualZero_PresentKey(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	driver, done := createTestDriver(ctx, t)
+	defer done()
+
+	key := testKey(t, "ver-neq-zero-present")
+	defer cleanupTestKey(ctx, driver, key)
+
+	_, err := driver.Execute(ctx, nil, []operation.Operation{
+		operation.Put(key, []byte("exists")),
+	}, nil)
+	require.NoError(t, err)
+
+	response, err := driver.Execute(ctx, []predicate.Predicate{
+		predicate.VersionNotEqual(key, 0),
+	}, []operation.Operation{
+		operation.Put(key, []byte("updated")),
+	}, nil)
+	require.NoError(t, err)
+	assert.True(t, response.Succeeded, "VersionNotEqual(presentKey, 0) should evaluate true")
+}
+
+// TestTCSDriver_VersionNotEqualZero_AbsentKey verifies the negative path of the
+// rewrite: for an absent key, VersionNotEqual(key, 0) must evaluate false
+// rather than erroring as mod_revision != 0 would on TCS.
+func TestTCSDriver_VersionNotEqualZero_AbsentKey(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	driver, done := createTestDriver(ctx, t)
+	defer done()
+
+	key := testKey(t, "ver-neq-zero-absent")
+	defer cleanupTestKey(ctx, driver, key)
+
+	response, err := driver.Execute(ctx, []predicate.Predicate{
+		predicate.VersionNotEqual(key, 0),
+	}, []operation.Operation{
+		operation.Put(key, []byte("should-not-be-written")),
+	}, nil)
+	require.NoError(t, err)
+	assert.False(t, response.Succeeded, "VersionNotEqual(absentKey, 0) should evaluate false")
+}
+
 func TestTCSDriver_MultipleKeysPut(t *testing.T) {
 	t.Parallel()
 
