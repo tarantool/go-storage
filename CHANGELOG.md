@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- driver.tcs: predicates of the form `VersionEqual(key, 0)` and
+  `VersionNotEqual(key, 0)` are now transparently rewritten to TCS's
+  `count == 0` / `count != 0` predicates on the wire. Previously these
+  errored against TCS because `mod_revision` is undefined for absent
+  keys. This brings parity with etcd's canonical absence/presence
+  idioms (#61).
+
 ## [v1.1.2] - 2026-03-30
 
 This release fixes an issue where Range returned empty results for names
