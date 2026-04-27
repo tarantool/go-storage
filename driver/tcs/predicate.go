@@ -58,8 +58,38 @@ func newPredicates(inPredicates []goPredicate.Predicate) []predicate {
 
 const (
 	predicateArrayLen = 4
+
+	tcsTargetCount = "count"
 )
 
+// isVersionAgainstZero reports whether the (target, op, value) triple
+// matches the etcd "key absent / key present" — version == 0 or
+// version != 0 — that TCS expresses via the count target.
+func isVersionAgainstZero(target goPredicate.Target, op goPredicate.Op, value any) bool {
+	if target != goPredicate.TargetVersion {
+		return false
+	}
+
+	if op != goPredicate.OpEqual && op != goPredicate.OpNotEqual {
+		return false
+	}
+
+	v, ok := value.(int64)
+
+	return ok && v == 0
+}
+
+// EncodeMsgpack writes the predicate in TCS wire format.
+//
+// Quirk: TCS errors when a `mod_revision` predicate references a key that
+// does not exist. Etcd's canonical absence/presence checks —
+// VersionEqual(key, 0) and VersionNotEqual(key, 0) — would therefore fail
+// on TCS. To preserve cross-driver portability, this encoder transparently
+// rewrites those two shapes to the TCS-native `count` target on the wire
+// (target == "count", same op, same value 0). The Predicate value returned
+// by predicate.VersionEqual / predicate.VersionNotEqual is unchanged; only
+// the wire bytes differ. This mirrors the rewrite TCS's server-side etcd
+// shim performs for `MOD == 0` and `MOD != 0`.
 func (p predicate) EncodeMsgpack(encoder *msgpack.Encoder) error {
 	op, ok := getOperator(p.Operation()) //nolint:varnamelen
 	if !ok {
@@ -69,6 +99,11 @@ func (p predicate) EncodeMsgpack(encoder *msgpack.Encoder) error {
 	target, ok := getTarget(p.Target())
 	if !ok {
 		return ErrUnknownTarget
+	}
+
+	value := p.Value()
+	if isVersionAgainstZero(p.Target(), p.Operation(), value) {
+		target = tcsTargetCount
 	}
 
 	err := encoder.EncodeArrayLen(predicateArrayLen)
@@ -86,7 +121,6 @@ func (p predicate) EncodeMsgpack(encoder *msgpack.Encoder) error {
 		return NewPredicateEncodingError("encode operator", err)
 	}
 
-	value := p.Value()
 	// TCS compares stored values as Lua strings; encoding []byte as msgpack bin
 	// causes a type mismatch in comparisons, so we encode it as string.
 	if b, ok := value.([]byte); ok {
