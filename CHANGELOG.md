@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- storage.Prefixed: New wrapper that scopes every operation, predicate,
+  Range, and Watch call under a given namespace prefix. Nested Prefixed
+  wrappers are flattened at construction.
+
 ### Changed
 
 ### Fixed

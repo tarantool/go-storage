@@ -1820,7 +1820,8 @@ func TestTypedWatch(t *testing.T) {
 	t.Run("basic event filtering", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
+
 		driverMock := mocks.NewDriverMock(t)
 		st := storage.NewStorage(driverMock)
 
@@ -1911,7 +1912,8 @@ func TestTypedWatch(t *testing.T) {
 	t.Run("ParseKey error skips event", func(t *testing.T) {
 		t.Parallel()
 
-		ctx := context.Background()
+		ctx := t.Context()
+
 		driverMock := mocks.NewDriverMock(t)
 		st := storage.NewStorage(driverMock)
 
