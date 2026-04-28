@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `/<sigLocation>/<name>`). The constructor validates segments
   (non-empty, slash-free, unique across categories) and `ParseKey`
   parses keys back to `(name, KeyType, property)` unambiguously.
+- integrity.Codec: schema-only `Codec[T]` (no storage handle) and
+  `CodecBuilder[T]` with a fluent value-receiver API mirroring
+  `TypedBuilder[T]`. `Build()` returns `(*Codec[T], error)` and
+  validates location-override keys eagerly so typos like
+  `WithHashLocation("sah256", …)` are no longer silently ignored.
 
 ### Changed
 
