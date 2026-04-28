@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `TypedBuilder[T]`. `Build()` returns `(*Codec[T], error)` and
   validates location-override keys eagerly so typos like
   `WithHashLocation("sah256", …)` are no longer silently ignored.
+- integrity.Tx: transaction primitives `Tx`, `Branch`, `Branchable`,
+  `GetFuture[T]`, `RangeFuture[T]`, `Response`, and sentinel errors
+  `ErrBranchNotFired`, `ErrTxNotCommitted`, `ErrTxAlreadyCommitted`.
+  `Codec[T]` gains `TxGet`, `TxPut`, `TxDelete`, `TxRange`, and
+  `BindPredicate` for use inside transactions.
 
 ### Changed
 
