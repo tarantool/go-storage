@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `ErrBranchNotFired`, `ErrTxNotCommitted`, `ErrTxAlreadyCommitted`.
   `Codec[T]` gains `TxGet`, `TxPut`, `TxDelete`, `TxRange`, and
   `BindPredicate` for use inside transactions.
+- integrity.Store: `Store[T]` (codec bound to a storage handle) with
+  `Get`/`Put`/`Delete`/`Range`/`Watch` implemented as thin `Tx`
+  wrappers, and `Codec[T].Bind` for cheap binding. Multi-codec
+  transactions lower to a single storage call.
 
 ### Changed
 

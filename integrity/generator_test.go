@@ -92,6 +92,7 @@ func newMockHasher(name string) *mockHasher {
 	}
 }
 
+//nolint:unparam // name kept for symmetry with newMockHasher
 func newMockHasherWithError(name, errMsg string) *mockHasher {
 	return &mockHasher{
 		name:      name,
