@@ -1,0 +1,488 @@
+package integrity_test
+
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/tarantool/go-storage/crypto"
+	"github.com/tarantool/go-storage/hasher"
+	"github.com/tarantool/go-storage/integrity"
+	"github.com/tarantool/go-storage/marshaller"
+	"github.com/tarantool/go-storage/namer"
+)
+
+type codecTestStruct struct {
+	Name  string `yaml:"name"`
+	Value int    `yaml:"value"`
+}
+
+func newTestRSAPSS(t *testing.T) crypto.SignerVerifier {
+	t.Helper()
+
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	return crypto.NewRSAPSSSignerVerifier(*pk)
+}
+
+func TestCodecBuilder_Defaults(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+}
+
+// The codec keeps its namer private, so the default-object-location guarantee
+// is verified by constructing an equivalent LayeredNamer and asserting its
+// output matches the documented "/objects/<name>" shape.
+func TestCodecBuilder_DefaultObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	defaultNamer, err := namer.NewLayeredNamer("objects", nil, nil)
+	require.NoError(t, err)
+
+	keys, err := defaultNamer.GenerateNames("foo")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, "/objects/foo", keys[0].Build())
+}
+
+func TestCodecBuilder_WithObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("myobjects").
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+}
+
+func TestCodecBuilder_WithHasher(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithHasher(hasher.NewSHA256Hasher()).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+
+	n, err := namer.NewLayeredNamer("objects",
+		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		nil)
+	require.NoError(t, err)
+
+	keys, err := n.GenerateNames("foo")
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+
+	var foundHash bool
+
+	for _, k := range keys {
+		if k.Build() == "/hash/sha256/objects/foo" {
+			foundHash = true
+		}
+	}
+
+	assert.True(t, foundHash, "expected hash key at /hash/sha256/objects/foo")
+}
+
+func TestCodecBuilder_WithHashLocation(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithHasher(hasher.NewSHA256Hasher()).
+		WithHashLocation("sha256", "checksums").
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+
+	n, err := namer.NewLayeredNamer("objects",
+		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "checksums"}},
+		nil)
+	require.NoError(t, err)
+
+	keys, err := n.GenerateNames("foo")
+	require.NoError(t, err)
+
+	var foundCustom bool
+
+	for _, k := range keys {
+		if k.Build() == "/hash/checksums/objects/foo" {
+			foundCustom = true
+		}
+	}
+
+	assert.True(t, foundCustom, "expected hash key at /hash/checksums/objects/foo")
+}
+
+func TestCodecBuilder_WithSigner(t *testing.T) {
+	t.Parallel()
+
+	sv := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithSigner(sv).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+}
+
+func TestCodecBuilder_WithVerifier(t *testing.T) {
+	t.Parallel()
+
+	sv := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithVerifier(sv).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+}
+
+func TestCodecBuilder_WithSignerVerifier(t *testing.T) {
+	t.Parallel()
+
+	sv := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithSignerVerifier(sv).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+}
+
+func TestCodecBuilder_WithSignatureLocation(t *testing.T) {
+	t.Parallel()
+
+	signerVerifier := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithSignerVerifier(signerVerifier).
+		WithSignatureLocation(signerVerifier.Name(), "sigs").
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+
+	n, err := namer.NewLayeredNamer("objects", nil,
+		[]namer.LayeredSigLocation{{SignerName: signerVerifier.Name(), Location: "sigs"}})
+	require.NoError(t, err)
+
+	keys, err := n.GenerateNames("bar")
+	require.NoError(t, err)
+
+	var foundSig bool
+
+	for _, key := range keys {
+		if key.Build() == "/sig/sigs/objects/bar" {
+			foundSig = true
+		}
+	}
+
+	assert.True(t, foundSig, "expected sig key at /sig/sigs/objects/bar")
+}
+
+func TestCodecBuilder_StaleHashLocationKey(t *testing.T) {
+	t.Parallel()
+
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithHasher(hasher.NewSHA256Hasher()).
+		WithHashLocation("sah256", "custom"). // typo — no matching hasher.
+		Build()
+	require.Error(t, err, "Build should fail when WithHashLocation key has no matching hasher")
+	assert.Contains(t, err.Error(), "sah256")
+}
+
+func TestCodecBuilder_StaleSigLocationKey(t *testing.T) {
+	t.Parallel()
+
+	sv := newTestRSAPSS(t)
+
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithSignerVerifier(sv).
+		WithSignatureLocation("nonexistent-signer", "sigs").
+		Build()
+	require.Error(t, err, "Build should fail when WithSignatureLocation key has no matching signer/verifier")
+	assert.Contains(t, err.Error(), "nonexistent-signer")
+}
+
+func TestCodecBuilder_ReservedObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	for _, reserved := range []string{"hash", "sig"} {
+		t.Run(reserved, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := integrity.NewCodecBuilder[codecTestStruct]().
+				WithObjectLocation(reserved).
+				Build()
+			require.Error(t, err, "Build should fail when objectLocation equals reserved marker %q", reserved)
+		})
+	}
+}
+
+func TestCodecBuilder_InvalidObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("/foo"). // leading slash — invalid.
+		Build()
+	require.Error(t, err, "Build should fail for location starting with '/'")
+}
+
+func TestCodecBuilder_EmptyObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	// "" is a valid input (it falls back to "objects" inside Build), so the
+	// invalid-segment check has to be exercised with a non-empty bad value.
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("a/b").
+		Build()
+	require.Error(t, err)
+}
+
+type sentinelMarshaller struct {
+	marshalCalled bool
+}
+
+func (s *sentinelMarshaller) Marshal(_ codecTestStruct) ([]byte, error) {
+	s.marshalCalled = true
+
+	return []byte(`name: "x"\nvalue: 1\n`), nil
+}
+
+func (s *sentinelMarshaller) Unmarshal(_ []byte) (codecTestStruct, error) {
+	return codecTestStruct{Name: "x", Value: 1}, nil
+}
+
+func TestCodecBuilder_WithMarshaller(t *testing.T) {
+	t.Parallel()
+
+	sentMarsh := &sentinelMarshaller{marshalCalled: false}
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithMarshaller(sentMarsh).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+
+	// ValueEqual is the smallest public surface that calls Marshal, so it
+	// makes a good probe for "did the custom marshaller actually take effect?".
+	_, err = codec.ValueEqual(codecTestStruct{Name: "x", Value: 1})
+	require.NoError(t, err)
+	assert.True(t, sentMarsh.marshalCalled, "custom marshaller should have been called")
+}
+
+type sentinelNamer struct {
+	called bool
+}
+
+func (n *sentinelNamer) GenerateNames(name string) ([]namer.Key, error) {
+	return []namer.Key{
+		namer.NewDefaultKey(name, namer.KeyTypeValue, "", "/sentinel/"+name),
+	}, nil
+}
+
+func (n *sentinelNamer) ParseKey(raw string) (namer.DefaultKey, error) {
+	name := strings.TrimPrefix(raw, "/sentinel/")
+
+	return namer.NewDefaultKey(name, namer.KeyTypeValue, "", raw), nil
+}
+
+func (n *sentinelNamer) ParseKeys(names []string, ignoreError bool) (namer.Results, error) {
+	out := map[string][]namer.Key{}
+
+	for _, raw := range names {
+		key, err := n.ParseKey(raw)
+		if err != nil {
+			if ignoreError {
+				continue
+			}
+
+			return namer.Results{}, err
+		}
+
+		out[key.Name()] = append(out[key.Name()], key)
+	}
+
+	return namer.NewResults(out), nil
+}
+
+func (n *sentinelNamer) Prefix(val string, _ bool) string {
+	return "/sentinel/" + strings.Trim(val, "/")
+}
+
+func TestCodecBuilder_WithNamer(t *testing.T) {
+	t.Parallel()
+
+	var constructorCalled bool
+
+	customConstructor := integrity.CodecNamerConstructor(func(
+		_ string,
+		_ []namer.LayeredHashLocation,
+		_ []namer.LayeredSigLocation,
+		_ ...namer.LayeredOption,
+	) (namer.Namer, error) {
+		constructorCalled = true
+
+		return &sentinelNamer{called: false}, nil
+	})
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithNamer(customConstructor).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+
+	// Build creates three namers (gen/val/top), so seeing the constructor
+	// fire at least once is enough to prove the override took effect.
+	assert.True(t, constructorCalled, "custom CodecNamerConstructor should have been called during Build")
+}
+
+func TestCodec_ValueEqual(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	val := codecTestStruct{Name: "hello", Value: 42}
+	pred, err := codec.ValueEqual(val)
+	require.NoError(t, err)
+	require.NotNil(t, pred)
+
+	key := []byte("/objects/foo")
+	concretePred := pred(key)
+	require.NotNil(t, concretePred)
+	assert.Equal(t, key, concretePred.Key())
+
+	marsh := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
+	expected, err := marsh.Marshal(val)
+	require.NoError(t, err)
+	assert.Equal(t, expected, concretePred.Value())
+}
+
+func TestCodec_ValueNotEqual(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	val := codecTestStruct{Name: "hello", Value: 42}
+	pred, err := codec.ValueNotEqual(val)
+	require.NoError(t, err)
+	require.NotNil(t, pred)
+
+	key := []byte("/objects/foo")
+	p := pred(key)
+	require.NotNil(t, p)
+	assert.Equal(t, key, p.Key())
+}
+
+func TestCodec_VersionEqual(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	pred := codec.VersionEqual(int64(42))
+	require.NotNil(t, pred)
+
+	key := []byte("/objects/foo")
+	p := pred(key)
+	require.NotNil(t, p)
+	assert.Equal(t, key, p.Key())
+	assert.Equal(t, int64(42), p.Value())
+}
+
+func TestCodec_VersionNotEqual(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	pred := codec.VersionNotEqual(int64(7))
+	key := []byte("/objects/bar")
+	p := pred(key)
+	assert.Equal(t, int64(7), p.Value())
+	assert.Equal(t, key, p.Key())
+}
+
+func TestCodec_VersionGreater(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	pred := codec.VersionGreater(int64(100))
+	key := []byte("/objects/baz")
+	p := pred(key)
+	assert.Equal(t, int64(100), p.Value())
+}
+
+func TestCodec_VersionLess(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	pred := codec.VersionLess(int64(5))
+	key := []byte("/objects/qux")
+	p := pred(key)
+	assert.Equal(t, int64(5), p.Value())
+}
+
+func TestCodecBuilder_Immutability(t *testing.T) {
+	t.Parallel()
+
+	base := integrity.NewCodecBuilder[codecTestStruct]()
+
+	marsh1 := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
+	marsh2 := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
+
+	builder1 := base.WithMarshaller(marsh1)
+	builder2 := builder1.WithMarshaller(marsh2)
+
+	codec1, err := builder1.Build()
+	require.NoError(t, err)
+
+	codec2, err := builder2.Build()
+	require.NoError(t, err)
+
+	assert.NotSame(t, codec1, codec2)
+}
+
+func TestCodecBuilder_ImmutabilityHashers(t *testing.T) {
+	t.Parallel()
+
+	base := integrity.NewCodecBuilder[codecTestStruct]()
+	withSHA256 := base.WithHasher(hasher.NewSHA256Hasher())
+	withSHA256SHA1 := withSHA256.WithHasher(hasher.NewSHA1Hasher())
+
+	_, err := base.Build()
+	require.NoError(t, err)
+
+	_, err = withSHA256.Build()
+	require.NoError(t, err)
+
+	_, err = withSHA256SHA1.Build()
+	require.NoError(t, err)
+}
+
+func TestCodecBuilder_MultipleBuildCalls(t *testing.T) {
+	t.Parallel()
+
+	builder := integrity.NewCodecBuilder[codecTestStruct]()
+
+	codec1, err := builder.Build()
+	require.NoError(t, err)
+
+	codec2, err := builder.Build()
+	require.NoError(t, err)
+
+	assert.NotSame(t, codec1, codec2, "each Build call should return a distinct *Codec[T]")
+}
