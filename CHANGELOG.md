@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - storage.Prefixed: New wrapper that scopes every operation, predicate,
   Range, and Watch call under a given namespace prefix. Nested Prefixed
   wrappers are flattened at construction.
+- namer.LayeredNamer: namespace-agnostic namer that places each key
+  category under its own top-level location segment
+  (`/<objectLocation>/<name>`, `/<hashLocation>/<name>`,
+  `/<sigLocation>/<name>`). The constructor validates segments
+  (non-empty, slash-free, unique across categories) and `ParseKey`
+  parses keys back to `(name, KeyType, property)` unambiguously.
 
 ### Changed
 
