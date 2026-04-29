@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [v1.2.0] - 2026-04-29
+
+This release introduces a new `connect` package for building `Storage`
+instances from configuration, fixes a goroutine leak in `storage.Watch`,
+and improves TCS predicate compatibility with etcd's absence/presence
+idioms.
+
+### Added
+
 - connect: Added a convenience package to create `Storage` instances from
   configuration for etcd and Tarantool Config Storage backends. TLS support
   for TCS is available via the `go_storage_ssl` build tag (requires CGO) (#55).
@@ -21,6 +34,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- storage.Watch: prevent goroutine leak when the consumer stops reading from
+  the event channel before the watch is cancelled.
 - driver.tcs: predicates of the form `VersionEqual(key, 0)` and
   `VersionNotEqual(key, 0)` are now transparently rewritten to TCS's
   `count == 0` / `count != 0` predicates on the wire. Previously these
@@ -90,6 +105,7 @@ The release introduces the initial version of the library.
 
 ### Fixed
 
+[v1.2.0]: https://github.com/tarantool/go-storage/releases/tag/v1.2.0
 [v1.1.2]: https://github.com/tarantool/go-storage/releases/tag/v1.1.2
 [v1.1.1]: https://github.com/tarantool/go-storage/releases/tag/v1.1.1
 [v1.1.0]: https://github.com/tarantool/go-storage/releases/tag/v1.1.0
