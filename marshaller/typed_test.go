@@ -9,15 +9,15 @@ import (
 )
 
 type TestStruct struct {
-	Name  string   `yaml:"name"`
-	Value int      `yaml:"value"`
-	Tags  []string `yaml:"tags,omitempty"`
+	Name  string   `json:"name"           yaml:"name"`
+	Value int      `json:"value"          yaml:"value"`
+	Tags  []string `json:"tags,omitempty" yaml:"tags,omitempty"`
 }
 
 type NestedStruct struct {
-	ID     int        `yaml:"id"`
-	Data   TestStruct `yaml:"data"`
-	Active bool       `yaml:"active"`
+	ID     int        `json:"id"     yaml:"id"`
+	Data   TestStruct `json:"data"   yaml:"data"`
+	Active bool       `json:"active" yaml:"active"`
 }
 
 func TestTypedYamlMarshaller_New(t *testing.T) {
@@ -240,4 +240,93 @@ func TestTypedYamlMarshaller_WithSliceType(t *testing.T) {
 	unmarshaled, err := marsh.Unmarshal(marshaled)
 	require.NoError(t, err)
 	require.Equal(t, original, unmarshaled)
+}
+
+func TestTypedJSONMarshaller_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	marsh := marshaller.NewTypedJSONMarshaller[TestStruct]()
+
+	original := TestStruct{
+		Name:  "roundtrip",
+		Value: 99,
+		Tags:  []string{"a", "b", "c"},
+	}
+
+	marshaled, err := marsh.Marshal(original)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"name":"roundtrip","value":99,"tags":["a","b","c"]}`, string(marshaled))
+
+	unmarshaled, err := marsh.Unmarshal(marshaled)
+	require.NoError(t, err)
+	require.Equal(t, original, unmarshaled)
+}
+
+func TestTypedJSONMarshaller_NestedStruct(t *testing.T) {
+	t.Parallel()
+
+	marsh := marshaller.NewTypedJSONMarshaller[NestedStruct]()
+
+	original := NestedStruct{
+		ID: 1,
+		Data: TestStruct{
+			Name:  "nested",
+			Value: 100,
+			Tags:  nil,
+		},
+		Active: true,
+	}
+
+	marshaled, err := marsh.Marshal(original)
+	require.NoError(t, err)
+
+	unmarshaled, err := marsh.Unmarshal(marshaled)
+	require.NoError(t, err)
+	require.Equal(t, original, unmarshaled)
+}
+
+func TestTypedJSONMarshaller_Unmarshal_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	marsh := marshaller.NewTypedJSONMarshaller[TestStruct]()
+
+	_, err := marsh.Unmarshal([]byte(`{not json}`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Failed to unmarshal")
+}
+
+func TestTypedBytesMarshaller_Passthrough(t *testing.T) {
+	t.Parallel()
+
+	marsh := marshaller.NewTypedBytesMarshaller()
+
+	original := []byte{0x00, 0x01, 0x02, 0xff}
+
+	marshaled, err := marsh.Marshal(original)
+	require.NoError(t, err)
+	require.Equal(t, original, marshaled)
+
+	unmarshaled, err := marsh.Unmarshal(marshaled)
+	require.NoError(t, err)
+	require.Equal(t, original, unmarshaled)
+}
+
+func TestTypedBytesMarshaller_Nil(t *testing.T) {
+	t.Parallel()
+
+	marsh := marshaller.NewTypedBytesMarshaller()
+
+	marshaled, err := marsh.Marshal(nil)
+	require.NoError(t, err)
+	require.Nil(t, marshaled)
+
+	unmarshaled, err := marsh.Unmarshal(nil)
+	require.NoError(t, err)
+	require.Nil(t, unmarshaled)
+}
+
+func TestTypedBytesMarshaller_ImplementsTypedMarshaller(t *testing.T) {
+	t.Parallel()
+
+	var _ marshaller.TypedMarshaller[[]byte] = marshaller.NewTypedBytesMarshaller()
 }
