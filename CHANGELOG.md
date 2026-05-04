@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `Get`/`Put`/`Delete`/`Range`/`Watch` implemented as thin `Tx`
   wrappers, and `Codec[T].Bind` for cheap binding. Multi-codec
   transactions lower to a single storage call.
+- marshaller: `TypedJSONMarshaller[T]` for `encoding/json`-based
+  marshalling and `TypedBytesMarshaller` passthrough
+  `TypedMarshaller[[]byte]` for values that are already serialized or
+  stored as opaque blobs.
 
 ### Changed
 
