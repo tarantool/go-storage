@@ -9,42 +9,49 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- storage.Prefixed: New wrapper that scopes every operation, predicate,
-  Range, and Watch call under a given namespace prefix. Nested Prefixed
-  wrappers are flattened at construction.
-- namer.LayeredNamer: namespace-agnostic namer that places each key
-  category under its own top-level location segment
-  (`/<objectLocation>/<name>`, `/<hashLocation>/<name>`,
-  `/<sigLocation>/<name>`). The constructor validates segments
-  (non-empty, slash-free, unique across categories) and `ParseKey`
-  parses keys back to `(name, KeyType, property)` unambiguously.
-- integrity.Codec: schema-only `Codec[T]` (no storage handle) and
-  `CodecBuilder[T]` with a fluent value-receiver API mirroring
-  `TypedBuilder[T]`. `Build()` returns `(*Codec[T], error)` and
-  validates location-override keys eagerly so typos like
-  `WithHashLocation("sah256", …)` are no longer silently ignored.
-- integrity.Tx: transaction primitives `Tx`, `Branch`, `Branchable`,
-  `GetFuture[T]`, `RangeFuture[T]`, `Response`, and sentinel errors
-  `ErrBranchNotFired`, `ErrTxNotCommitted`, `ErrTxAlreadyCommitted`.
-  `Codec[T]` gains `TxGet`, `TxPut`, `TxDelete`, `TxRange`, and
-  `BindPredicate` for use inside transactions.
-- integrity.Store: `Store[T]` (codec bound to a storage handle) with
-  `Get`/`Put`/`Delete`/`Range`/`Watch` implemented as thin `Tx`
-  wrappers, and `Codec[T].Bind` for cheap binding. Multi-codec
-  transactions lower to a single storage call.
-- marshaller: `TypedJSONMarshaller[T]` for `encoding/json`-based
-  marshalling and `TypedBytesMarshaller` passthrough
-  `TypedMarshaller[[]byte]` for values that are already serialized or
-  stored as opaque blobs.
-
 ### Changed
 
 ### Fixed
 
-- Bump google.golang.org/grpc to v1.79.3 to fix GO-2026-4762
-  (authorization bypass via missing leading slash in :path).
-- Bump go.opentelemetry.io/otel/sdk to v1.40.0 to fix GO-2026-4394
-  (arbitrary code execution via PATH hijacking).
+## [v1.3.0] - 2026-05-05
+
+This release introduces a new transaction-aware integrity API
+(`Codec[T]`, `Store[T]`, and `Tx`), a `Prefixed` storage wrapper for
+namespace scoping, a `LayeredNamer` with per-category key layout, and
+additional typed marshallers. It also bumps dependencies to address
+vulnerabilities reported by govulncheck.
+
+### Added
+
+- storage.Prefixed: wrapper that scopes every storage operation,
+  predicate, Range, and Watch call under a given namespace prefix.
+  Nested wrappers are flattened automatically (#67).
+- namer.LayeredNamer: namespace-agnostic namer that places each key
+  category under its own top-level location segment
+  (`/<objectLocation>/<name>`, `/hash/<hashLocation>/...`,
+  `/sig/<sigLocation>/...`). Segments are validated at construction
+  and `ParseKey` parses keys back to `(name, KeyType, property)`
+  unambiguously (#68).
+- integrity: new schema-driven API for integrity-protected storage.
+  `Codec[T]` describes the value layout independently of any storage
+  handle and is built via the fluent `CodecBuilder[T]`, which
+  validates location-override keys eagerly so typos like
+  `WithHashLocation("sah256", …)` are no longer silently ignored.
+  `Store[T]` binds a codec to a storage handle and exposes
+  `Get`/`Put`/`Delete`/`Range`/`Watch`. Conditional multi-key updates
+  are available through `Tx` with `Branch` and typed futures;
+  multi-codec transactions are lowered to a single storage call
+  (#69, #70, #71).
+- marshaller: `TypedJSONMarshaller[T]` for `encoding/json`-based
+  marshalling and `TypedBytesMarshaller` passthrough for values
+  already stored as opaque bytes (#73).
+
+### Fixed
+
+- Bumped `google.golang.org/grpc` to `v1.79.3` (GO-2026-4762:
+  authorization bypass via missing leading slash in `:path`) and
+  `go.opentelemetry.io/otel/sdk` to `v1.40.0` (GO-2026-4394: arbitrary
+  code execution via PATH hijacking) (#75).
 
 ## [v1.2.0] - 2026-04-29
 
@@ -138,6 +145,7 @@ The release introduces the initial version of the library.
 
 ### Fixed
 
+[v1.3.0]: https://github.com/tarantool/go-storage/releases/tag/v1.3.0
 [v1.2.0]: https://github.com/tarantool/go-storage/releases/tag/v1.2.0
 [v1.1.2]: https://github.com/tarantool/go-storage/releases/tag/v1.1.2
 [v1.1.1]: https://github.com/tarantool/go-storage/releases/tag/v1.1.1
