@@ -37,6 +37,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- Bump google.golang.org/grpc to v1.79.3 to fix GO-2026-4762
+  (authorization bypass via missing leading slash in :path).
+- Bump go.opentelemetry.io/otel/sdk to v1.40.0 to fix GO-2026-4394
+  (arbitrary code execution via PATH hijacking).
+
 ## [v1.2.0] - 2026-04-29
 
 This release introduces a new `connect` package for building `Storage`
