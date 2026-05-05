@@ -32,6 +32,10 @@ safety are critical.
 - Real-time Watch: Monitor changes to keys and prefixes
 - Conditional Execution: Value and version-based predicates for safe updates
 - Data Integrity: Built-in signing and verification of stored data
+- Schema-Driven Integrity API: `Codec[T]` / `Store[T]` for type-safe values
+  plus multi-key atomic transactions via `Tx`
+- Namespace Scoping: `Prefixed` wrapper that scopes every operation under a
+  key prefix
 - Key‑Value Operations: Get, Put, Delete with prefix support
 - Range Queries: Efficient scanning of keys with filters
 - Extensible Drivers: Easy to add new storage backends
@@ -208,6 +212,23 @@ The core `Storage` interface (`storage.Storage`) provides high‑level methods:
 - `Tx(ctx) tx.Tx` – create a transaction builder
 - `Range(ctx, opts) ([]kv.KeyValue, error)` – range query with prefix/limit
 
+#### Namespace Scoping with `Prefixed`
+
+`storage.Prefixed(prefix, inner)` returns a `Storage` that transparently
+prepends `prefix` to every operation, predicate, Range, and Watch call, and
+strips it back from any keys returned to the caller. Nested wrappers are
+flattened at construction (`Prefixed("/a", Prefixed("/b", base))` is
+equivalent to `Prefixed("/a/b", base)`).
+
+```go
+scoped := storage.Prefixed("/ns", storage.NewStorage(driver))
+
+// Caller writes /cfg/version; the driver actually stores /ns/cfg/version.
+_, err := scoped.Tx(ctx).Then(
+    operation.Put([]byte("/cfg/version"), []byte("1.0.0")),
+).Commit()
+```
+
 #### Transaction Builder
 The `tx.Tx` interface enables conditional transactions:
 
@@ -345,6 +366,97 @@ type MyConfig struct {
 The `integrity.Typed` builder also accepts custom marshallers (default is
 YAML), custom namers, and separate signer/verifier instances for asymmetric
 setups.
+
+#### Schema-Driven Integrity API (`Codec`, `Store`, `Tx`)
+
+Alongside `integrity.Typed`, the package exposes a schema-first API split
+into three pieces:
+
+- `integrity.Codec[T]` describes the on-disk layout (object location,
+  hashers, signers, marshaller) without binding to any storage handle. It is
+  built via the fluent `CodecBuilder[T]`, which validates location-override
+  keys eagerly so typos like `WithHashLocation("sah256", …)` fail at
+  `Build()` instead of being silently ignored.
+- `integrity.Store[T]` is a codec bound to a `storage.Storage` and exposes
+  the familiar `Get` / `Put` / `Delete` / `Range` / `Watch` methods.
+- `integrity.Tx` accumulates `TxGet` / `TxPut` / `TxDelete` / `TxRange`
+  calls from one or more codecs and commits them atomically through a
+  single storage call. Reads return typed futures (`GetFuture[T]`,
+  `RangeFuture[T]`) whose `Result()` is populated after `Commit`.
+
+##### Codec and Store
+
+```go
+codec, err := integrity.NewCodecBuilder[MyConfig]().
+    WithObjectLocation("config").
+    WithHasher(hasher.NewSHA256Hasher()).
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+
+store := codec.Bind(baseStorage)
+
+if err := store.Put(ctx, "app/settings", MyConfig{...}); err != nil {
+    log.Fatal(err)
+}
+
+res, err := store.Get(ctx, "app/settings")
+if err != nil {
+    log.Fatal(err)
+}
+cfg := res.Value.Unwrap()
+```
+
+##### Multi-Key Transactions
+
+`Tx` batches reads and writes — across multiple codecs if needed — into one
+atomic storage call. `If` predicates are routed by `Then` / `Else`; futures
+attached to the branch that did not fire return `ErrBranchNotFired`.
+
+```go
+txn := integrity.NewTx(baseStorage)
+
+pred, _ := codec.ValueEqual(MyConfig{...})
+bound, _ := codec.BindPredicate("app/settings", pred)
+txn.If(bound)
+
+newFut := codec.TxGet(txn.Then(), "app/new-settings")
+_ = codec.TxPut(txn.Then(), "app/settings", MyConfig{...})
+
+resp, err := txn.Commit(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+if !resp.Succeeded {
+    // The Then branch did not fire; newFut.Result() returns
+    // integrity.ErrBranchNotFired.
+}
+```
+
+##### Layered Key Layout
+
+The new API uses `namer.LayeredNamer` by default, which places each key
+category under its own top-level location segment:
+
+```
+/<objectLocation>/<name>                       (value)
+/hash/<hashLocation>/<objectLocation>/<name>   (one per hasher)
+/sig/<sigLocation>/<objectLocation>/<name>     (one per signer)
+```
+
+`namer.CompactSingleHash()` and `namer.CompactSingleSig()` drop the
+per-hasher / per-signer segment when exactly one is configured. `ParseKey`
+parses a raw key back to `(name, KeyType, property)` unambiguously.
+
+##### Marshallers
+
+Beyond the default YAML marshaller, the `marshaller` package now ships:
+
+- `TypedJSONMarshaller[T]` — `encoding/json`-based marshalling for any
+  Go type.
+- `TypedBytesMarshaller` — passthrough `TypedMarshaller[[]byte]` for values
+  that are already serialized or stored as opaque blobs.
 
 ### Examples
 
