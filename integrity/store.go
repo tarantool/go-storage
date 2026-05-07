@@ -21,12 +21,6 @@ type Store[T any] struct {
 	storage storage.Storage
 }
 
-// Bind creates a new Store[T] by binding c to the given storage. Bind is a
-// cheap struct literal — no caching, no validation.
-func (c *Codec[T]) Bind(s storage.Storage) *Store[T] {
-	return &Store[T]{codec: c, storage: s}
-}
-
 // Get retrieves and validates a single named value from storage.
 func (s *Store[T]) Get(
 	ctx context.Context,

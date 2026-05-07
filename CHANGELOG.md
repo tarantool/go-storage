@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   inner `/`. The reserved-marker check still applies to the first segment,
   so `objectLocation` values like `"hash/foo"` or `"sig/foo"` remain
   rejected because they would collide with the hash/sig key dispatch.
+- integrity.SingletonStore[T] + `Codec[T].BindSingleton`: bind a codec to
+  one fixed name at construction time, then call
+  `Get`/`Put`/`Delete`/`Watch` and `TxGet`/`TxPut`/`TxDelete` without
+  threading the name through every call. Suited for configuration
+  objects that live at a single known key (e.g. `/settings/auth`)
+  instead of under a directory of `<objectLocation>/<id>` items. The
+  on-disk layout is identical to `Store[T]` for the same name — no
+  separate codec, no separate namer.
 
 ### Changed
 
