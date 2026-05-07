@@ -344,3 +344,71 @@ func TestDefaultNamer_Prefix(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultNamer_Prefixes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		prefix    string
+		hashNames []string
+		sigNames  []string
+		val       string
+		isPrefix  bool
+		expected  []string
+	}{
+		{
+			name:      "empty val collapses to single root regardless of categories",
+			prefix:    "/storage",
+			hashNames: nil,
+			sigNames:  nil,
+			val:       "",
+			isPrefix:  true,
+			expected:  []string{"/storage/"},
+		},
+		{
+			name:      "empty val with hashers and signers still collapses",
+			prefix:    "/storage",
+			hashNames: []string{"sha256"},
+			sigNames:  []string{"rsa"},
+			val:       "",
+			isPrefix:  true,
+			expected:  []string{"/storage/"},
+		},
+		{
+			name:      "non-empty val fans out per category as prefix",
+			prefix:    "/storage",
+			hashNames: []string{"sha256"},
+			sigNames:  []string{"rsa"},
+			val:       "alice",
+			isPrefix:  true,
+			expected: []string{
+				"/storage/alice/",
+				"/storage/hash/sha256/alice/",
+				"/storage/sig/rsa/alice/",
+			},
+		},
+		{
+			name:      "non-empty val fans out per category, no trailing slash",
+			prefix:    "/storage",
+			hashNames: []string{"sha256"},
+			sigNames:  []string{"rsa"},
+			val:       "alice",
+			isPrefix:  false,
+			expected: []string{
+				"/storage/alice",
+				"/storage/hash/sha256/alice",
+				"/storage/sig/rsa/alice",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dn := namer.NewDefaultNamer(tt.prefix, tt.hashNames, tt.sigNames)
+			assert.Equal(t, tt.expected, dn.Prefixes(tt.val, tt.isPrefix))
+		})
+	}
+}

@@ -228,6 +228,63 @@ func TestStoreIntegration_Range(t *testing.T) {
 	})
 }
 
+// TestStoreIntegration_Range_EmptyWithSignerVerifier is a regression test for
+// the bug where Range(ctx, "") returned no items as soon as a hasher or
+// signer/verifier was configured: the empty-name branch fetched only the
+// value-layer prefix, so validation always reported missing hash/sig keys and
+// every result was filtered out.
+func TestStoreIntegration_Range_EmptyWithSignerVerifier(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		shaHash := hasher.NewSHA256Hasher()
+		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+
+		_, store := newIntegrationCodecStore(t, driverInstance,
+			func(b integrity.CodecBuilder[IntegrationStruct]) integrity.CodecBuilder[IntegrationStruct] {
+				return b.
+					WithHasher(shaHash).
+					WithSignerVerifier(rsaSV).
+					WithObjectLocation("haha")
+			})
+
+		seed := map[string]IntegrationStruct{
+			"key1": {Name: "obj1", Value: 100},
+			"key2": {Name: "obj2", Value: 200},
+		}
+		for name, value := range seed {
+			require.NoError(t, store.Put(ctx, name, value))
+		}
+
+		defer cleanupStore(t, store, "key1", "key2")
+
+		results, err := store.Range(ctx, "")
+		require.NoError(t, err)
+		require.Len(t, results, len(seed))
+
+		for i := range results {
+			results[i].ModRevision = 0
+		}
+
+		expected := []integrity.ValidatedResult[IntegrationStruct]{
+			{
+				Name:        "key1",
+				Value:       option.Some(seed["key1"]),
+				ModRevision: 0,
+				Error:       nil,
+			},
+			{
+				Name:        "key2",
+				Value:       option.Some(seed["key2"]),
+				ModRevision: 0,
+				Error:       nil,
+			},
+		}
+		require.ElementsMatch(t, expected, results)
+	})
+}
+
 // TestStoreIntegration_WithSignerVerifier round-trips a value through a codec
 // with both a hasher and an RSA-PSS signer/verifier; Get must verify cleanly.
 func TestStoreIntegration_WithSignerVerifier(t *testing.T) {

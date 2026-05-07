@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- namer.Namer: new `Prefixes(val, isPrefix) []string` method returning one
+  range prefix per key category (value, hash, sig). `Prefix` only covered
+  the value layer, which makes `Range` miss hash/sig keys when an integrity
+  validator is attached. Both `DefaultNamer` and `LayeredNamer` implement
+  it; third-party implementations of `Namer` must add the method.
 - namer.LayeredNamer: `objectLocation` may now be a multi-segment path
   (e.g. `"settings/ldap"`). Previously the segment validator rejected any
   inner `/`. The reserved-marker check still applies to the first segment,
@@ -42,6 +47,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- integrity: `Store[T].Range(ctx, "")` and `Typed[T].Range(ctx, "")`
+  returned an empty slice as soon as a hasher or signer/verifier was
+  configured. The empty-name branch fetched only the value-layer prefix,
+  so the validator saw no hash/sig keys and dropped every result with a
+  "missing signature/hash" error. Both methods now fan out across every
+  category prefix via the new `Namer.Prefixes` method. With
+  `LayeredNamer` (the `Codec` default) hash and sig keys live at separate
+  roots, so this reproduced for every empty `Range`; with `DefaultNamer`
+  the bug was masked because all categories share a single root prefix.
 - watch: prefix-shaped Watch calls (e.g. `Watch(ctx, "acl/")`) used to
   silently drop every event because drivers emitted the watched key
   with the trailing `/` intact and the integrity layer's `ParseKey`

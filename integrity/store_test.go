@@ -1486,14 +1486,24 @@ func TestStore_Range_WithValidationError(t *testing.T) {
 	require.Len(t, kvs, 2)
 
 	// Only data KV — hash missing → validation error (object skipped).
+	// Empty Range fans out one Get per category prefix (value + hash); the
+	// hash-prefix Get returns nothing, which is the missing-hash signal.
 	dataKV := kvs[0]
 
-	expectedPrefix := testNamer.Prefix("", true)
-	expectedOps := []operation.Operation{makeAbsoluteGetOp(expectedPrefix)}
+	expectedPrefixes := testNamer.Prefixes("", true)
+	require.Len(t, expectedPrefixes, 2)
+
+	expectedOps := make([]operation.Operation, 0, len(expectedPrefixes))
+	for _, prefix := range expectedPrefixes {
+		expectedOps = append(expectedOps, makeAbsoluteGetOp(prefix))
+	}
 
 	response := tx.Response{
 		Succeeded: true,
-		Results:   []tx.RequestResponse{{Values: []kv.KeyValue{dataKV}}},
+		Results: []tx.RequestResponse{
+			{Values: []kv.KeyValue{dataKV}}, // value-prefix Get: data present.
+			{Values: nil},                   // hash-prefix Get: empty.
+		},
 	}
 
 	driverMock.ExecuteMock.Expect(ctx, []predicate.Predicate{}, expectedOps, nil).Return(response, nil)
@@ -1531,12 +1541,20 @@ func TestStore_Range_WithIgnoreVerificationError(t *testing.T) {
 
 	dataKV := kvs[0]
 
-	expectedPrefix := testNamer.Prefix("", true)
-	expectedOps := []operation.Operation{makeAbsoluteGetOp(expectedPrefix)}
+	expectedPrefixes := testNamer.Prefixes("", true)
+	require.Len(t, expectedPrefixes, 2)
+
+	expectedOps := make([]operation.Operation, 0, len(expectedPrefixes))
+	for _, prefix := range expectedPrefixes {
+		expectedOps = append(expectedOps, makeAbsoluteGetOp(prefix))
+	}
 
 	response := tx.Response{
 		Succeeded: true,
-		Results:   []tx.RequestResponse{{Values: []kv.KeyValue{dataKV}}},
+		Results: []tx.RequestResponse{
+			{Values: []kv.KeyValue{dataKV}}, // value-prefix Get: data present.
+			{Values: nil},                   // hash-prefix Get: empty.
+		},
 	}
 
 	driverMock.ExecuteMock.Expect(ctx, []predicate.Predicate{}, expectedOps, nil).Return(response, nil)
