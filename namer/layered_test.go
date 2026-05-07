@@ -51,8 +51,13 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "objectLocation with inner slash",
+			name:    "objectLocation with inner slash is valid (multi-segment)",
 			args:    args{objectLocation: "obj/ects", hashLocations: nil, sigLocations: nil, opts: nil},
+			wantErr: false,
+		},
+		{
+			name:    "objectLocation with empty inner segment",
+			args:    args{objectLocation: "a//b", hashLocations: nil, sigLocations: nil, opts: nil},
 			wantErr: true,
 		},
 		{
@@ -64,6 +69,21 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name:    "objectLocation reserved: sig",
 			args:    args{objectLocation: "sig", hashLocations: nil, sigLocations: nil, opts: nil},
 			wantErr: true,
+		},
+		{
+			name:    "objectLocation with reserved first segment: hash/foo",
+			args:    args{objectLocation: "hash/foo", hashLocations: nil, sigLocations: nil, opts: nil},
+			wantErr: true,
+		},
+		{
+			name:    "objectLocation with reserved first segment: sig/foo",
+			args:    args{objectLocation: "sig/foo", hashLocations: nil, sigLocations: nil, opts: nil},
+			wantErr: true,
+		},
+		{
+			name:    "objectLocation with non-reserved segments and inner /",
+			args:    args{objectLocation: "settings/ldap", hashLocations: nil, sigLocations: nil, opts: nil},
+			wantErr: false,
 		},
 		{
 			name: "hash Location with leading slash",
@@ -727,4 +747,111 @@ func TestLayeredNamer_Prefix(t *testing.T) {
 			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+// TestLayeredNamer_MultiSegmentObjectLocation covers the round-trip of value,
+// hash, and sig keys when objectLocation is itself a multi-segment path
+// (e.g. "settings/ldap"). The full and compact layouts are both exercised.
+func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	const objLoc = "settings/ldap"
+
+	t.Run("value key generate and parse", func(t *testing.T) {
+		t.Parallel()
+
+		layeredN, err := namer.NewLayeredNamer(objLoc, nil, nil)
+		require.NoError(t, err)
+
+		keys, err := layeredN.GenerateNames("entry-1")
+		require.NoError(t, err)
+		require.Len(t, keys, 1)
+		assert.Equal(t, "/settings/ldap/entry-1", keys[0].Build())
+
+		parsed, err := layeredN.ParseKey("/settings/ldap/entry-1")
+		require.NoError(t, err)
+		assert.Equal(t, namer.KeyTypeValue, parsed.Type())
+		assert.Equal(t, "entry-1", parsed.Name())
+	})
+
+	t.Run("full hash and sig", func(t *testing.T) {
+		t.Parallel()
+
+		layeredN, err := namer.NewLayeredNamer(
+			objLoc,
+			[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+			[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		)
+		require.NoError(t, err)
+
+		keys, err := layeredN.GenerateNames("entry-1")
+		require.NoError(t, err)
+		require.Len(t, keys, 3)
+		assert.Equal(t, "/settings/ldap/entry-1", keys[0].Build())
+		assert.Equal(t, "/hash/sha256/settings/ldap/entry-1", keys[1].Build())
+		assert.Equal(t, "/sig/ed25519/settings/ldap/entry-1", keys[2].Build())
+
+		// Round-trip each key.
+		for _, k := range keys {
+			parsed, err := layeredN.ParseKey(k.Build())
+			require.NoError(t, err, "ParseKey(%q)", k.Build())
+			assert.Equal(t, k.Type(), parsed.Type())
+			assert.Equal(t, k.Name(), parsed.Name())
+			assert.Equal(t, k.Property(), parsed.Property())
+		}
+	})
+
+	t.Run("compact hash and sig", func(t *testing.T) {
+		t.Parallel()
+
+		layeredN, err := namer.NewLayeredNamer(
+			objLoc,
+			[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+			[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+			namer.CompactSingleHash(),
+			namer.CompactSingleSig(),
+		)
+		require.NoError(t, err)
+
+		keys, err := layeredN.GenerateNames("entry-1")
+		require.NoError(t, err)
+		require.Len(t, keys, 3)
+		assert.Equal(t, "/settings/ldap/entry-1", keys[0].Build())
+		assert.Equal(t, "/hash/settings/ldap/entry-1", keys[1].Build())
+		assert.Equal(t, "/sig/settings/ldap/entry-1", keys[2].Build())
+
+		for _, k := range keys {
+			parsed, err := layeredN.ParseKey(k.Build())
+			require.NoError(t, err, "ParseKey(%q)", k.Build())
+			assert.Equal(t, k.Type(), parsed.Type())
+			assert.Equal(t, k.Name(), parsed.Name())
+		}
+	})
+
+	t.Run("parse rejects mismatching prefix", func(t *testing.T) {
+		t.Parallel()
+
+		layeredN, err := namer.NewLayeredNamer(objLoc, nil, nil)
+		require.NoError(t, err)
+
+		// Right first segment, wrong second segment — must not be misread as
+		// a value at "/settings/ldap/...".
+		_, err = layeredN.ParseKey("/settings/oauth/entry-1")
+		require.Error(t, err)
+
+		// Truncated — first segment matches, but the full prefix does not.
+		_, err = layeredN.ParseKey("/settings")
+		require.Error(t, err)
+	})
+
+	t.Run("Prefix produces correct walk root", func(t *testing.T) {
+		t.Parallel()
+
+		layeredN, err := namer.NewLayeredNamer(objLoc, nil, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, "/settings/ldap/", layeredN.Prefix("", false))
+		assert.Equal(t, "/settings/ldap/alice", layeredN.Prefix("alice", false))
+		assert.Equal(t, "/settings/ldap/users/", layeredN.Prefix("users", true))
+	})
 }
