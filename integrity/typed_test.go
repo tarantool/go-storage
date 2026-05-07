@@ -74,6 +74,10 @@ func (m *mockNamer) Prefix(val string, isPrefix bool) string {
 	}
 }
 
+func (m *mockNamer) Prefixes(val string, isPrefix bool) []string {
+	return []string{m.Prefix(val, isPrefix)}
+}
+
 func TestTypedGet_InvalidName(t *testing.T) {
 	t.Parallel()
 

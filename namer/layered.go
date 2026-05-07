@@ -352,6 +352,58 @@ func (n *layeredNamer) Prefix(val string, isPrefix bool) string {
 	return builder.String()
 }
 
+// Prefixes returns one range prefix per key category — value, then one per
+// configured hasher, then one per configured signer. Hash and sig keys live
+// under their own roots (/hash/... and /sig/...), so a single Prefix() call
+// covering only /<objectLocation>/ misses them; this method emits the full
+// fan-out a validating range walk needs.
+func (n *layeredNamer) Prefixes(val string, isPrefix bool) []string {
+	suffix := strings.Trim(val, "/")
+	out := make([]string, 0, 1+len(n.hashLocations)+len(n.sigLocations))
+
+	out = append(out, n.layerPrefix("/"+n.objectLocation+"/", suffix, isPrefix))
+
+	for _, hl := range n.hashLocations {
+		root := "/" + layeredHashMarker + "/"
+		if !n.compactHash {
+			root += hl.Location + "/"
+		}
+
+		root += n.objectLocation + "/"
+
+		out = append(out, n.layerPrefix(root, suffix, isPrefix))
+	}
+
+	for _, sl := range n.sigLocations {
+		root := "/" + layeredSigMarker + "/"
+		if !n.compactSig {
+			root += sl.Location + "/"
+		}
+
+		root += n.objectLocation + "/"
+
+		out = append(out, n.layerPrefix(root, suffix, isPrefix))
+	}
+
+	return out
+}
+
+// layerPrefix appends suffix to a category root, optionally tacking on a
+// trailing slash. Empty suffix returns the root unchanged — the root already
+// ends in "/", so a range scan on it covers the whole category.
+func (n *layeredNamer) layerPrefix(root, suffix string, isPrefix bool) string {
+	if suffix == "" {
+		return root
+	}
+
+	out := root + suffix
+	if isPrefix {
+		out += "/"
+	}
+
+	return out
+}
+
 func (n *layeredNamer) buildHashKey(hashLocation, name string) string {
 	if n.compactHash {
 		return "/" + layeredHashMarker + "/" + n.objectLocation + "/" + name

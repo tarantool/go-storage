@@ -17,6 +17,13 @@ type Namer interface {
 	ParseKey(name string) (DefaultKey, error)
 	ParseKeys(names []string, ignoreError bool) (Results, error)
 	Prefix(val string, isPrefix bool) string
+	// Prefixes returns one prefix per key category (value, hash, sig) so a
+	// range walk can fetch every key the namer owns. For namers whose
+	// categories share a single root (DefaultNamer) the returned slice may
+	// have a single element. Use this instead of Prefix when validating
+	// integrity-protected data — Prefix only covers the value layer, which
+	// makes the validator report missing hash/sig keys.
+	Prefixes(val string, isPrefix bool) []string
 }
 
 // DefaultNamer represents default namer.
@@ -145,6 +152,43 @@ func (n *DefaultNamer) Prefix(val string, isPrefix bool) string {
 	}
 
 	return builder.String()
+}
+
+// Prefixes returns the range prefixes for every key category. DefaultNamer
+// stores all categories under a single /<prefix>/ root, so the empty-name
+// case collapses to a single prefix. For non-empty names the per-category
+// fan-out matters because each category interleaves an extra path segment.
+func (n *DefaultNamer) Prefixes(val string, isPrefix bool) []string {
+	suffix := strings.Trim(val, "/")
+	if suffix == "" {
+		return []string{n.Prefix(val, isPrefix)}
+	}
+
+	out := make([]string, 0, 1+len(n.hashNames)+len(n.sigNames))
+
+	out = append(out, n.prefixWith(isPrefix, suffix))
+
+	for _, h := range n.hashNames {
+		out = append(out, n.prefixWith(isPrefix, hashName, h, suffix))
+	}
+
+	for _, s := range n.sigNames {
+		out = append(out, n.prefixWith(isPrefix, signatureName, s, suffix))
+	}
+
+	return out
+}
+
+// prefixWith builds a /<prefix>/<elems...> path, optionally suffixed with "/"
+// when isPrefix is true. The trailing slash matches the convention used by
+// Prefix() — callers compose Get(prefix) range scans on this output.
+func (n *DefaultNamer) prefixWith(isPrefix bool, elems ...string) string {
+	out := n.join(elems...)
+	if isPrefix {
+		out += "/"
+	}
+
+	return out
 }
 
 func (n *DefaultNamer) join(elems ...string) string {

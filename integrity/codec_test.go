@@ -334,6 +334,10 @@ func (n *sentinelNamer) Prefix(val string, _ bool) string {
 	return "/sentinel/" + strings.Trim(val, "/")
 }
 
+func (n *sentinelNamer) Prefixes(val string, isPrefix bool) []string {
+	return []string{n.Prefix(val, isPrefix)}
+}
+
 func TestCodecBuilder_WithNamer(t *testing.T) {
 	t.Parallel()
 
