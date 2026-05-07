@@ -151,6 +151,9 @@ func (s *Store[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, 
 	rawCh := s.storage.Watch(ctx, []byte(key))
 	filteredCh := make(chan watch.Event)
 
+	// Drivers strip the trailing "/" from event.Prefix; mirror that here.
+	filterName := strings.TrimSuffix(name, "/")
+
 	go func() {
 		defer close(filteredCh)
 
@@ -170,7 +173,7 @@ func (s *Store[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, 
 					continue
 				}
 
-				if !strings.HasPrefix(parsedKey.Name(), name) {
+				if !strings.HasPrefix(parsedKey.Name(), filterName) {
 					continue
 				}
 

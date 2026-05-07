@@ -436,9 +436,9 @@ func ExampleDriver_Watch() {
 	// Watching for changes on: /config/app/status
 	// Received watch event for key: /config/app/status
 	// Watching for changes on prefix: /config/database/
-	// Event 1: change detected on /config/database/
-	// Event 2: change detected on /config/database/
-	// Event 3: change detected on /config/database/
+	// Event 1: change detected on /config/database
+	// Event 2: change detected on /config/database
+	// Event 3: change detected on /config/database
 	// Started watch with manual control
 	// Stopping watch gracefully...
 }
