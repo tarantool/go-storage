@@ -135,6 +135,10 @@ func (s *Store[T]) Range(
 // Watch returns a channel that receives events for values under the given
 // name prefix. Watch is not transactional and bypasses Tx; it calls
 // s.storage.Watch directly.
+//
+// Under the signal-only Event.Prefix contract every event carries the watched
+// prefix verbatim (driver-stripped of its trailing "/"), so filtering on
+// event.Prefix is a no-op — callers must Range/Get to learn what changed.
 func (s *Store[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, error) {
 	if !checkRangeName(name) {
 		return storeClosedChan, ErrInvalidName
@@ -142,45 +146,7 @@ func (s *Store[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, 
 
 	key := s.codec.namer.Prefix(name, strings.HasSuffix(name, "/"))
 
-	rawCh := s.storage.Watch(ctx, []byte(key))
-	filteredCh := make(chan watch.Event)
-
-	// Drivers strip the trailing "/" from event.Prefix; mirror that here.
-	filterName := strings.TrimSuffix(name, "/")
-
-	go func() {
-		defer close(filteredCh)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case event, ok := <-rawCh:
-				if !ok {
-					return
-				}
-
-				parsedKey, err := s.codec.namer.ParseKey(string(event.Prefix))
-				if err != nil {
-					// Drop events on keys this codec does not own (e.g., a
-					// neighbour codec writing under the same storage prefix).
-					continue
-				}
-
-				if !strings.HasPrefix(parsedKey.Name(), filterName) {
-					continue
-				}
-
-				select {
-				case <-ctx.Done():
-					return
-				case filteredCh <- event:
-				}
-			}
-		}
-	}()
-
-	return filteredCh, nil
+	return s.storage.Watch(ctx, []byte(key)), nil
 }
 
 func (s *Store[T]) bindPredicates(name string, preds []Predicate) ([]predicate.Predicate, error) {

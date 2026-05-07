@@ -62,6 +62,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   rejected it. Drivers now strip the trailing `/`; the integrity store
   filter strips it from the user-supplied name as well so the
   neighbour-codec filter matches both single-key and prefix watches.
+- integrity: `Store[T].Watch(ctx, "")` and `Typed[T].Watch(ctx, "")`
+  (the "watch the whole codec" case) silently dropped every event.
+  Under the signal-only `Event.Prefix` contract drivers always emit
+  the watched prefix verbatim, but the integrity layer was running
+  `ParseKey` on it and dropping anything that did not look like a key
+  — and `/<objectLocation>` is a single segment, which `ParseKey`
+  rejects. The filter was a no-op under the new contract anyway, so
+  both methods now forward driver events as-is.
 
 ## [v1.3.0] - 2026-05-05
 
