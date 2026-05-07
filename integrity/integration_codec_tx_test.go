@@ -335,6 +335,38 @@ func TestStoreIntegration_Watch(t *testing.T) {
 	})
 }
 
+// Regression: Store[T].Watch with an empty name (the "watch the whole codec"
+// case) used to silently drop every event. Drivers emit the watched prefix
+// with any trailing "/" stripped, so the value reaching the integrity filter
+// was "/<objectLocation>" — a single segment. ParseKey requires at least two
+// segments, so it errored and the filter dropped the event. Watching the
+// empty prefix must deliver events for any key under the codec.
+func TestStoreIntegration_Watch_EmptyName(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		_, store := newIntegrationCodecStore(t, driverInstance, nil)
+
+		eventCh, err := store.Watch(ctx, "")
+		require.NoError(t, err)
+
+		// Give the watch channel time to register before the first write.
+		time.Sleep(200 * time.Millisecond)
+
+		require.NoError(t, store.Put(ctx, "object1", IntegrationStruct{Name: "obj1", Value: 100}))
+
+		select {
+		case ev := <-eventCh:
+			assert.Equal(t, []byte("/objects"), ev.Prefix)
+		case <-time.After(defaultWaitTimeout):
+			t.Fatal("regression: empty-name Watch delivered no events")
+		}
+
+		cleanupStore(t, store, "object1")
+	})
+}
+
 // TestTxIntegration_MultiOpAtomic enqueues multiple TxPut calls onto a single
 // Tx and verifies they all land in one commit.
 func TestTxIntegration_MultiOpAtomic(t *testing.T) {
