@@ -31,10 +31,11 @@ var (
 	ErrSegmentTrailingSlash = errors.New("namer: segment must not end with '/'")
 	// ErrSegmentInnerSlash is returned when a segment contains '/'.
 	ErrSegmentInnerSlash = errors.New("namer: segment must not contain '/'")
-	// ErrObjectLocationReserved is returned when objectLocation equals one of the
-	// reserved category markers ("hash" or "sig"), which would collide with
-	// hash/sig key paths.
-	ErrObjectLocationReserved = errors.New("namer: objectLocation must not equal reserved marker \"hash\" or \"sig\"")
+	// ErrObjectLocationReserved is returned when objectLocation's first segment
+	// is one of the reserved category markers ("hash" or "sig"), which would
+	// collide with hash/sig key paths during parsing.
+	ErrObjectLocationReserved = errors.New(
+		"namer: objectLocation must not start with reserved segment \"hash\" or \"sig\"")
 	// ErrCompactSingleHashCardinality is returned when CompactSingleHash is set
 	// but the configured hash list does not have exactly one entry.
 	ErrCompactSingleHashCardinality = errors.New("namer: CompactSingleHash requires exactly one hash entry")
@@ -100,11 +101,18 @@ type layeredNamer struct {
 //	/hash/<hashLocation>/<objectLocation>/<name>      (hash, one per hasher)
 //	/sig/<sigLocation>/<objectLocation>/<name>        (sig, one per signer)
 //
+// objectLocation may itself be a multi-segment path (e.g. "settings/ldap").
+// hashLocation and sigLocation are still single tokens since they index
+// per-hasher / per-signer maps.
+//
 // With CompactSingleHash, the <hashLocation> segment is omitted; with
 // CompactSingleSig, the <sigLocation> segment is omitted.
 //
 // Validation rules:
-//   - Each segment must be non-empty, contain no '/', and not equal "hash" or "sig" for objectLocation.
+//   - hashLocation / sigLocation must be a single non-empty segment with no '/'.
+//   - objectLocation must be non-empty, must not start or end with '/', and
+//     must not contain empty inner segments ("//"). Its first segment must
+//     not be "hash" or "sig".
 //   - hashLocations must be unique within hashes; sigLocations must be unique within sigs.
 //   - Compact flags require exactly one entry in their respective category.
 func NewLayeredNamer(
@@ -119,12 +127,13 @@ func NewLayeredNamer(
 		opt(&resolved)
 	}
 
-	err := validateSegment("objectLocation", objectLocation)
+	err := validateObjectLocation(objectLocation)
 	if err != nil {
 		return nil, err
 	}
 
-	if objectLocation == layeredHashMarker || objectLocation == layeredSigMarker {
+	firstSeg, _, _ := strings.Cut(objectLocation, "/")
+	if firstSeg == layeredHashMarker || firstSeg == layeredSigMarker {
 		return nil, fmt.Errorf("%w: got %q", ErrObjectLocationReserved, objectLocation)
 	}
 
@@ -205,6 +214,29 @@ func validateSegment(field, seg string) error {
 	return nil
 }
 
+// validateObjectLocation accepts multi-segment paths (e.g. "settings/ldap")
+// while still rejecting empty input, leading or trailing '/', and empty
+// inner segments ("//"). Reserved-marker checks are done by the caller.
+func validateObjectLocation(seg string) error {
+	if seg == "" {
+		return fmt.Errorf("%w: objectLocation", ErrSegmentEmpty)
+	}
+
+	if strings.HasPrefix(seg, "/") {
+		return fmt.Errorf("%w: objectLocation %q", ErrSegmentLeadingSlash, seg)
+	}
+
+	if strings.HasSuffix(seg, "/") {
+		return fmt.Errorf("%w: objectLocation %q", ErrSegmentTrailingSlash, seg)
+	}
+
+	if strings.Contains(seg, "//") {
+		return fmt.Errorf("%w: objectLocation %q has empty inner segment", ErrSegmentEmpty, seg)
+	}
+
+	return nil
+}
+
 // GenerateNames returns one key per category for the given object name.
 // name must be non-empty; a leading "/" is stripped.
 func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
@@ -268,7 +300,7 @@ func (n *layeredNamer) ParseKey(raw string) (DefaultKey, error) {
 	case layeredSigMarker:
 		return n.parseSigKey(raw, rest)
 	default:
-		return n.parseValueKey(raw, first, rest)
+		return n.parseValueKey(raw, stripped)
 	}
 }
 
@@ -336,20 +368,23 @@ func (n *layeredNamer) buildSigKey(sigLocation, name string) string {
 	return "/" + layeredSigMarker + "/" + sigLocation + "/" + n.objectLocation + "/" + name
 }
 
-func (n *layeredNamer) parseValueKey(raw, first, rest string) (DefaultKey, error) {
-	if first != n.objectLocation {
+func (n *layeredNamer) parseValueKey(raw, stripped string) (DefaultKey, error) {
+	name, ok := strings.CutPrefix(stripped, n.objectLocation+"/")
+	if !ok {
+		first, _, _ := strings.Cut(stripped, "/")
+
 		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown location segment %q", first))
 	}
 
-	if rest == "" {
+	if name == "" {
 		return DefaultKey{}, errInvalidKey(raw, "name part must not be empty")
 	}
 
-	if strings.HasSuffix(rest, "/") {
+	if strings.HasSuffix(name, "/") {
 		return DefaultKey{}, errInvalidKey(raw, "key name should not be prefix")
 	}
 
-	return NewDefaultKey(rest, KeyTypeValue, "", raw), nil
+	return NewDefaultKey(name, KeyTypeValue, "", raw), nil
 }
 
 func (n *layeredNamer) parseHashKey(raw, rest string) (DefaultKey, error) {
@@ -361,14 +396,10 @@ func (n *layeredNamer) parseHashKey(raw, rest string) (DefaultKey, error) {
 }
 
 func (n *layeredNamer) parseCompactHashKey(raw, rest string) (DefaultKey, error) {
-	objLoc, after, found := strings.Cut(rest, "/")
-	if !found || objLoc == "" {
-		return DefaultKey{}, errInvalidKey(raw, "hash key missing objectLocation")
-	}
-
-	if objLoc != n.objectLocation {
+	after, ok := strings.CutPrefix(rest, n.objectLocation+"/")
+	if !ok {
 		return DefaultKey{}, errInvalidKey(raw,
-			fmt.Sprintf("hash key objectLocation %q does not match %q", objLoc, n.objectLocation))
+			fmt.Sprintf("hash key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "hash")
@@ -390,14 +421,10 @@ func (n *layeredNamer) parseFullHashKey(raw, rest string) (DefaultKey, error) {
 		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown hash location %q", hashLoc))
 	}
 
-	objLoc, after, found := strings.Cut(afterLoc, "/")
-	if !found || objLoc == "" {
-		return DefaultKey{}, errInvalidKey(raw, "hash key missing objectLocation")
-	}
-
-	if objLoc != n.objectLocation {
+	after, ok := strings.CutPrefix(afterLoc, n.objectLocation+"/")
+	if !ok {
 		return DefaultKey{}, errInvalidKey(raw,
-			fmt.Sprintf("hash key objectLocation %q does not match %q", objLoc, n.objectLocation))
+			fmt.Sprintf("hash key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "hash")
@@ -417,14 +444,10 @@ func (n *layeredNamer) parseSigKey(raw, rest string) (DefaultKey, error) {
 }
 
 func (n *layeredNamer) parseCompactSigKey(raw, rest string) (DefaultKey, error) {
-	objLoc, after, found := strings.Cut(rest, "/")
-	if !found || objLoc == "" {
-		return DefaultKey{}, errInvalidKey(raw, "sig key missing objectLocation")
-	}
-
-	if objLoc != n.objectLocation {
+	after, ok := strings.CutPrefix(rest, n.objectLocation+"/")
+	if !ok {
 		return DefaultKey{}, errInvalidKey(raw,
-			fmt.Sprintf("sig key objectLocation %q does not match %q", objLoc, n.objectLocation))
+			fmt.Sprintf("sig key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "sig")
@@ -446,14 +469,10 @@ func (n *layeredNamer) parseFullSigKey(raw, rest string) (DefaultKey, error) {
 		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown sig location %q", sigLoc))
 	}
 
-	objLoc, after, found := strings.Cut(afterLoc, "/")
-	if !found || objLoc == "" {
-		return DefaultKey{}, errInvalidKey(raw, "sig key missing objectLocation")
-	}
-
-	if objLoc != n.objectLocation {
+	after, ok := strings.CutPrefix(afterLoc, n.objectLocation+"/")
+	if !ok {
 		return DefaultKey{}, errInvalidKey(raw,
-			fmt.Sprintf("sig key objectLocation %q does not match %q", objLoc, n.objectLocation))
+			fmt.Sprintf("sig key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "sig")

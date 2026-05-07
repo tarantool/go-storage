@@ -235,13 +235,30 @@ func TestCodecBuilder_InvalidObjectLocation(t *testing.T) {
 	require.Error(t, err, "Build should fail for location starting with '/'")
 }
 
-func TestCodecBuilder_EmptyObjectLocation(t *testing.T) {
+func TestCodecBuilder_MultiSegmentObjectLocation(t *testing.T) {
 	t.Parallel()
 
-	// "" is a valid input (it falls back to "objects" inside Build), so the
-	// invalid-segment check has to be exercised with a non-empty bad value.
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("settings/ldap").
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
+
+	n, err := namer.NewLayeredNamer("settings/ldap", nil, nil)
+	require.NoError(t, err)
+
+	keys, err := n.GenerateNames("entry-1")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, "/settings/ldap/entry-1", keys[0].Build())
+}
+
+func TestCodecBuilder_EmptyInnerSegmentObjectLocation(t *testing.T) {
+	t.Parallel()
+
+	// Multi-segment paths are allowed, but empty inner segments ("//") are not.
 	_, err := integrity.NewCodecBuilder[codecTestStruct]().
-		WithObjectLocation("a/b").
+		WithObjectLocation("a//b").
 		Build()
 	require.Error(t, err)
 }
