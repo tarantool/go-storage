@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	storage "github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/crypto"
 	"github.com/tarantool/go-storage/hasher"
 	"github.com/tarantool/go-storage/marshaller"
@@ -417,4 +418,21 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 		namer:      topNamer,
 		marshaller: marsh,
 	}, nil
+}
+
+// Bind creates a new Store[T] by binding c to the given storage. Bind is a
+// cheap struct literal — no caching, no validation.
+func (c *Codec[T]) Bind(s storage.Storage) *Store[T] {
+	return &Store[T]{codec: c, storage: s}
+}
+
+// BindSingleton binds c to s and bakes name into every operation of the
+// returned SingletonStore[T]. The name is validated eagerly with the same
+// rules as Store[T] operations; an invalid name returns ErrInvalidName.
+func (c *Codec[T]) BindSingleton(s storage.Storage, name string) (*SingletonStore[T], error) {
+	if !checkName(name) {
+		return nil, ErrInvalidName
+	}
+
+	return &SingletonStore[T]{store: c.Bind(s), name: name}, nil
 }

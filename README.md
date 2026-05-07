@@ -456,6 +456,49 @@ segment of `objectLocation` must not equal the reserved markers `hash` or
 per-hasher / per-signer segment when exactly one is configured. `ParseKey`
 parses a raw key back to `(name, KeyType, property)` unambiguously.
 
+##### Singleton Store: One Fixed Key per Codec
+
+For configuration objects that live at a single, known key (e.g.
+`/settings/auth`) — not under a directory of `<objectLocation>/<id>`
+items — `Codec[T].BindSingleton(storage, name)` returns a
+`*SingletonStore[T]` that bakes the name in once. All operations
+(`Get` / `Put` / `Delete` / `Watch`, plus `TxGet` / `TxPut` / `TxDelete`
+for multi-op transactions) drop the `name` parameter:
+
+```go
+codec, err := integrity.NewCodecBuilder[AuthConfig]().
+    WithObjectLocation("settings").
+    WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privKey)).
+    Build()
+if err != nil {
+    log.Fatal(err)
+}
+
+auth, err := codec.BindSingleton(baseStorage, "auth")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Wire layout:
+//   /settings/auth                      (value)
+//   /hash/<hashLoc>/settings/auth       (hash, per hasher)
+//   /sig/<sigLoc>/settings/auth         (sig,  per signer)
+
+if err := auth.Put(ctx, AuthConfig{Issuer: "example"}); err != nil {
+    log.Fatal(err)
+}
+
+res, err := auth.Get(ctx)
+```
+
+The same `Codec[T]` can serve both shapes: `codec.Bind(storage)` for a
+directory of items keyed by name, `codec.BindSingleton(storage, name)`
+for a fixed singleton. Predicates from the codec (`ValueEqual`,
+`VersionEqual`, etc.) are name-agnostic and work as-is when passed
+through `WithPutPredicates(...)` / `WithDeletePredicates(...)`. For
+multi-op transactions, `auth.BindPredicate(pred)` resolves the predicate
+to the singleton's value-layer key for use in `Tx.If`.
+
 ##### Marshallers
 
 Beyond the default YAML marshaller, the `marshaller` package now ships:
