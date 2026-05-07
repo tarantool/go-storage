@@ -442,6 +442,10 @@ func (t *Typed[T]) Range(
 }
 
 // Watch returns a channel for watching changes to values under the given name prefix.
+//
+// Under the signal-only Event.Prefix contract every event carries the watched
+// prefix verbatim (driver-stripped of its trailing "/"), so filtering on
+// event.Prefix is a no-op — callers must Range/Get to learn what changed.
 func (t *Typed[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, error) {
 	if !checkRangeName(name) {
 		return closedChan, ErrInvalidName
@@ -449,47 +453,7 @@ func (t *Typed[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, 
 
 	key := t.namer.Prefix(name, strings.HasSuffix(name, "/"))
 
-	rawCh := t.base.Watch(ctx, []byte(key))
-	filteredCh := make(chan watch.Event)
-
-	// Drivers strip the trailing "/" from event.Prefix; mirror that here.
-	filterName := strings.TrimSuffix(name, "/")
-
-	go func() {
-		defer close(filteredCh)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case event, ok := <-rawCh:
-				if !ok {
-					return
-				}
-
-				// Parse the key from the event prefix.
-				key, err := t.namer.ParseKey(string(event.Prefix))
-				if err != nil {
-					// Skip events for non-integrity keys.
-					continue
-				}
-
-				// Filter by name prefix.
-				if !strings.HasPrefix(key.Name(), filterName) {
-					continue
-				}
-
-				// Forward the event.
-				select {
-				case <-ctx.Done():
-					return
-				case filteredCh <- event:
-				}
-			}
-		}
-	}()
-
-	return filteredCh, nil
+	return t.base.Watch(ctx, []byte(key)), nil
 }
 
 var (

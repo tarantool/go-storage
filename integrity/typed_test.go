@@ -1821,7 +1821,7 @@ func TestTypedBuilder_WithMarshaller(t *testing.T) {
 func TestTypedWatch(t *testing.T) {
 	t.Parallel()
 
-	t.Run("basic event filtering", func(t *testing.T) {
+	t.Run("event pass-through", func(t *testing.T) {
 		t.Parallel()
 
 		ctx := t.Context()
@@ -1844,35 +1844,18 @@ func TestTypedWatch(t *testing.T) {
 		eventCh, err := typed.Watch(ctx, "my-object")
 		require.NoError(t, err)
 
-		// Send events.
-		events := []watch.Event{
-			{Prefix: []byte("/test/my-object")},             // value key, name "my-object" passes.
-			{Prefix: []byte("/test/my-object2")},            // value key, name "my-object2" passes (prefix match).
-			{Prefix: []byte("/test/hash/sha256/my-object")}, // hash key, name "my-object" passes.
-			{Prefix: []byte("/test/other-object")},          // name "other-object" filtered out (no prefix match).
+		// Under the signal-only contract every event reaching the integrity
+		// layer carries the watched prefix verbatim — Typed.Watch must
+		// forward it as-is.
+		event := watch.Event{Prefix: []byte("/test/my-object")}
+		rawCh <- event
+
+		select {
+		case e := <-eventCh:
+			assert.Equal(t, event, e)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("expected event to be forwarded")
 		}
-
-		for _, e := range events {
-			rawCh <- e
-		}
-
-		// Read events from filtered channel.
-		var received []watch.Event
-
-	loop:
-		for range 3 {
-			select {
-			case e := <-eventCh:
-				received = append(received, e)
-			case <-time.After(100 * time.Millisecond):
-				break loop
-			}
-		}
-
-		require.Len(t, received, 3)
-		assert.Equal(t, events[0], received[0])
-		assert.Equal(t, events[1], received[1])
-		assert.Equal(t, events[2], received[2])
 
 		driverMock.MinimockFinish()
 	})
@@ -1913,43 +1896,6 @@ func TestTypedWatch(t *testing.T) {
 		driverMock.MinimockFinish()
 	})
 
-	t.Run("ParseKey error skips event", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := t.Context()
-
-		driverMock := mocks.NewDriverMock(t)
-		st := storage.NewStorage(driverMock)
-
-		typed := integrity.NewTypedBuilder[SimpleStruct](st).
-			WithPrefix("/test").
-			Build()
-
-		namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
-		key := namerInstance.Prefix("my-object", false)
-
-		rawCh := make(chan watch.Event, 1)
-		cleanup := func() {} // no-op.
-
-		driverMock.WatchMock.Expect(ctx, []byte(key)).Return(rawCh, cleanup, nil)
-
-		eventCh, err := typed.Watch(ctx, "my-object")
-		require.NoError(t, err)
-
-		// Send an event with malformed prefix that will cause ParseKey error.
-		rawCh <- watch.Event{Prefix: []byte("/invalid/key")}
-
-		// No event should be forwarded.
-		select {
-		case <-eventCh:
-			t.Fatal("unexpected event forwarded")
-		case <-time.After(100 * time.Millisecond):
-			// Expected - event filtered out.
-		}
-
-		driverMock.MinimockFinish()
-	})
-
 	t.Run("context cancellation while waiting", func(t *testing.T) {
 		t.Parallel()
 
@@ -1975,96 +1921,6 @@ func TestTypedWatch(t *testing.T) {
 		require.NoError(t, err)
 
 		// Cancel context.
-		cancel()
-
-		// filteredCh should be closed.
-		select {
-		case _, ok := <-eventCh:
-			assert.False(t, ok, "channel should be closed after context cancellation")
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("expected channel to be closed after context cancellation")
-		}
-
-		driverMock.MinimockFinish()
-	})
-
-	t.Run("context cancellation while sending", func(t *testing.T) {
-		t.Parallel()
-
-		driverMock := mocks.NewDriverMock(t)
-		st := storage.NewStorage(driverMock)
-
-		typed := integrity.NewTypedBuilder[SimpleStruct](st).
-			WithPrefix("/test").
-			Build()
-
-		namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
-		key := namerInstance.Prefix("my-object", false)
-
-		rawCh := make(chan watch.Event, 1)
-		cleanup := func() {} // no-op.
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		driverMock.WatchMock.Expect(ctx, []byte(key)).Return(rawCh, cleanup, nil)
-
-		eventCh, err := typed.Watch(ctx, "my-object")
-		require.NoError(t, err)
-
-		// Send an event that will be filtered (valid key but not matching name).
-		rawCh <- watch.Event{Prefix: []byte("/test/other-object")}
-
-		// Cancel context while goroutine is trying to send to filteredCh (which nobody reads).
-		// Since filteredCh is unbuffered and we're not reading, the send will block.
-		// Cancelling context should cause goroutine to exit.
-		cancel()
-
-		// Wait a bit for goroutine to exit.
-		time.Sleep(50 * time.Millisecond)
-
-		// filteredCh should be closed.
-		select {
-		case _, ok := <-eventCh:
-			assert.False(t, ok, "channel should be closed after context cancellation")
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("expected channel to be closed after context cancellation")
-		}
-
-		driverMock.MinimockFinish()
-	})
-
-	t.Run("inner select context cancellation", func(t *testing.T) {
-		t.Parallel()
-
-		driverMock := mocks.NewDriverMock(t)
-		st := storage.NewStorage(driverMock)
-
-		typed := integrity.NewTypedBuilder[SimpleStruct](st).
-			WithPrefix("/test").
-			Build()
-
-		namerInstance := namer.NewDefaultNamer("/test", []string{}, []string{})
-		key := namerInstance.Prefix("my-object", false)
-
-		rawCh := make(chan watch.Event, 1)
-		cleanup := func() {} // no-op.
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		driverMock.WatchMock.Expect(ctx, []byte(key)).Return(rawCh, cleanup, nil)
-
-		eventCh, err := typed.Watch(ctx, "my-object")
-		require.NoError(t, err)
-
-		// Send a valid event that passes all filters.
-		rawCh <- watch.Event{Prefix: []byte("/test/my-object")}
-
-		// Give goroutine time to receive event and enter inner select.
-		time.Sleep(10 * time.Millisecond)
-
-		// Cancel context while goroutine is blocked trying to send to filteredCh.
 		cancel()
 
 		// filteredCh should be closed.

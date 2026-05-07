@@ -1711,18 +1711,16 @@ func TestStore_WithNamer(t *testing.T) {
 func TestStore_Watch(t *testing.T) {
 	t.Parallel()
 
-	t.Run("basic event filtering", func(t *testing.T) {
+	t.Run("event pass-through", func(t *testing.T) {
 		t.Parallel()
 
 		ctx := context.Background()
 		driverMock := mocks.NewDriverMock(t)
 
-		// Use sha256 hasher so the namer knows the "sha256" location.
-		mockH := newMockHasher("sha256")
-		codec := newStoreCodecWithHasher(t, mockH)
+		codec := newStoreCodec(t)
 		store := newMockedStore(t, codec, driverMock)
 
-		// Codec namer (LayeredNamer with sha256): Prefix("my-object", false) = "/objects/my-object"
+		// Codec namer (LayeredNamer): Prefix("my-object", false) = "/objects/my-object"
 		// Prefixed wrapper adds "/test" → driver Watch called with "/test/objects/my-object".
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event, 10)
@@ -1733,40 +1731,17 @@ func TestStore_Watch(t *testing.T) {
 		eventCh, err := store.Watch(ctx, "my-object")
 		require.NoError(t, err)
 
-		// Prefixed wrapper strips "/test" from event.Prefix before forwarding.
-		// Events on rawCh carry absolute keys; Store.Watch goroutine sees stripped keys.
-		events := []watch.Event{
-			// value key for "my-object" → stripped: /objects/my-object → name "my-object" → passes.
-			{Prefix: absKeyStr("/objects/my-object")},
-			// value key for "my-object2" → stripped: /objects/my-object2 → name "my-object2" → passes (prefix match).
-			{Prefix: absKeyStr("/objects/my-object2")},
-			// hash key for "my-object" (sha256) → stripped: /hash/sha256/objects/my-object → name "my-object" → passes.
-			{Prefix: absKeyStr("/hash/sha256/objects/my-object")},
-			// value key for "other-object" → stripped: /objects/other-object → filtered.
-			{Prefix: absKeyStr("/objects/other-object")},
+		// Under the signal-only contract every event reaching the integrity
+		// layer carries the watched prefix verbatim — Store.Watch must forward
+		// it as-is (the Prefixed wrapper has already stripped its own prefix).
+		rawCh <- watch.Event{Prefix: absKeyStr("/objects/my-object")}
+
+		select {
+		case e := <-eventCh:
+			assert.Equal(t, []byte("/objects/my-object"), e.Prefix)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("expected event to be forwarded")
 		}
-
-		for _, e := range events {
-			rawCh <- e
-		}
-
-		var received []watch.Event
-
-	loop:
-		for range 3 {
-			select {
-			case e := <-eventCh:
-				received = append(received, e)
-			case <-time.After(100 * time.Millisecond):
-				break loop
-			}
-		}
-
-		require.Len(t, received, 3)
-		// Events are forwarded with prefix already stripped (Prefixed wrapper does it).
-		assert.Equal(t, []byte("/objects/my-object"), received[0].Prefix)
-		assert.Equal(t, []byte("/objects/my-object2"), received[1].Prefix)
-		assert.Equal(t, []byte("/hash/sha256/objects/my-object"), received[2].Prefix)
 
 		driverMock.MinimockFinish()
 	})
@@ -1801,37 +1776,6 @@ func TestStore_Watch(t *testing.T) {
 		driverMock.MinimockFinish()
 	})
 
-	t.Run("ParseKey error skips event", func(t *testing.T) {
-		t.Parallel()
-
-		ctx := context.Background()
-		driverMock := mocks.NewDriverMock(t)
-
-		codec := newStoreCodec(t)
-		store := newMockedStore(t, codec, driverMock)
-
-		absWatchKey := absKeyStr("/objects/my-object")
-		rawCh := make(chan watch.Event, 1)
-		cleanup := func() {}
-
-		driverMock.WatchMock.Expect(ctx, absWatchKey).Return(rawCh, cleanup, nil)
-
-		eventCh, err := store.Watch(ctx, "my-object")
-		require.NoError(t, err)
-
-		// After stripping "/test", this becomes "/invalid/key" which ParseKey rejects
-		// (no "invalid" location in namer).
-		rawCh <- watch.Event{Prefix: absKeyStr("/invalid/key")}
-
-		select {
-		case <-eventCh:
-			t.Fatal("unexpected event forwarded")
-		case <-time.After(100 * time.Millisecond):
-		}
-
-		driverMock.MinimockFinish()
-	})
-
 	t.Run("context cancellation while waiting", func(t *testing.T) {
 		t.Parallel()
 
@@ -1850,77 +1794,6 @@ func TestStore_Watch(t *testing.T) {
 
 		eventCh, err := store.Watch(ctx, "my-object")
 		require.NoError(t, err)
-
-		cancel()
-
-		select {
-		case _, ok := <-eventCh:
-			assert.False(t, ok, "channel should be closed after context cancellation")
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("expected channel to be closed after context cancellation")
-		}
-
-		driverMock.MinimockFinish()
-	})
-
-	t.Run("context cancellation while sending", func(t *testing.T) {
-		t.Parallel()
-
-		driverMock := mocks.NewDriverMock(t)
-		codec := newStoreCodec(t)
-		store := newMockedStore(t, codec, driverMock)
-
-		absWatchKey := absKeyStr("/objects/my-object")
-		rawCh := make(chan watch.Event, 1)
-		cleanup := func() {}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		driverMock.WatchMock.Expect(ctx, absWatchKey).Return(rawCh, cleanup, nil)
-
-		eventCh, err := store.Watch(ctx, "my-object")
-		require.NoError(t, err)
-
-		// Valid key but not matching "my-object" — filtered. Goroutine loops back.
-		rawCh <- watch.Event{Prefix: absKeyStr("/objects/other-object")}
-
-		cancel()
-		time.Sleep(50 * time.Millisecond)
-
-		select {
-		case _, ok := <-eventCh:
-			assert.False(t, ok, "channel should be closed after context cancellation")
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("expected channel to be closed after context cancellation")
-		}
-
-		driverMock.MinimockFinish()
-	})
-
-	t.Run("inner select context cancellation", func(t *testing.T) {
-		t.Parallel()
-
-		driverMock := mocks.NewDriverMock(t)
-		codec := newStoreCodec(t)
-		store := newMockedStore(t, codec, driverMock)
-
-		absWatchKey := absKeyStr("/objects/my-object")
-		rawCh := make(chan watch.Event, 1)
-		cleanup := func() {}
-
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		driverMock.WatchMock.Expect(ctx, absWatchKey).Return(rawCh, cleanup, nil)
-
-		eventCh, err := store.Watch(ctx, "my-object")
-		require.NoError(t, err)
-
-		// Valid matching event → goroutine enters inner select, blocks on unbuffered filteredCh.
-		rawCh <- watch.Event{Prefix: absKeyStr("/objects/my-object")}
-
-		time.Sleep(10 * time.Millisecond)
 
 		cancel()
 
