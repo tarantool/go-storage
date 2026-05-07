@@ -99,7 +99,7 @@ const (
 )
 
 // Watch monitors changes to a specific key and returns a stream of events.
-// It supports optional watch configuration through the opts parameter.
+// event.Prefix is the watched key with any trailing "/" stripped.
 func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
 	eventCh := make(chan watch.Event, eventChannelSize)
 
@@ -109,6 +109,8 @@ func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-cha
 	if bytes.HasSuffix(key, []byte("/")) {
 		opts = append(opts, etcd.WithPrefix())
 	}
+
+	emitted := bytes.TrimSuffix(key, []byte("/"))
 
 	watchChan := d.client.Watch(ctx, string(key), opts...)
 
@@ -131,7 +133,7 @@ func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-cha
 				for range watchResp.Events {
 					select {
 					case eventCh <- watch.Event{
-						Prefix: key,
+						Prefix: emitted,
 					}:
 					case <-ctx.Done():
 						return

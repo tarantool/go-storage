@@ -8,6 +8,7 @@
 package etcd_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -371,16 +372,16 @@ func TestEtcdDriver_Watch_Prefix(t *testing.T) {
 	putValue(ctx, t, driver, key1, value1)
 	putValue(ctx, t, driver, key2, value2)
 
-	// Wait for watch events for both puts.
-	eventCount := 0
-	for eventCount < 2 {
+	expected := bytes.TrimSuffix(prefix, []byte("/"))
+
+	// Wait for watch events for both puts. Each event carries the watched
+	// prefix (trailing slash stripped) as a signal, not the changed key.
+	for i := range 2 {
 		select {
 		case event := <-eventCh:
-			assert.Equal(t, prefix, event.Prefix, "Event should contain the watched prefix")
-
-			eventCount++
+			assert.Equal(t, expected, event.Prefix, "Event should signal the watched prefix")
 		case <-time.After(defaultWaitTimeout):
-			t.Fatalf("Expected %d watch events but only received %d", 2, eventCount)
+			t.Fatalf("Expected 2 watch events but only received %d", i)
 		}
 	}
 
@@ -389,7 +390,7 @@ func TestEtcdDriver_Watch_Prefix(t *testing.T) {
 	// Wait for the delete event.
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, prefix, event.Prefix, "Event should contain the watched prefix")
+		assert.Equal(t, expected, event.Prefix, "Event should signal the watched prefix")
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "Expected watch event for delete but timed out")
 	}

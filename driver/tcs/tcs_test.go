@@ -246,19 +246,61 @@ func TestDriver_Watch_CallbackTwiceCalled(t *testing.T) {
 	assert.NotNil(t, events)
 	assert.NotNil(t, cleanup)
 
-	select {
-	case val, ok := <-events:
-		require.True(t, ok)
-		assert.Equal(t, []byte("test-key"), val.Prefix)
-	case <-time.After(defaultWaitTimeout):
-		assert.Fail(t, "timeout")
+	for attempt := range 2 {
+		select {
+		case val, ok := <-events:
+			require.True(t, ok)
+			assert.Equal(t, []byte("test-key"), val.Prefix)
+		case <-time.After(defaultWaitTimeout):
+			assert.Fail(t, "timeout waiting for event", ": #%d", attempt+1)
+		}
 	}
 
 	select {
 	case val, ok := <-events:
-		require.True(t, ok)
-		assert.Fail(t, "must be empty", ": %v, %v", val, ok)
+		assert.Fail(t, "channel must be drained after both events", ": %v, %v", val, ok)
 	default:
+	}
+
+	cleanup()
+	mc.Wait(defaultUnregisterTimeout)
+}
+
+func TestDriver_Watch_PrefixKeyStripsTrailingSlash(t *testing.T) {
+	t.Parallel()
+
+	mc := minimock.NewController(t)
+
+	mockDoer := mocks.NewDoerWatcherMock(mc)
+	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
+
+	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {
+		assert.Equal(t, "config.storage:/acl/", key, "subscribed topic keeps the trailing slash")
+		assert.NotNil(t, callback)
+
+		callback(tarantool.WatchEvent{
+			Conn:  nil,
+			Key:   "config.storage:/acl/",
+			Value: int8(1),
+		})
+
+		return watcher, nil
+	})
+
+	driver := tcs.New(mockDoer)
+
+	ctx := context.Background()
+	events, cleanup, err := driver.Watch(ctx, []byte("/acl/"))
+
+	require.NoError(t, err)
+
+	select {
+	case val, ok := <-events:
+		require.True(t, ok)
+		assert.Equal(t, []byte("/acl"), val.Prefix,
+			"emitted event drops the trailing slash so consumers can ParseKey it")
+	case <-time.After(defaultWaitTimeout):
+		assert.Fail(t, "timeout")
 	}
 
 	cleanup()

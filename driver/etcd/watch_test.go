@@ -114,9 +114,8 @@ func TestDriver_Watch_EventsForwarded(t *testing.T) {
 	})
 
 	driver := New(client)
-	key := []byte("test-key")
 
-	eventCh, cancelWatch, err := driver.Watch(context.Background(), key)
+	eventCh, cancelWatch, err := driver.Watch(context.Background(), []byte("test-prefix/"))
 	require.NoError(t, err)
 
 	defer cancelWatch()
@@ -129,7 +128,8 @@ func TestDriver_Watch_EventsForwarded(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix)
+		assert.Equal(t, []byte("test-prefix"), event.Prefix,
+			"event.Prefix is the watched key with trailing slash stripped")
 	case <-time.After(time.Second):
 		t.Fatal("expected event to be forwarded")
 	}

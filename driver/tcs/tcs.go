@@ -3,6 +3,7 @@
 package tcs
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 	"github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
+
+const watchEventChannelSize = 16
 
 // DoerWatcher is an interface that combines tarantool.Doer and NewWatcher method.
 // tarantool.Connection and pool.ConnectionAdapter implement this interface.
@@ -69,15 +72,16 @@ func (d Driver) Execute(
 }
 
 // Watch monitors changes to a specific key and returns a stream of events.
-// It supports optional watch configuration through the opts parameter.
-// To watch for config storage key "config.storage:" prefix should be used.
+// event.Prefix is the watched key with any trailing "/" stripped.
 func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
-	rvChan := make(chan watch.Event, 1)
+	rvChan := make(chan watch.Event, watchEventChannelSize)
+
+	emitted := bytes.TrimSuffix(key, []byte("/"))
 
 	watcher, err := d.conn.NewWatcher("config.storage:"+string(key), func(_ tarantool.WatchEvent) {
 		select {
-		case rvChan <- watch.Event{Prefix: key}:
-		default:
+		case rvChan <- watch.Event{Prefix: emitted}:
+		case <-ctx.Done():
 		}
 	})
 	if err != nil {
