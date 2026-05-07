@@ -437,9 +437,9 @@ func ExampleDriver_Watch_multipleOperations() {
 
 	// Output:
 	// Watching for changes on prefix: /config/database/
-	// Event 1: change detected on /config/database/
-	// Event 2: change detected on /config/database/
-	// Event 3: change detected on /config/database/
+	// Event 1: change detected on /config/database
+	// Event 2: change detected on /config/database
+	// Event 3: change detected on /config/database
 }
 
 // ExampleDriver_Watch_gracefulTermination demonstrates graceful watch termination with manual control.

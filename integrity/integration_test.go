@@ -901,6 +901,36 @@ func TestTypedIntegration_NonEmptyRangeWithDiffHashIgnore(t *testing.T) {
 	})
 }
 
+// Regression: Watch over a prefix-shaped name used to silently drop every
+// event because drivers emitted the watched key with a trailing "/" that
+// the integrity layer's ParseKey rejected.
+func TestTypedIntegration_Watch_Prefix(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storage.NewStorage(driverInstance)).
+			WithPrefix("/test").
+			Build()
+
+		eventCh, err := typed.Watch(ctx, "obj/")
+		require.NoError(t, err)
+
+		time.Sleep(200 * time.Millisecond)
+
+		require.NoError(t, typed.Put(ctx, "obj/1", IntegrationStruct{Name: "1", Value: 1}))
+
+		select {
+		case event := <-eventCh:
+			assert.Equal(t, []byte("/test/obj"), event.Prefix)
+		case <-time.After(defaultWaitTimeout):
+			t.Fatal("regression: prefix Watch delivered no events")
+		}
+
+		require.NoError(t, typed.Delete(ctx, "obj/1"))
+	})
+}
+
 func TestTypedIntegration_Watch(t *testing.T) {
 	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
 		t.Helper()

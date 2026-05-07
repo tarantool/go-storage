@@ -11,7 +11,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- watch: unified all drivers (etcd, dummy, tcs) on a signal-only
+  `Event.Prefix` contract. Every driver now emits the watched key with
+  any trailing `/` stripped — a signal that something at or under the
+  watched key changed, not the per-event changed key. Consumers that
+  need the changed key must follow up with `Range`. tcs's per-watcher
+  buffer is bumped to 16 with a blocking, ctx-aware send so server
+  bursts no longer drop on a full channel.
+
 ### Fixed
+
+- watch: prefix-shaped Watch calls (e.g. `Watch(ctx, "acl/")`) used to
+  silently drop every event because drivers emitted the watched key
+  with the trailing `/` intact and the integrity layer's `ParseKey`
+  rejected it. Drivers now strip the trailing `/`; the integrity store
+  filter strips it from the user-supplied name as well so the
+  neighbour-codec filter matches both single-key and prefix watches.
 
 ## [v1.3.0] - 2026-05-05
 

@@ -307,15 +307,17 @@ func (d *Driver) addWatcher(ctx context.Context, key string) (chan watch.Event, 
 	return wch, func() { isStoppedOnce.Do(func() { close(isStopped) }) }
 }
 
-// notifyWatchers sends a watch event to all watchers
-// whose prefix matches the given key.
+// notifyWatchers sends a signal event (the watched key with any trailing "/"
+// stripped) to every watcher whose prefix matches the given key.
 func (d *Driver) notifyWatchers(key string) {
 	for prefix, watchers := range d.data.watchChanStorage {
 		if strings.HasPrefix(key, prefix) && isPrefix(prefix) || key == prefix {
+			emitted := strings.TrimSuffix(prefix, "/")
+
 			for _, ch := range watchers.chans {
 				select {
 				case ch <- watch.Event{
-					Prefix: []byte(prefix),
+					Prefix: []byte(emitted),
 				}:
 				default:
 				}
