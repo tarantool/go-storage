@@ -416,9 +416,12 @@ func (c *Codec[T]) TxRange(
 
 	switch name {
 	case "":
-		prefix := c.namer.Prefix("", true)
-
-		branch.ops = append(branch.ops, operation.Get([]byte(prefix)))
+		// Empty name fans out across every key category — value, hash, sig.
+		// A single Prefix("", true) only covers the value layer, which makes
+		// the validator report missing hash/sig keys for every entry.
+		for _, prefix := range c.namer.Prefixes("", true) {
+			branch.ops = append(branch.ops, operation.Get([]byte(prefix)))
+		}
 	default:
 		keys, err := c.namer.GenerateNames(name)
 		if err != nil {

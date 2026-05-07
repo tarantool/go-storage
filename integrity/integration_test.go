@@ -605,6 +605,77 @@ func TestTypedIntegration_EmptyRange(t *testing.T) {
 	})
 }
 
+// TestTypedIntegration_EmptyRangeWithVerification is a regression test for
+// Typed.Range(ctx, "") with a hasher and signer/verifier configured: the
+// empty-name branch previously fetched only the value-layer prefix, so
+// validation reported missing hash/sig keys for every entry and the result
+// slice came back empty.
+func TestTypedIntegration_EmptyRangeWithVerification(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		shaHash := hasher.NewSHA256Hasher()
+		rsaVer := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+
+		fillDataOptions := FillDataOptions{
+			Prefix: "/test",
+			Names:  []string{"object1", "object2"},
+			Records: []IntegrationStruct{
+				{
+					Name:  "obj1",
+					Value: 100,
+				},
+				{
+					Name:  "obj2",
+					Value: 200,
+				},
+			},
+			Hashers: []hasher.Hasher{shaHash},
+			Signers: []crypto.Signer{rsaVer},
+		}
+
+		cleanup := fillData(t, driverInstance, fillDataOptions)
+		defer cleanup()
+
+		ctx := t.Context()
+		storageInstance := storage.NewStorage(driverInstance)
+		typed := integrity.NewTypedBuilder[IntegrationStruct](storageInstance).
+			WithPrefix("/test").
+			WithHasher(shaHash).
+			WithSignerVerifier(rsaVer).
+			Build()
+
+		results, err := typed.Range(ctx, "")
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		for i := range results {
+			results[i].ModRevision = 0
+		}
+
+		require.ElementsMatch(t, results, []integrity.ValidatedResult[IntegrationStruct]{
+			{
+				Name: "object1",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "obj1",
+					Value: 100,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+			{
+				Name: "object2",
+				Value: option.Some[IntegrationStruct](IntegrationStruct{
+					Name:  "obj2",
+					Value: 200,
+				}),
+				ModRevision: 0,
+				Error:       nil,
+			},
+		})
+	})
+}
+
 func TestTypedIntegration_RangeWithTrailingSlash(t *testing.T) {
 	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
 		t.Helper()

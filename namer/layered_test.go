@@ -749,6 +749,78 @@ func TestLayeredNamer_Prefix(t *testing.T) {
 	}
 }
 
+func TestLayeredNamer_Prefixes(t *testing.T) {
+	t.Parallel()
+
+	layeredN := newTestLayeredNamer(t)
+
+	tests := []struct {
+		name     string
+		val      string
+		isPrefix bool
+		expected []string
+	}{
+		{
+			name:     "empty val emits one prefix per category root",
+			val:      "",
+			isPrefix: true,
+			expected: []string{
+				"/objects/",
+				"/hash/sha256/objects/",
+				"/sig/ed25519/objects/",
+			},
+		},
+		{
+			name:     "non-empty val with isPrefix true",
+			val:      "alice",
+			isPrefix: true,
+			expected: []string{
+				"/objects/alice/",
+				"/hash/sha256/objects/alice/",
+				"/sig/ed25519/objects/alice/",
+			},
+		},
+		{
+			name:     "non-empty val with isPrefix false",
+			val:      "alice",
+			isPrefix: false,
+			expected: []string{
+				"/objects/alice",
+				"/hash/sha256/objects/alice",
+				"/sig/ed25519/objects/alice",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.expected, layeredN.Prefixes(tt.val, tt.isPrefix))
+		})
+	}
+}
+
+func TestLayeredNamer_Prefixes_Compact(t *testing.T) {
+	t.Parallel()
+
+	layeredN, err := namer.NewLayeredNamer(
+		"objects",
+		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		namer.CompactSingleHash(),
+		namer.CompactSingleSig(),
+	)
+	require.NoError(t, err)
+
+	expected := []string{
+		"/objects/",
+		"/hash/objects/",
+		"/sig/objects/",
+	}
+	assert.Equal(t, expected, layeredN.Prefixes("", true))
+}
+
 // TestLayeredNamer_MultiSegmentObjectLocation covers the round-trip of value,
 // hash, and sig keys when objectLocation is itself a multi-segment path
 // (e.g. "settings/ldap"). The full and compact layouts are both exercised.

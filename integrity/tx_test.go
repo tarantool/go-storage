@@ -603,6 +603,10 @@ func (n *hashOnlyNamer) ParseKeys(_ []string, _ bool) (namer.Results, error) {
 
 func (n *hashOnlyNamer) Prefix(_ string, _ bool) string { return "/sha256/" }
 
+func (n *hashOnlyNamer) Prefixes(val string, isPrefix bool) []string {
+	return []string{n.Prefix(val, isPrefix)}
+}
+
 func TestTx_ResultDispatchIsolatesCodecs(t *testing.T) {
 	t.Parallel()
 

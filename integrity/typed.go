@@ -387,9 +387,15 @@ func (t *Typed[T]) Range(
 
 	switch name {
 	case "":
-		prefix := t.namer.Prefix(name, true)
+		// Empty name fans out across every key category — value, hash, sig.
+		// A single Prefix(name, true) only covers the value layer, which
+		// makes the validator report missing hash/sig keys for every entry.
+		prefixes := t.namer.Prefixes(name, true)
 
-		ops = []operation.Operation{operation.Get([]byte(prefix))}
+		ops = make([]operation.Operation, 0, len(prefixes))
+		for _, prefix := range prefixes {
+			ops = append(ops, operation.Get([]byte(prefix)))
+		}
 	default:
 		keys, err := t.namer.GenerateNames(name)
 		if err != nil {
