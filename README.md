@@ -445,6 +445,13 @@ category under its own top-level location segment:
 /sig/<sigLocation>/<objectLocation>/<name>     (one per signer)
 ```
 
+`objectLocation` may itself be a multi-segment path (e.g. `"settings/ldap"`)
+— useful when the on-disk hierarchy of a feature is fixed at codec build
+time rather than per item. `hashLocation` and `sigLocation` are still
+single tokens because they index per-hasher / per-signer maps. The first
+segment of `objectLocation` must not equal the reserved markers `hash` or
+`sig` (they would collide with the parser's category dispatch).
+
 `namer.CompactSingleHash()` and `namer.CompactSingleSig()` drop the
 per-hasher / per-signer segment when exactly one is configured. `ParseKey`
 parses a raw key back to `(name, KeyType, property)` unambiguously.

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- namer.LayeredNamer: `objectLocation` may now be a multi-segment path
+  (e.g. `"settings/ldap"`). Previously the segment validator rejected any
+  inner `/`. The reserved-marker check still applies to the first segment,
+  so `objectLocation` values like `"hash/foo"` or `"sig/foo"` remain
+  rejected because they would collide with the hash/sig key dispatch.
+
 ### Changed
 
 - watch: unified all drivers (etcd, dummy, tcs) on a signal-only
