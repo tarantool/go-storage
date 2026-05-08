@@ -85,9 +85,18 @@ func newStoreCodecWithSignerVerifier(t *testing.T, sv crypto.SignerVerifier) *in
 	return codec
 }
 
-func newMockedStore(codec *integrity.Codec[SimpleStruct], driverMock *mocks.DriverMock) *integrity.Store[SimpleStruct] {
+func newMockedStore(
+	t *testing.T,
+	codec *integrity.Codec[SimpleStruct],
+	driverMock *mocks.DriverMock,
+) *integrity.Store[SimpleStruct] {
+	t.Helper()
+
 	st := storage.NewStorage(driverMock)
-	return codec.Bind(storage.Prefixed(storeTestPrefix, st))
+	prefixed, err := storage.Prefixed(storeTestPrefix, st)
+	require.NoError(t, err)
+
+	return codec.Bind(prefixed)
 }
 
 // newLayeredNamer reproduces the codec's internal namer so tests can compute
@@ -156,7 +165,7 @@ func TestStore_Get_InvalidName(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -177,7 +186,7 @@ func TestStore_Put_InvalidName(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -198,7 +207,7 @@ func TestStore_Delete_InvalidName(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -219,7 +228,7 @@ func TestStore_Range_InvalidName(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -232,7 +241,7 @@ func TestStore_Watch_InvalidName(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -249,7 +258,7 @@ func TestStore_Get_Success(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -305,7 +314,7 @@ func TestStore_Get_ExecutionError(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -333,7 +342,7 @@ func TestStore_Get_NotFound(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -369,7 +378,7 @@ func TestStore_Get_VerificationError(t *testing.T) {
 
 	mockH := newMockHasher("sha256")
 	codec := newStoreCodecWithHasher(t, mockH)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	ctx := context.Background()
 
@@ -423,7 +432,7 @@ func TestStore_Get_WithIgnoreVerificationError(t *testing.T) {
 
 	mockH := newMockHasher("sha256")
 	codec := newStoreCodecWithHasher(t, mockH)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	ctx := context.Background()
 
@@ -479,7 +488,7 @@ func TestStore_Get_WithIgnoreMoreThanOneResult(t *testing.T) {
 
 	driverMock := mocks.NewDriverMock(t)
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -529,7 +538,7 @@ func TestStore_Get_WithHasher(t *testing.T) {
 
 	mockH := newMockHasher("sha256")
 	codec := newStoreCodecWithHasher(t, mockH)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, []string{"sha256"}, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -592,7 +601,7 @@ func TestStore_Get_WithVerifier(t *testing.T) {
 
 	mockV := &mockVerifier{name: "rsa", verifyErr: nil}
 	codec := newStoreCodecWithVerifier(t, mockV)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
@@ -668,7 +677,10 @@ func TestStore_Get_NamerGenerateNamesError(t *testing.T) {
 		Build()
 	require.NoError(t, err)
 
-	store := codec.Bind(storage.Prefixed(storeTestPrefix, storage.NewStorage(driverMock)))
+	prefixed, errPrefix := storage.Prefixed(storeTestPrefix, storage.NewStorage(driverMock))
+	require.NoError(t, errPrefix)
+
+	store := codec.Bind(prefixed)
 
 	ctx := context.Background()
 
@@ -686,7 +698,7 @@ func TestStore_Get_PassingModRevision(t *testing.T) {
 
 	driverMock := mocks.NewDriverMock(t)
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -731,7 +743,7 @@ func TestStore_Put_Success(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
@@ -770,7 +782,7 @@ func TestStore_Put_WithPutPredicates(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
@@ -817,7 +829,7 @@ func TestStore_Put_WithPredicates_Failed(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
@@ -862,7 +874,7 @@ func TestStore_Put_GenerationError(t *testing.T) {
 
 	failingHasher := newMockHasherWithError("sha256", "hash computation failed")
 	codec := newStoreCodecWithHasher(t, failingHasher)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	value := SimpleStruct{Name: "test", Value: 42}
 	err := store.Put(ctx, "my-object", value)
@@ -879,7 +891,7 @@ func TestStore_Put_TransactionExecutionError(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
@@ -916,7 +928,7 @@ func TestStore_Put_SignerError(t *testing.T) {
 
 	failingSigner := newMockSignerWithError("rsa", "signature generation failed")
 	codec := newStoreCodecWithSigner(t, failingSigner)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	value := SimpleStruct{Name: "test", Value: 42}
 	err := store.Put(ctx, "my-object", value)
@@ -934,7 +946,7 @@ func TestStore_Put_WithSigner(t *testing.T) {
 
 	mockS := newMockSigner("rsa")
 	codec := newStoreCodecWithSigner(t, mockS)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
@@ -975,7 +987,7 @@ func TestStore_Put_WithSignerVerifier(t *testing.T) {
 
 	mockSV := &mockSignerVerifier{name: "rsa", signErr: nil, verifyErr: nil}
 	codec := newStoreCodecWithSignerVerifier(t, mockSV)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
@@ -1019,7 +1031,7 @@ func TestStore_Put_WithMarshaller(t *testing.T) {
 		Build()
 	require.NoError(t, err)
 
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
@@ -1054,7 +1066,7 @@ func TestStore_Predicates_ValueOps(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 	codec := newStoreCodec(t)
 	// store not used — just testing predicate factory methods on codec.
-	_ = newMockedStore(codec, driverMock)
+	_ = newMockedStore(t, codec, driverMock)
 
 	// The key for the predicate is whatever the caller passes in.
 	key := []byte("/objects/my-object")
@@ -1108,7 +1120,7 @@ func TestStore_Predicates_VersionOps(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 	codec := newStoreCodec(t)
 
-	_ = newMockedStore(codec, driverMock)
+	_ = newMockedStore(t, codec, driverMock)
 
 	key := []byte("/objects/my-object")
 	version := int64(67)
@@ -1164,7 +1176,7 @@ func TestStore_Delete_Success(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -1193,7 +1205,7 @@ func TestStore_Delete_WithDeletePredicates(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -1224,7 +1236,7 @@ func TestStore_Delete_WithDeletePredicates_Failed(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -1254,7 +1266,7 @@ func TestStore_Delete_TransactionExecutionError(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
@@ -1295,7 +1307,10 @@ func TestStore_Delete_NamerGenerateNamesError(t *testing.T) {
 		Build()
 	require.NoError(t, err)
 
-	store := codec.Bind(storage.Prefixed(storeTestPrefix, storage.NewStorage(driverMock)))
+	prefixed, errPrefix := storage.Prefixed(storeTestPrefix, storage.NewStorage(driverMock))
+	require.NoError(t, errPrefix)
+
+	store := codec.Bind(prefixed)
 
 	ctx := context.Background()
 
@@ -1311,7 +1326,7 @@ func TestStore_Delete_Prefix(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	testNamer := newLayeredNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("test/")
@@ -1341,7 +1356,7 @@ func TestStore_Delete_PrefixEmptyKey(t *testing.T) {
 	ctx := context.Background()
 	driverMock := mocks.NewDriverMock(t)
 
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	err := store.Delete(ctx, "", integrity.WithPrefix())
 	require.Error(t, err)
@@ -1353,7 +1368,7 @@ func TestStore_Delete_PrefixHasPrefix(t *testing.T) {
 	ctx := context.Background()
 	driverMock := mocks.NewDriverMock(t)
 
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	err := store.Delete(ctx, "/objs/", integrity.WithPrefix())
 	require.Error(t, err)
@@ -1365,7 +1380,7 @@ func TestStore_Delete_PrefixNoSuffix(t *testing.T) {
 	ctx := context.Background()
 	driverMock := mocks.NewDriverMock(t)
 
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	err := store.Delete(ctx, "/objs", integrity.WithPrefix())
 	require.Error(t, err)
@@ -1376,7 +1391,7 @@ func TestStore_Range_Success(t *testing.T) {
 
 	driverMock := mocks.NewDriverMock(t)
 	codec := newStoreCodec(t)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	ctx := context.Background()
 
@@ -1453,7 +1468,7 @@ func TestStore_Range_WithValidationError(t *testing.T) {
 
 	mockH := newMockHasher("sha256")
 	codec := newStoreCodecWithHasher(t, mockH)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	ctx := context.Background()
 
@@ -1497,7 +1512,7 @@ func TestStore_Range_WithIgnoreVerificationError(t *testing.T) {
 
 	mockH := newMockHasher("sha256")
 	codec := newStoreCodecWithHasher(t, mockH)
-	store := newMockedStore(codec, driverMock)
+	store := newMockedStore(t, codec, driverMock)
 
 	ctx := context.Background()
 
@@ -1545,7 +1560,7 @@ func TestStore_Range_ExecutionError(t *testing.T) {
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -1569,7 +1584,7 @@ func TestStore_Range_WithIgnoreVerificationErrorButFailedToDecode(t *testing.T) 
 	t.Parallel()
 
 	driverMock := mocks.NewDriverMock(t)
-	store := newMockedStore(newStoreCodec(t), driverMock)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
 
 	ctx := context.Background()
 
@@ -1632,7 +1647,10 @@ func TestStore_WithNamer(t *testing.T) {
 		Build()
 	require.NoError(t, err)
 
-	store := codec.Bind(storage.Prefixed(storeTestPrefix, storage.NewStorage(driverMock)))
+	prefixed, errPrefix := storage.Prefixed(storeTestPrefix, storage.NewStorage(driverMock))
+	require.NoError(t, errPrefix)
+
+	store := codec.Bind(prefixed)
 
 	require.True(t, constructorCalled, "namer constructor should have been called")
 	require.Equal(t, "objects", capturedObjectLoc)
@@ -1684,7 +1702,7 @@ func TestStore_Watch(t *testing.T) {
 		// Use sha256 hasher so the namer knows the "sha256" location.
 		mockH := newMockHasher("sha256")
 		codec := newStoreCodecWithHasher(t, mockH)
-		store := newMockedStore(codec, driverMock)
+		store := newMockedStore(t, codec, driverMock)
 
 		// Codec namer (LayeredNamer with sha256): Prefix("my-object", false) = "/objects/my-object"
 		// Prefixed wrapper adds "/test" → driver Watch called with "/test/objects/my-object".
@@ -1742,7 +1760,7 @@ func TestStore_Watch(t *testing.T) {
 		driverMock := mocks.NewDriverMock(t)
 
 		codec := newStoreCodec(t)
-		store := newMockedStore(codec, driverMock)
+		store := newMockedStore(t, codec, driverMock)
 
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event)
@@ -1772,7 +1790,7 @@ func TestStore_Watch(t *testing.T) {
 		driverMock := mocks.NewDriverMock(t)
 
 		codec := newStoreCodec(t)
-		store := newMockedStore(codec, driverMock)
+		store := newMockedStore(t, codec, driverMock)
 
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event, 1)
@@ -1801,7 +1819,7 @@ func TestStore_Watch(t *testing.T) {
 
 		driverMock := mocks.NewDriverMock(t)
 		codec := newStoreCodec(t)
-		store := newMockedStore(codec, driverMock)
+		store := newMockedStore(t, codec, driverMock)
 
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event)
@@ -1832,7 +1850,7 @@ func TestStore_Watch(t *testing.T) {
 
 		driverMock := mocks.NewDriverMock(t)
 		codec := newStoreCodec(t)
-		store := newMockedStore(codec, driverMock)
+		store := newMockedStore(t, codec, driverMock)
 
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event, 1)
@@ -1867,7 +1885,7 @@ func TestStore_Watch(t *testing.T) {
 
 		driverMock := mocks.NewDriverMock(t)
 		codec := newStoreCodec(t)
-		store := newMockedStore(codec, driverMock)
+		store := newMockedStore(t, codec, driverMock)
 
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event, 1)

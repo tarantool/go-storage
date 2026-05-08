@@ -3,7 +3,9 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/tarantool/go-storage/kv"
 	"github.com/tarantool/go-storage/operation"
@@ -11,6 +13,11 @@ import (
 	txPkg "github.com/tarantool/go-storage/tx"
 	"github.com/tarantool/go-storage/watch"
 )
+
+// ErrPrefixTrailingSlash is returned by Prefixed when the prefix ends with
+// "/". The codec namer prepends "/" to every key, so a trailing slash here
+// would produce keys like "/foo//objectLocation/name".
+var ErrPrefixTrailingSlash = errors.New("storage.Prefixed: prefix must not end with '/'")
 
 // Prefixed returns a Storage that scopes every operation, predicate, range,
 // and watch under prefix. Keys returned to the caller (RequestResponse.Values,
@@ -21,8 +28,15 @@ import (
 // Nested wrappers are flattened at construction so the outer prefix is the
 // leftmost segment.
 //
-// An empty prefix yields a transparent wrapper.
-func Prefixed(prefix string, inner Storage) Storage {
+// An empty prefix yields a transparent wrapper. A non-empty prefix must not
+// end with "/" (returns ErrPrefixTrailingSlash) — the codec namer prepends
+// "/" to every key, so a trailing slash here would produce keys like
+// "/foo//objectLocation/name".
+func Prefixed(prefix string, inner Storage) (Storage, error) {
+	if prefix != "" && strings.HasSuffix(prefix, "/") {
+		return nil, fmt.Errorf("%w: %q", ErrPrefixTrailingSlash, prefix)
+	}
+
 	if existing, ok := inner.(*prefixed); ok {
 		merged := make([]byte, 0, len(prefix)+len(existing.prefix))
 
@@ -32,13 +46,13 @@ func Prefixed(prefix string, inner Storage) Storage {
 		return &prefixed{
 			prefix: merged,
 			inner:  existing.inner,
-		}
+		}, nil
 	}
 
 	return &prefixed{
 		prefix: []byte(prefix),
 		inner:  inner,
-	}
+	}, nil
 }
 
 type prefixed struct {

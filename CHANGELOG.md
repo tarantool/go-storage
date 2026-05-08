@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- storage.Prefixed: signature is now
+  `Prefixed(prefix, inner) (Storage, error)`. A non-empty prefix ending
+  with `/` is rejected with `ErrPrefixTrailingSlash`. The codec namer
+  prepends `/` to every key, so a trailing slash here would silently
+  produce keys like `/foo//objectLocation/name`. Empty prefix still
+  yields a transparent wrapper. Callers must update to handle the
+  returned error.
 - watch: unified all drivers (etcd, dummy, tcs) on a signal-only
   `Event.Prefix` contract. Every driver now emits the watched key with
   any trailing `/` stripped — a signal that something at or under the

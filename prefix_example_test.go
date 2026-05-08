@@ -18,9 +18,13 @@ import (
 func ExamplePrefixed() {
 	ctx := context.Background()
 	base := storage.NewStorage(dummy.New())
-	scoped := storage.Prefixed("/ns", base)
 
-	_, err := scoped.Tx(ctx).Then(
+	scoped, err := storage.Prefixed("/ns", base)
+	if err != nil {
+		log.Fatalf("prefix: %v", err)
+	}
+
+	_, err = scoped.Tx(ctx).Then(
 		operation.Put([]byte("/cfg/version"), []byte("1.0.0")),
 	).Commit()
 	if err != nil {
@@ -48,9 +52,18 @@ func ExamplePrefixed() {
 func ExamplePrefixed_nested() {
 	ctx := context.Background()
 	base := storage.NewStorage(dummy.New())
-	outer := storage.Prefixed("/a", storage.Prefixed("/b", base))
 
-	_, err := outer.Tx(ctx).Then(
+	inner, err := storage.Prefixed("/b", base)
+	if err != nil {
+		log.Fatalf("prefix /b: %v", err)
+	}
+
+	outer, err := storage.Prefixed("/a", inner)
+	if err != nil {
+		log.Fatalf("prefix /a: %v", err)
+	}
+
+	_, err = outer.Tx(ctx).Then(
 		operation.Put([]byte("/k"), []byte("v")),
 	).Commit()
 	if err != nil {
@@ -76,9 +89,13 @@ func ExamplePrefixed_nested() {
 // the configured prefix, so conditional transactions stay scoped.
 func ExamplePrefixed_predicates() {
 	ctx := context.Background()
-	scoped := storage.Prefixed("/ns", storage.NewStorage(dummy.New()))
 
-	_, err := scoped.Tx(ctx).Then(
+	scoped, err := storage.Prefixed("/ns", storage.NewStorage(dummy.New()))
+	if err != nil {
+		log.Fatalf("prefix: %v", err)
+	}
+
+	_, err = scoped.Tx(ctx).Then(
 		operation.Put([]byte("/feature"), []byte("on")),
 	).Commit()
 	if err != nil {
