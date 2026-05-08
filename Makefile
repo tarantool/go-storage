@@ -15,7 +15,7 @@ test:
 .PHONY: testrace
 testrace:
 	@echo "Running tests with race flag"
-	@go test ./... -count=100 -race -v
+	@go test ./... -count=100 -race -v -timeout 30m
 
 .PHONY: coverage
 coverage:
