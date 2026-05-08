@@ -82,6 +82,38 @@ func (t *recordingTx) Commit() (txPkg.Response, error) {
 	return t.rec.txResp, t.rec.txErr
 }
 
+func mustPrefix(t *testing.T, prefix string, inner storage.Storage) storage.Storage {
+	t.Helper()
+
+	s, err := storage.Prefixed(prefix, inner)
+	require.NoError(t, err)
+
+	return s
+}
+
+func TestPrefixed_RejectsTrailingSlash(t *testing.T) {
+	t.Parallel()
+
+	inner := &recordingStorage{
+		lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+		txResp:       txPkg.Response{Succeeded: true, Results: nil},
+		txErr:        nil,
+		lastWatchKey: nil,
+		watchEvents:  nil,
+	}
+
+	cases := []string{"/", "/ns/", "/a/b/"}
+	for _, prefix := range cases {
+		t.Run(prefix, func(t *testing.T) {
+			t.Parallel()
+
+			s, err := storage.Prefixed(prefix, inner)
+			assert.Nil(t, s)
+			require.ErrorIs(t, err, storage.ErrPrefixTrailingSlash)
+		})
+	}
+}
+
 func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Parallel()
 
@@ -99,7 +131,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		_, err := prefixedStore.Tx(ctx).
 			Then(operation.Put([]byte("key"), []byte("val"))).
@@ -124,7 +156,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		_, err := prefixedStore.Tx(ctx).
 			Then(operation.Get([]byte("foo"))).
@@ -148,7 +180,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		_, err := prefixedStore.Tx(ctx).
 			Else(operation.Delete([]byte("bar"))).
@@ -172,7 +204,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed("", inner)
+		prefixedStore := mustPrefix(t, "", inner)
 
 		_, err := prefixedStore.Tx(ctx).
 			Then(operation.Put([]byte("key"), []byte("val"))).
@@ -193,7 +225,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		_, err := prefixedStore.Tx(ctx).
 			Then(
@@ -284,7 +316,7 @@ func TestPrefixed_PredicateKeyPrefixing(t *testing.T) {
 				lastWatchKey: nil,
 				watchEvents:  nil,
 			}
-			prefixedStore := storage.Prefixed(namespace, inner)
+			prefixedStore := mustPrefix(t, namespace, inner)
 
 			callerKey := []byte("mykey")
 			pred := testCase.build(callerKey)
@@ -322,7 +354,7 @@ func TestPrefixed_Range(t *testing.T) {
 
 		mockDriver := mocks.NewDriverMock(t)
 		inner := storage.NewStorage(mockDriver)
-		prefixedStore := storage.Prefixed("/test", inner)
+		prefixedStore := mustPrefix(t, "/test", inner)
 
 		// "/test" + "/foo" + trailing "/" added by storage.go.
 		combinedKey := []byte("/test/foo/")
@@ -355,7 +387,7 @@ func TestPrefixed_Range(t *testing.T) {
 		// not invoke the driver at all — hence no ExecuteMock expectation.
 		mockDriver := mocks.NewDriverMock(t)
 		inner := storage.NewStorage(mockDriver)
-		prefixedStore := storage.Prefixed("/test", inner)
+		prefixedStore := mustPrefix(t, "/test", inner)
 
 		kvs, err := prefixedStore.Range(ctx)
 		require.NoError(t, err)
@@ -369,7 +401,7 @@ func TestPrefixed_Range(t *testing.T) {
 
 		mockDriver := mocks.NewDriverMock(t)
 		inner := storage.NewStorage(mockDriver)
-		prefixedStore := storage.Prefixed("/ns", inner)
+		prefixedStore := mustPrefix(t, "/ns", inner)
 
 		absKVs := []kv.KeyValue{
 			{Key: []byte("/ns/obj/x"), Value: []byte("val-x"), ModRevision: 1},
@@ -415,7 +447,7 @@ func TestPrefixed_Watch(t *testing.T) {
 				{Prefix: []byte("/testfoo")},
 			},
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		watchCh := prefixedStore.Watch(ctx, []byte("foo"))
 
@@ -441,7 +473,7 @@ func TestPrefixed_Watch(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		watchCh := prefixedStore.Watch(ctx, []byte("k"))
 
@@ -463,7 +495,7 @@ func TestPrefixed_Watch(t *testing.T) {
 		// goroutine has nothing to drain and can only exit via ctx.Done().
 		blockCh := make(chan watch.Event)
 		blockInner := &blockingWatchStorage{ch: blockCh}
-		prefixedStore := storage.Prefixed(namespace, blockInner)
+		prefixedStore := mustPrefix(t, namespace, blockInner)
 
 		ctx2, cancel := context.WithCancel(ctx)
 
@@ -524,7 +556,7 @@ func TestPrefixed_Composition(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		composed := storage.Prefixed("/a", storage.Prefixed("/b", base))
+		composed := mustPrefix(t, "/a", mustPrefix(t, "/b", base))
 
 		_, err := composed.Tx(ctx).
 			Then(operation.Put([]byte("k"), []byte("v"))).
@@ -554,8 +586,8 @@ func TestPrefixed_Composition(t *testing.T) {
 			watchEvents:  nil,
 		}
 
-		composed := storage.Prefixed("/a", storage.Prefixed("/b", base1))
-		flat := storage.Prefixed("/a/b", base2)
+		composed := mustPrefix(t, "/a", mustPrefix(t, "/b", base1))
+		flat := mustPrefix(t, "/a/b", base2)
 
 		callerKey := []byte("/obj/name")
 		callerVal := []byte("data")
@@ -583,7 +615,7 @@ func TestPrefixed_Composition(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		composed := storage.Prefixed("/a", storage.Prefixed("/b", storage.Prefixed("/c", base)))
+		composed := mustPrefix(t, "/a", mustPrefix(t, "/b", mustPrefix(t, "/c", base)))
 
 		_, err := composed.Tx(ctx).
 			Then(operation.Put([]byte("x"), []byte("v"))).
@@ -623,7 +655,7 @@ func TestPrefixed_ResultKeyStripping(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		resp, err := prefixedStore.Tx(ctx).
 			Then(operation.Get([]byte("a")), operation.Get([]byte("c"))).
@@ -658,7 +690,7 @@ func TestPrefixed_ResultKeyStripping(t *testing.T) {
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		prefixedStore := storage.Prefixed(namespace, inner)
+		prefixedStore := mustPrefix(t, namespace, inner)
 
 		resp, err := prefixedStore.Tx(ctx).Then(operation.Get([]byte("x"))).Commit()
 		require.NoError(t, err)
@@ -672,7 +704,7 @@ func TestPrefixed_ResultKeyStripping(t *testing.T) {
 
 		mockDriver := mocks.NewDriverMock(t)
 		inner := storage.NewStorage(mockDriver)
-		prefixedStore := storage.Prefixed("/ns", inner)
+		prefixedStore := mustPrefix(t, "/ns", inner)
 
 		absKVs := []kv.KeyValue{
 			{Key: []byte("/ns/objects/myname"), Value: []byte("data"), ModRevision: 1},

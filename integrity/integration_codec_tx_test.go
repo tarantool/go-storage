@@ -29,7 +29,10 @@ func integrationPrefix(t *testing.T) string {
 func scopedStorage(t *testing.T, driverInstance driver.Driver) storage.Storage {
 	t.Helper()
 
-	return storage.Prefixed(integrationPrefix(t), storage.NewStorage(driverInstance))
+	st, err := storage.Prefixed(integrationPrefix(t), storage.NewStorage(driverInstance))
+	require.NoError(t, err)
+
+	return st
 }
 
 // newIntegrationCodecStore builds a Codec[IntegrationStruct] and binds it to
