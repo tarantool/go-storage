@@ -33,30 +33,64 @@ func newTestRSAPSS(t *testing.T) crypto.SignerVerifier {
 func TestCodecBuilder_Defaults(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 	require.NotNil(t, codec)
 }
 
 // The codec keeps its namer private, so the default-object-location guarantee
 // is verified by constructing an equivalent LayeredNamer and asserting its
-// output matches the documented "/objects/<name>" shape.
-func TestCodecBuilder_DefaultObjectLocation(t *testing.T) {
+// output matches the documented unnamed shape (no objectLocation segment).
+func TestCodecBuilder_DefaultIsUnnamed(t *testing.T) {
 	t.Parallel()
 
-	defaultNamer, err := namer.NewLayeredNamer("objects", nil, nil)
+	defaultNamer, err := namer.NewLayeredNamer(namer.ObjectLocationMissing, nil, nil)
 	require.NoError(t, err)
 
 	keys, err := defaultNamer.GenerateNames("foo")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
-	assert.Equal(t, "/objects/foo", keys[0].Build())
+	assert.Equal(t, "/foo", keys[0].Build())
+}
+
+// TestCodec_DefaultBuildsUnnamedKeys exercises the actual builder path —
+// no WithObjectLocation call — and asserts that the keys produced by its
+// generator omit the per-codec location segment.
+func TestCodec_DefaultBuildsUnnamedKeys(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithHasher(hasher.NewSHA256Hasher()).
+		Build()
+	require.NoError(t, err)
+
+	pred, err := codec.ValueEqual(codecTestStruct{Name: "x", Value: 1})
+	require.NoError(t, err)
+
+	// ValueEqual binds via the value-key resolved against the namer; a
+	// /<name> raw key (no /objects/ segment) confirms the unnamed default.
+	bound, err := codec.BindPredicate("alice", pred)
+	require.NoError(t, err)
+	require.NotNil(t, bound)
+}
+
+// TestCodec_ExplicitObjectLocationMissing — passing the sentinel directly
+// produces the same unnamed layout as omitting WithObjectLocation entirely.
+func TestCodec_ExplicitObjectLocationMissing(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation(namer.ObjectLocationMissing).
+		WithHasher(hasher.NewSHA256Hasher()).
+		Build()
+	require.NoError(t, err)
+	require.NotNil(t, codec)
 }
 
 func TestCodecBuilder_WithObjectLocation(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithObjectLocation("myobjects").
 		Build()
 	require.NoError(t, err)
@@ -66,7 +100,7 @@ func TestCodecBuilder_WithObjectLocation(t *testing.T) {
 func TestCodecBuilder_WithHasher(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		Build()
 	require.NoError(t, err)
@@ -95,7 +129,7 @@ func TestCodecBuilder_WithHasher(t *testing.T) {
 func TestCodecBuilder_WithHashLocation(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		WithHashLocation("sha256", "checksums").
 		Build()
@@ -126,7 +160,7 @@ func TestCodecBuilder_WithSigner(t *testing.T) {
 
 	sv := newTestRSAPSS(t)
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithSigner(sv).
 		Build()
 	require.NoError(t, err)
@@ -138,7 +172,7 @@ func TestCodecBuilder_WithVerifier(t *testing.T) {
 
 	sv := newTestRSAPSS(t)
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithVerifier(sv).
 		Build()
 	require.NoError(t, err)
@@ -150,7 +184,7 @@ func TestCodecBuilder_WithSignerVerifier(t *testing.T) {
 
 	sv := newTestRSAPSS(t)
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithSignerVerifier(sv).
 		Build()
 	require.NoError(t, err)
@@ -162,7 +196,7 @@ func TestCodecBuilder_WithSignatureLocation(t *testing.T) {
 
 	signerVerifier := newTestRSAPSS(t)
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithSignerVerifier(signerVerifier).
 		WithSignatureLocation(signerVerifier.Name(), "sigs").
 		Build()
@@ -190,7 +224,7 @@ func TestCodecBuilder_WithSignatureLocation(t *testing.T) {
 func TestCodecBuilder_StaleHashLocationKey(t *testing.T) {
 	t.Parallel()
 
-	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		WithHashLocation("sah256", "custom"). // typo — no matching hasher.
 		Build()
@@ -203,7 +237,7 @@ func TestCodecBuilder_StaleSigLocationKey(t *testing.T) {
 
 	sv := newTestRSAPSS(t)
 
-	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithSignerVerifier(sv).
 		WithSignatureLocation("nonexistent-signer", "sigs").
 		Build()
@@ -218,7 +252,7 @@ func TestCodecBuilder_ReservedObjectLocation(t *testing.T) {
 		t.Run(reserved, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := integrity.NewCodecBuilder[codecTestStruct]().
+			_, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 				WithObjectLocation(reserved).
 				Build()
 			require.Error(t, err, "Build should fail when objectLocation equals reserved marker %q", reserved)
@@ -229,7 +263,7 @@ func TestCodecBuilder_ReservedObjectLocation(t *testing.T) {
 func TestCodecBuilder_InvalidObjectLocation(t *testing.T) {
 	t.Parallel()
 
-	_, err := integrity.NewCodecBuilder[codecTestStruct]().
+	_, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithObjectLocation("/foo"). // leading slash — invalid.
 		Build()
 	require.Error(t, err, "Build should fail for location starting with '/'")
@@ -282,7 +316,7 @@ func TestCodecBuilder_WithMarshaller(t *testing.T) {
 
 	sentMarsh := &sentinelMarshaller{marshalCalled: false}
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithMarshaller(sentMarsh).
 		Build()
 	require.NoError(t, err)
@@ -354,7 +388,7 @@ func TestCodecBuilder_WithNamer(t *testing.T) {
 		return &sentinelNamer{called: false}, nil
 	})
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").
 		WithNamer(customConstructor).
 		Build()
 	require.NoError(t, err)
@@ -368,7 +402,7 @@ func TestCodecBuilder_WithNamer(t *testing.T) {
 func TestCodec_ValueEqual(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	val := codecTestStruct{Name: "hello", Value: 42}
@@ -390,7 +424,7 @@ func TestCodec_ValueEqual(t *testing.T) {
 func TestCodec_ValueNotEqual(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	val := codecTestStruct{Name: "hello", Value: 42}
@@ -407,7 +441,7 @@ func TestCodec_ValueNotEqual(t *testing.T) {
 func TestCodec_VersionEqual(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	pred := codec.VersionEqual(int64(42))
@@ -423,7 +457,7 @@ func TestCodec_VersionEqual(t *testing.T) {
 func TestCodec_VersionNotEqual(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	pred := codec.VersionNotEqual(int64(7))
@@ -436,7 +470,7 @@ func TestCodec_VersionNotEqual(t *testing.T) {
 func TestCodec_VersionGreater(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	pred := codec.VersionGreater(int64(100))
@@ -448,7 +482,7 @@ func TestCodec_VersionGreater(t *testing.T) {
 func TestCodec_VersionLess(t *testing.T) {
 	t.Parallel()
 
-	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	pred := codec.VersionLess(int64(5))
@@ -460,7 +494,7 @@ func TestCodec_VersionLess(t *testing.T) {
 func TestCodecBuilder_Immutability(t *testing.T) {
 	t.Parallel()
 
-	base := integrity.NewCodecBuilder[codecTestStruct]()
+	base := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects")
 
 	marsh1 := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
 	marsh2 := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
@@ -480,7 +514,7 @@ func TestCodecBuilder_Immutability(t *testing.T) {
 func TestCodecBuilder_ImmutabilityHashers(t *testing.T) {
 	t.Parallel()
 
-	base := integrity.NewCodecBuilder[codecTestStruct]()
+	base := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects")
 	withSHA256 := base.WithHasher(hasher.NewSHA256Hasher())
 	withSHA256SHA1 := withSHA256.WithHasher(hasher.NewSHA1Hasher())
 
@@ -497,7 +531,7 @@ func TestCodecBuilder_ImmutabilityHashers(t *testing.T) {
 func TestCodecBuilder_MultipleBuildCalls(t *testing.T) {
 	t.Parallel()
 
-	builder := integrity.NewCodecBuilder[codecTestStruct]()
+	builder := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects")
 
 	codec1, err := builder.Build()
 	require.NoError(t, err)

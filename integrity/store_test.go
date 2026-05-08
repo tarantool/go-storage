@@ -2,7 +2,7 @@ package integrity_test
 
 // Conventions used by tests in this file:
 //
-//   codec := integrity.NewCodecBuilder[T]().WithHasher(...).Build()
+//   codec := integrity.NewCodecBuilder[T]().WithObjectLocation("objects").WithHasher(...).Build()
 //   store := codec.Bind(storage.Prefixed("/test", storage.NewStorage(driverMock)))
 //
 // LayeredNamer key layout (objectLocation = "objects"):
@@ -43,7 +43,7 @@ const storeTestPrefix = "/test"
 func newStoreCodec(t *testing.T) *integrity.Codec[SimpleStruct] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().Build()
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	return codec
@@ -52,7 +52,7 @@ func newStoreCodec(t *testing.T) *integrity.Codec[SimpleStruct] {
 func newStoreCodecWithHasher(t *testing.T, h hasher.Hasher) *integrity.Codec[SimpleStruct] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithHasher(h).Build()
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").WithHasher(h).Build()
 	require.NoError(t, err)
 
 	return codec
@@ -61,7 +61,7 @@ func newStoreCodecWithHasher(t *testing.T, h hasher.Hasher) *integrity.Codec[Sim
 func newStoreCodecWithSigner(t *testing.T, s crypto.Signer) *integrity.Codec[SimpleStruct] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithSigner(s).Build()
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").WithSigner(s).Build()
 	require.NoError(t, err)
 
 	return codec
@@ -70,7 +70,7 @@ func newStoreCodecWithSigner(t *testing.T, s crypto.Signer) *integrity.Codec[Sim
 func newStoreCodecWithVerifier(t *testing.T, v crypto.Verifier) *integrity.Codec[SimpleStruct] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithVerifier(v).Build()
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").WithVerifier(v).Build()
 	require.NoError(t, err)
 
 	return codec
@@ -79,7 +79,7 @@ func newStoreCodecWithVerifier(t *testing.T, v crypto.Verifier) *integrity.Codec
 func newStoreCodecWithSignerVerifier(t *testing.T, sv crypto.SignerVerifier) *integrity.Codec[SimpleStruct] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithSignerVerifier(sv).Build()
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").WithSignerVerifier(sv).Build()
 	require.NoError(t, err)
 
 	return codec
@@ -665,7 +665,7 @@ func TestStore_Get_NamerGenerateNamesError(t *testing.T) {
 
 	generateErr := errors.New("namer error")
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithNamer(func(
 			_ string,
 			_ []namer.LayeredHashLocation,
@@ -1026,7 +1026,7 @@ func TestStore_Put_WithMarshaller(t *testing.T) {
 	ctx := context.Background()
 	driverMock := mocks.NewDriverMock(t)
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithMarshaller(marshaller.NewTypedYamlMarshaller[SimpleStruct]()).
 		Build()
 	require.NoError(t, err)
@@ -1295,7 +1295,7 @@ func TestStore_Delete_NamerGenerateNamesError(t *testing.T) {
 
 	generateErr := errors.New("namer error")
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithNamer(func(
 			_ string,
 			_ []namer.LayeredHashLocation,
@@ -1646,7 +1646,7 @@ func TestStore_WithNamer(t *testing.T) {
 
 	var capturedSigLocs []namer.LayeredSigLocation
 
-	codec, err := integrity.NewCodecBuilder[SimpleStruct]().
+	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithHasher(newMockHasher("sha256")).
 		WithSigner(newMockSigner("rsa")).
 		WithNamer(func(
@@ -1844,12 +1844,12 @@ func TestStore_CrossCodec_AtomicCommit(t *testing.T) {
 
 	base := storage.NewStorage(driverMock)
 
-	userCodec, err := integrity.NewCodecBuilder[UserVal]().
+	userCodec, err := integrity.NewCodecBuilder[UserVal]().WithObjectLocation("objects").
 		WithObjectLocation("users").
 		Build()
 	require.NoError(t, err)
 
-	orderCodec, err := integrity.NewCodecBuilder[OrderVal]().
+	orderCodec, err := integrity.NewCodecBuilder[OrderVal]().WithObjectLocation("objects").
 		WithObjectLocation("orders").
 		Build()
 	require.NoError(t, err)

@@ -18,7 +18,7 @@ type txExampleValue struct {
 }
 
 func newTxExampleCodec() *integrity.Codec[txExampleValue] {
-	codec, err := integrity.NewCodecBuilder[txExampleValue]().
+	codec, err := integrity.NewCodecBuilder[txExampleValue]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		Build()
 	if err != nil {

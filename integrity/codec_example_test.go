@@ -22,7 +22,7 @@ type codecExampleConfig struct {
 // ExampleNewCodecBuilder builds a Codec[T] using the fluent builder.
 // Each WithX call returns a copy, so the original builder is never mutated.
 func ExampleNewCodecBuilder() {
-	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().
+	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		Build()
 	if err != nil {
@@ -53,7 +53,7 @@ func ExampleNewCodecBuilder() {
 // ExampleCodecBuilder_WithObjectLocation shows overriding the value-layer
 // location segment. The default is "objects".
 func ExampleCodecBuilder_WithObjectLocation() {
-	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().
+	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().WithObjectLocation("objects").
 		WithObjectLocation("users").
 		WithHasher(hasher.NewSHA256Hasher()).
 		Build()
@@ -86,7 +86,7 @@ func ExampleCodecBuilder_WithObjectLocation() {
 // original builder is unchanged after a setter call, so two divergent codecs
 // can be built from the same base.
 func ExampleNewCodecBuilder_immutability() {
-	base := integrity.NewCodecBuilder[codecExampleConfig]()
+	base := integrity.NewCodecBuilder[codecExampleConfig]().WithObjectLocation("objects")
 
 	withHasher := base.WithHasher(hasher.NewSHA256Hasher())
 	withoutHasher := base // unchanged.
@@ -116,7 +116,7 @@ func ExampleCodecBuilder_WithSignerVerifier() {
 		log.Fatalf("genkey: %v", err)
 	}
 
-	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().
+	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*priv)).
 		Build()
@@ -148,7 +148,7 @@ func ExampleCodecBuilder_WithSignerVerifier() {
 // to Tx.If via Codec.BindPredicate, or used through Store helpers like
 // WithPutPredicates.
 func ExampleCodec_ValueEqual() {
-	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().Build()
+	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().WithObjectLocation("objects").Build()
 	if err != nil {
 		log.Fatalf("build: %v", err)
 	}
