@@ -45,7 +45,7 @@ func newIntegrationCodecStore(
 ) (*integrity.Codec[IntegrationStruct], *integrity.Store[IntegrationStruct]) {
 	t.Helper()
 
-	builder := integrity.NewCodecBuilder[IntegrationStruct]()
+	builder := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects")
 	if configure != nil {
 		builder = configure(builder)
 	}
@@ -347,7 +347,7 @@ func TestTxIntegration_MultiOpAtomic(t *testing.T) {
 		ctx := t.Context()
 		base := scopedStorage(t, driverInstance)
 
-		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().Build()
+		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects").Build()
 		require.NoError(t, err)
 
 		txn := integrity.NewTx(base)
@@ -384,7 +384,7 @@ func TestTxIntegration_ThenElse_ThenFires(t *testing.T) {
 		ctx := t.Context()
 		base := scopedStorage(t, driverInstance)
 
-		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().Build()
+		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects").Build()
 		require.NoError(t, err)
 
 		store := codec.Bind(base)
@@ -425,7 +425,7 @@ func TestTxIntegration_ThenElse_ElseFires(t *testing.T) {
 		ctx := t.Context()
 		base := scopedStorage(t, driverInstance)
 
-		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().Build()
+		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects").Build()
 		require.NoError(t, err)
 
 		store := codec.Bind(base)
@@ -469,7 +469,7 @@ func TestTxIntegration_TxRange(t *testing.T) {
 		ctx := t.Context()
 		base := scopedStorage(t, driverInstance)
 
-		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().Build()
+		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects").Build()
 		require.NoError(t, err)
 
 		store := codec.Bind(base)
@@ -504,7 +504,7 @@ func TestTxIntegration_TxDelete(t *testing.T) {
 		ctx := t.Context()
 		base := scopedStorage(t, driverInstance)
 
-		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().
+		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects").
 			WithHasher(hasher.NewSHA256Hasher()).
 			Build()
 		require.NoError(t, err)
@@ -533,7 +533,7 @@ func TestTxIntegration_AlreadyCommitted(t *testing.T) {
 		ctx := t.Context()
 		base := scopedStorage(t, driverInstance)
 
-		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().Build()
+		codec, err := integrity.NewCodecBuilder[IntegrationStruct]().WithObjectLocation("objects").Build()
 		require.NoError(t, err)
 
 		txn := integrity.NewTx(base)

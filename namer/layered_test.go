@@ -36,9 +36,16 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "empty objectLocation",
-			args:    args{objectLocation: "", hashLocations: nil, sigLocations: nil, opts: nil},
-			wantErr: true,
+			// ObjectLocationMissing ("") selects unnamed mode and is
+			// accepted at construction time.
+			name: "empty objectLocation (unnamed mode)",
+			args: args{
+				objectLocation: namer.ObjectLocationMissing,
+				hashLocations:  nil,
+				sigLocations:   nil,
+				opts:           nil,
+			},
+			wantErr: false,
 		},
 		{
 			name:    "objectLocation with leading slash",

@@ -30,7 +30,7 @@ func newTestStorage() storage.Storage {
 func newTestCodec(t *testing.T) *integrity.Codec[txTestValue] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[txTestValue]().Build()
+	codec, err := integrity.NewCodecBuilder[txTestValue]().WithObjectLocation("objects").Build()
 	require.NoError(t, err)
 
 	return codec
@@ -39,7 +39,7 @@ func newTestCodec(t *testing.T) *integrity.Codec[txTestValue] {
 func newTestCodecWithHasher(t *testing.T) *integrity.Codec[txTestValue] {
 	t.Helper()
 
-	codec, err := integrity.NewCodecBuilder[txTestValue]().
+	codec, err := integrity.NewCodecBuilder[txTestValue]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		Build()
 	require.NoError(t, err)
@@ -567,7 +567,7 @@ func TestBindPredicate_NoValueKey(t *testing.T) {
 	// key to anchor the predicate to.
 	noValueNamer := &hashOnlyNamer{}
 
-	codec, err := integrity.NewCodecBuilder[txTestValue]().
+	codec, err := integrity.NewCodecBuilder[txTestValue]().WithObjectLocation("objects").
 		WithNamer(func(
 			_ string,
 			_ []namer.LayeredHashLocation,
@@ -614,12 +614,12 @@ func TestTx_ResultDispatchIsolatesCodecs(t *testing.T) {
 
 	// Two codecs sharing a type but living under distinct object locations,
 	// so each codec only sees its own keys when results are dispatched.
-	codecA, err := integrity.NewCodecBuilder[txTestValue]().
+	codecA, err := integrity.NewCodecBuilder[txTestValue]().WithObjectLocation("objects").
 		WithObjectLocation("typeA").
 		Build()
 	require.NoError(t, err)
 
-	codecB, err := integrity.NewCodecBuilder[txTestValue]().
+	codecB, err := integrity.NewCodecBuilder[txTestValue]().WithObjectLocation("objects").
 		WithObjectLocation("typeB").
 		Build()
 	require.NoError(t, err)

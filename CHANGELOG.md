@@ -27,8 +27,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   instead of under a directory of `<objectLocation>/<id>` items. The
   on-disk layout is identical to `Store[T]` for the same name — no
   separate codec, no separate namer.
+- namer.LayeredNamer: new `ObjectLocationMissing` sentinel. Passing it as
+  `objectLocation` to `NewLayeredNamer` (or omitting `WithObjectLocation`
+  on `CodecBuilder`) puts the namer in unnamed mode: keys are emitted as
+  `/<name>`, `/hash/<hashLocation>/<name>`, `/sig/<sigLocation>/<name>`,
+  with the per-codec location segment dropped. Object names whose first
+  slash-separated segment is `hash` or `sig` are rejected to avoid
+  colliding with the category markers.
 
 ### Changed
+
+- integrity.CodecBuilder: a builder that does not call
+  `WithObjectLocation` no longer falls back to `"objects"`; it now
+  produces an unnamed codec (keys at `/<name>` instead of
+  `/objects/<name>`). Callers who relied on the silent default must add
+  `.WithObjectLocation("objects")` (or any other segment) explicitly.
+  This is a breaking change for codecs that omitted `WithObjectLocation`.
 
 - storage.Prefixed: signature is now
   `Prefixed(prefix, inner) (Storage, error)`. A non-empty prefix ending

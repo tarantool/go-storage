@@ -18,7 +18,7 @@ type storeExampleValue struct {
 }
 
 func newExampleCodec() *integrity.Codec[storeExampleValue] {
-	codec, err := integrity.NewCodecBuilder[storeExampleValue]().
+	codec, err := integrity.NewCodecBuilder[storeExampleValue]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
 		Build()
 	if err != nil {

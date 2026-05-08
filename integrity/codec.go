@@ -119,7 +119,9 @@ type CodecBuilder[T any] struct {
 
 // NewCodecBuilder returns a new CodecBuilder with sensible defaults.
 // Default marshaller: TypedYamlMarshaller[T].
-// Default objectLocation: "" (resolved to "objects" at Build time).
+// Default objectLocation: namer.ObjectLocationMissing (unnamed codec —
+// keys are emitted without the per-codec location segment). Call
+// WithObjectLocation to opt into a named layout like /<location>/<name>.
 // Default namerFunc: wraps namer.NewLayeredNamer.
 func NewCodecBuilder[T any]() CodecBuilder[T] {
 	return CodecBuilder[T]{
@@ -200,8 +202,9 @@ func (b CodecBuilder[T]) WithSignerVerifier(sv crypto.SignerVerifier) CodecBuild
 	return out
 }
 
-// WithObjectLocation sets the location segment for value keys.
-// If not called, defaults to "objects" at Build time.
+// WithObjectLocation sets the location segment for value keys. If not
+// called, the codec is built in unnamed mode (no per-codec location
+// segment); see NewCodecBuilder.
 func (b CodecBuilder[T]) WithObjectLocation(loc string) CodecBuilder[T] {
 	out := b.copy()
 
@@ -277,10 +280,11 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 		namerFn = namer.NewLayeredNamer
 	}
 
+	// objLoc == namer.ObjectLocationMissing ("") puts the codec in
+	// unnamed mode — keys are emitted without the per-codec location
+	// segment. Callers who want the old "objects" layout must call
+	// WithObjectLocation("objects") explicitly.
 	objLoc := b.objectLocation
-	if objLoc == "" {
-		objLoc = "objects"
-	}
 
 	// hashLocations/sigLocations override key→loc; reject keys that have no
 	// matching hasher/signer/verifier so a typo doesn't silently no-op.
