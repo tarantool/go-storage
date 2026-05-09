@@ -5,12 +5,14 @@ package connect_test
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
 	"go.etcd.io/etcd/client/pkg/v3/transport" //nolint:depguard
+	etcdclient "go.etcd.io/etcd/client/v3"
 	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 	etcdlazy "go.etcd.io/etcd/tests/v3/integration"
 
@@ -27,8 +30,17 @@ import (
 	"github.com/tarantool/go-storage/operation"
 )
 
+const (
+	etcdAuthRootUser = "root"
+	etcdAuthRootPass = "root-secret"
+	etcdAuthUser     = "connect-user"
+	etcdAuthPass     = "connect-pass"
+)
+
 var haveTCS bool          //nolint:gochecknoglobals
 var tcsEndpoints []string //nolint:gochecknoglobals
+var tcsUsername string    //nolint:gochecknoglobals
+var tcsPassword string    //nolint:gochecknoglobals
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -42,6 +54,7 @@ func TestMain(m *testing.M) {
 	default:
 		haveTCS = true
 		tcsEndpoints = tcsInstance.Endpoints()
+		tcsUsername, tcsPassword = tcsInstance.Credentials()
 	}
 
 	code := m.Run()
@@ -56,6 +69,16 @@ func TestMain(m *testing.M) {
 func createEtcdTestConfig(t *testing.T) connect.Config {
 	t.Helper()
 
+	cluster := createEtcdCluster(t)
+
+	return connect.Config{ //nolint:exhaustruct
+		Endpoints: cluster.EndpointsGRPC(),
+	}
+}
+
+func createEtcdCluster(t *testing.T) etcdlazy.LazyCluster {
+	t.Helper()
+
 	if testing.Short() {
 		t.Skip("skipping integration tests in short mode")
 	}
@@ -66,9 +89,114 @@ func createEtcdTestConfig(t *testing.T) connect.Config {
 
 	t.Cleanup(func() { cluster.Terminate() })
 
-	return connect.Config{ //nolint:exhaustruct
-		Endpoints: cluster.EndpointsGRPC(),
+	return cluster
+}
+
+func createTCSTestConfig(t *testing.T) connect.Config {
+	t.Helper()
+
+	if !haveTCS {
+		t.Skip("TCS is unsupported or Tarantool isn't found")
 	}
+
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
+	return connect.Config{ //nolint:exhaustruct
+		Endpoints: tcsEndpoints,
+		Username:  tcsUsername,
+		Password:  tcsPassword,
+	}
+}
+
+func assertStorageRoundtrip(t *testing.T, stor storage.Storage, value string) {
+	t.Helper()
+
+	ctx := context.Background()
+
+	prefix := "/" + t.Name() + "/test"
+	key := []byte(prefix + "/value")
+
+	_, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit()
+	t.Cleanup(func() { _, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit() })
+
+	_, err := stor.Tx(ctx).Then(operation.Put(key, []byte(value))).Commit()
+	require.NoError(t, err)
+
+	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
+	require.NoError(t, err)
+	require.NotEmpty(t, kvs)
+	assert.Equal(t, key, kvs[0].Key)
+	assert.Equal(t, []byte(value), kvs[0].Value)
+}
+
+func configureEtcdAuth(t *testing.T, cluster etcdlazy.LazyCluster, clientTLS *tls.Config) {
+	t.Helper()
+
+	client := cluster.Cluster().Client(0)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err := client.RoleAdd(ctx, etcdAuthRootUser)
+	require.NoError(t, err)
+
+	_, err = client.UserAdd(ctx, etcdAuthRootUser, etcdAuthRootPass)
+	require.NoError(t, err)
+
+	_, err = client.UserGrantRole(ctx, etcdAuthRootUser, etcdAuthRootUser)
+	require.NoError(t, err)
+
+	_, err = client.AuthEnable(ctx)
+	require.NoError(t, err)
+
+	rootCfg := etcdclient.Config{ //nolint:exhaustruct
+		Endpoints:   cluster.EndpointsGRPC(),
+		Username:    etcdAuthRootUser,
+		Password:    etcdAuthRootPass,
+		DialTimeout: 5 * time.Second,
+	}
+	if clientTLS != nil {
+		rootCfg.TLS = clientTLS
+	}
+
+	rootClient, err := etcdclient.New(rootCfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = rootClient.Close() })
+
+	_, err = rootClient.RoleAdd(ctx, etcdAuthUser)
+	require.NoError(t, err)
+
+	_, err = rootClient.UserAdd(ctx, etcdAuthUser, etcdAuthPass)
+	require.NoError(t, err)
+
+	_, err = rootClient.UserGrantRole(ctx, etcdAuthUser, etcdAuthUser)
+	require.NoError(t, err)
+
+	_, err = rootClient.RoleGrantPermission(
+		ctx,
+		etcdAuthUser,
+		"/",
+		"",
+		etcdclient.PermissionType(etcdclient.PermReadWrite),
+	)
+	require.NoError(t, err)
+}
+
+func assertAuthFailure(t *testing.T, err error) {
+	t.Helper()
+
+	require.Error(t, err)
+
+	errMsg := strings.ToLower(err.Error())
+	assert.Condition(t, func() bool {
+		return strings.Contains(errMsg, "auth") ||
+			strings.Contains(errMsg, "credential") ||
+			strings.Contains(errMsg, "password") ||
+			strings.Contains(errMsg, "denied") ||
+			strings.Contains(errMsg, "rw instance")
+	}, "unexpected auth error: %s", errMsg)
 }
 
 func TestNewEtcdStorage_PutAndGet(t *testing.T) {
@@ -79,54 +207,18 @@ func TestNewEtcdStorage_PutAndGet(t *testing.T) {
 	require.NoError(t, err)
 
 	defer cancel()
-
-	prefix := "/" + t.Name() + "/test"
-	key := []byte(prefix + "/value")
-
-	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("hello"))).Commit()
-	require.NoError(t, err)
-
-	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
-	require.NoError(t, err)
-	require.NotEmpty(t, kvs)
-	assert.Equal(t, key, kvs[0].Key)
-	assert.Equal(t, []byte("hello"), kvs[0].Value)
+	assertStorageRoundtrip(t, stor, "hello")
 }
 
 func TestNewTCSStorage_PutAndGet(t *testing.T) {
-	if !haveTCS {
-		t.Skip("TCS is unsupported or Tarantool isn't found")
-	}
-
-	if testing.Short() {
-		t.Skip("skipping integration tests in short mode")
-	}
+	cfg := createTCSTestConfig(t)
 
 	ctx := context.Background()
-	stor, cancel, err := connect.NewTCSStorage(ctx, connect.Config{ //nolint:exhaustruct
-		Endpoints: tcsEndpoints,
-		Username:  "client",
-		Password:  "secret",
-	})
+	stor, cancel, err := connect.NewTCSStorage(ctx, cfg)
 	require.NoError(t, err)
 
 	defer cancel()
-
-	prefix := "/" + t.Name() + "/test"
-	key := []byte(prefix + "/value")
-
-	_, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit()
-
-	defer func() { _, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit() }()
-
-	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("hello"))).Commit()
-	require.NoError(t, err)
-
-	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
-	require.NoError(t, err)
-	require.NotEmpty(t, kvs)
-	assert.Equal(t, key, kvs[0].Key)
-	assert.Equal(t, []byte("hello"), kvs[0].Value)
+	assertStorageRoundtrip(t, stor, "hello")
 }
 
 func TestNewStorage_AutoDetect_Etcd(t *testing.T) {
@@ -137,53 +229,77 @@ func TestNewStorage_AutoDetect_Etcd(t *testing.T) {
 	require.NoError(t, err)
 
 	defer cancel()
-
-	prefix := "/" + t.Name() + "/test"
-	key := []byte(prefix + "/value")
-
-	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("auto"))).Commit()
-	require.NoError(t, err)
-
-	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
-	require.NoError(t, err)
-	require.NotEmpty(t, kvs)
-	assert.Equal(t, []byte("auto"), kvs[0].Value)
+	assertStorageRoundtrip(t, stor, "auto")
 }
 
 func TestNewStorage_AutoDetect_TCS(t *testing.T) {
-	if !haveTCS {
-		t.Skip("TCS is unsupported or Tarantool isn't found")
-	}
-
-	if testing.Short() {
-		t.Skip("skipping integration tests in short mode")
-	}
+	cfg := createTCSTestConfig(t)
 
 	ctx := context.Background()
-
-	stor, cancel, err := connect.NewStorage(ctx, connect.Config{ //nolint:exhaustruct
-		Endpoints: tcsEndpoints,
-		Username:  "client",
-		Password:  "secret",
-	})
+	stor, cancel, err := connect.NewStorage(ctx, cfg)
 	require.NoError(t, err)
 
 	defer cancel()
+	assertStorageRoundtrip(t, stor, "auto-tcs")
+}
 
-	prefix := "/" + t.Name() + "/test"
-	key := []byte(prefix + "/value")
+func TestNewEtcdStorage_InvalidCredentials(t *testing.T) {
+	cluster := createEtcdCluster(t)
+	configureEtcdAuth(t, cluster, nil)
 
-	_, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit()
+	ctx := context.Background()
+	_, _, err := connect.NewEtcdStorage(ctx, connect.Config{ //nolint:exhaustruct
+		Endpoints:   cluster.EndpointsGRPC(),
+		Username:    etcdAuthUser,
+		Password:    "wrong-password",
+		DialTimeout: 5 * time.Second,
+	})
+	assertAuthFailure(t, err)
+}
 
-	defer func() { _, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit() }()
+func TestNewEtcdStorage_WithTLSAndInvalidCredentials(t *testing.T) {
+	cluster := createEtcdTLSCluster(t)
+	tlsPath := tlsDir(t)
+	cert, certErr := tls.LoadX509KeyPair(filepath.Join(tlsPath, "localhost.crt"), filepath.Join(tlsPath, "localhost.key"))
+	require.NoError(t, certErr)
 
-	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("auto-tcs"))).Commit()
-	require.NoError(t, err)
+	configureEtcdAuth(t, cluster, &tls.Config{ //nolint:exhaustruct,gosec
+		InsecureSkipVerify: true,
+		Certificates:       []tls.Certificate{cert},
+	})
 
-	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
-	require.NoError(t, err)
-	require.NotEmpty(t, kvs)
-	assert.Equal(t, []byte("auto-tcs"), kvs[0].Value)
+	ctx := context.Background()
+
+	_, _, err := connect.NewEtcdStorage(ctx, connect.Config{ //nolint:exhaustruct
+		Endpoints: cluster.EndpointsGRPC(),
+		Username:  etcdAuthUser,
+		Password:  "wrong-password",
+		SSL: connect.SSLConfig{ //nolint:exhaustruct
+			Enable: true,
+			CaFile: filepath.Join(tlsPath, "ca.crt"),
+		},
+	})
+	assertAuthFailure(t, err)
+}
+
+func TestNewTCSStorage_InvalidCredentials(t *testing.T) {
+	cfg := createTCSTestConfig(t)
+	cfg.Password = "wrong-password"
+
+	ctx := context.Background()
+	_, _, err := connect.NewTCSStorage(ctx, cfg)
+	assertAuthFailure(t, err)
+}
+
+func TestNewStorage_AutoDetect_TCSInvalidCredentials(t *testing.T) {
+	cfg := createTCSTestConfig(t)
+	cfg.Password = "wrong-password"
+
+	ctx := context.Background()
+	_, _, err := connect.NewStorage(ctx, cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to connect to etcd")
+	assert.Contains(t, err.Error(), "failed to connect to TCS")
 }
 
 func tlsDir(t *testing.T) string {
@@ -384,16 +500,12 @@ func TestNewEtcdStorage_CanceledContext(t *testing.T) {
 }
 
 func TestNewTCSStorage_CanceledContext(t *testing.T) {
-	if !haveTCS {
-		t.Skip("TCS is unsupported or Tarantool isn't found")
-	}
+	cfg := createTCSTestConfig(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := connect.NewTCSStorage(ctx, connect.Config{ //nolint:exhaustruct
-		Endpoints: tcsEndpoints,
-	})
+	_, _, err := connect.NewTCSStorage(ctx, cfg)
 	require.Error(t, err)
 }
 

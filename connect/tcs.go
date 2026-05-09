@@ -6,6 +6,7 @@ import (
 
 	"github.com/tarantool/go-tarantool/v2"
 	"github.com/tarantool/go-tarantool/v2/pool"
+	"github.com/tarantool/go-tlsdialer"
 
 	tcsdriver "github.com/tarantool/go-storage/driver/tcs"
 )
@@ -43,4 +44,28 @@ func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher
 	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
 
 	return wrapper, func() { _ = wrapper.Close() }, nil
+}
+
+func newDialerForAddress(cfg Config, address string) (tarantool.Dialer, error) {
+	if cfg.SSL.Enable {
+		return tlsdialer.OpenSSLDialer{
+			Address:         address,
+			Auth:            tarantool.AutoAuth,
+			User:            cfg.Username,
+			Password:        cfg.Password,
+			SslKeyFile:      cfg.SSL.KeyFile,
+			SslCertFile:     cfg.SSL.CertFile,
+			SslCaFile:       cfg.SSL.CaFile,
+			SslCiphers:      cfg.SSL.Ciphers,
+			SslPassword:     cfg.SSL.Password,
+			SslPasswordFile: cfg.SSL.PasswordFile,
+		}, nil
+	}
+
+	return &tarantool.NetDialer{
+		Address:              address,
+		User:                 cfg.Username,
+		Password:             cfg.Password,
+		RequiredProtocolInfo: tarantool.ProtocolInfo{}, //nolint:exhaustruct
+	}, nil
 }

@@ -5,8 +5,6 @@ import "errors"
 var (
 	// ErrNoEndpoint is returned when no endpoint is provided.
 	ErrNoEndpoint = errors.New("at least one endpoint is required")
-	// ErrSSLDisabled is returned when SSL is requested but support is disabled.
-	ErrSSLDisabled = errors.New("SSL support is disabled")
 	// ErrInvalidSSLConfig is returned when SSL configuration is invalid.
 	ErrInvalidSSLConfig = errors.New("invalid SSL configuration")
 
