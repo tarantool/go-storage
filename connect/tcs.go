@@ -42,5 +42,25 @@ func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher
 
 	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
 
+	err = probeTCSConnection(ctx, wrapper)
+	if err != nil {
+		_ = wrapper.Close()
+
+		return nil, nil, err
+	}
+
 	return wrapper, func() { _ = wrapper.Close() }, nil
+}
+
+func probeTCSConnection(ctx context.Context, conn tcsdriver.DoerWatcher) error {
+	req := tarantool.NewCallRequest("config.storage.get").
+		Args([]any{"/"}).
+		Context(ctx)
+
+	_, err := conn.Do(req).GetResponse()
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFailedTarantoolProbe, err)
+	}
+
+	return nil
 }

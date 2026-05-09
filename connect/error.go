@@ -10,6 +10,8 @@ var (
 	// ErrInvalidSSLConfig is returned when SSL configuration is invalid.
 	ErrInvalidSSLConfig = errors.New("invalid SSL configuration")
 
+	errFailedTarantoolProbe = errors.New("failed to probe Tarantool")
+
 	errNoCACerts         = errors.New("failed to append CA certificates")
 	errFailedReadCAFile  = errors.New("failed to read CA file")
 	errFailedReadCAPath  = errors.New("failed to read CA path")

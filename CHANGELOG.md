@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `/objects/<name>`). Callers who relied on the silent default must add
   `.WithObjectLocation("objects")` (or any other segment) explicitly.
   This is a breaking change for codecs that omitted `WithObjectLocation`.
+- connect: tcs now pings the server on connect to detect valid credentials.
 
 - storage.Prefixed: signature is now
   `Prefixed(prefix, inner) (Storage, error)`. A non-empty prefix ending
