@@ -16,7 +16,6 @@ var (
 	errFailedLoadKeyPair = errors.New("failed to load key pair")
 	errFailedTLSConfig   = errors.New("failed to build TLS config")
 	errFailedEtcdClient  = errors.New("failed to create etcd client")
-	errFailedEtcdProbe   = errors.New("failed to probe etcd cluster")
 	errFailedTarantool   = errors.New("failed to connect to Tarantool")
 	errCertFileRead      = errors.New("failed to read certificate file")
 	errUnknownCipher     = errors.New("unknown cipher")

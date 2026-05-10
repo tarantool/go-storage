@@ -84,6 +84,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   — and `/<objectLocation>` is a single segment, which `ParseKey`
   rejects. The filter was a no-op under the new contract anyway, so
   both methods now forward driver events as-is.
+- connect: NewEtcdStorage stuck in infinite loop with bad endpoints.
+- connect: NewTCSStorage didn't check credentials validity.
 
 ## [v1.3.0] - 2026-05-05
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	etcdclient "go.etcd.io/etcd/client/v3"
+	"go.uber.org/zap"
 )
 
 func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, CleanupFunc, error) {
@@ -28,6 +29,7 @@ func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, Clea
 		DialTimeout: cfg.dialTimeout(),
 		Username:    cfg.Username,
 		Password:    cfg.Password,
+		Logger:      zap.NewNop(),
 	}
 
 	if cfg.SSL.Enable {
@@ -44,11 +46,14 @@ func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, Clea
 		return nil, nil, fmt.Errorf("%w: %w", errFailedEtcdClient, clientErr)
 	}
 
-	_, statusErr := client.Status(ctx, cfg.Endpoints[0])
+	statusCtx, statusCancel := context.WithTimeout(ctx, cfg.dialTimeout())
+	defer statusCancel()
+
+	_, statusErr := client.Status(statusCtx, cfg.Endpoints[0])
 	if statusErr != nil {
 		_ = client.Close()
 
-		return nil, nil, fmt.Errorf("%w: %w", errFailedEtcdProbe, statusErr)
+		return nil, nil, fmt.Errorf("%w: %w", errFailedEtcdClient, statusErr)
 	}
 
 	return client, func() { _ = client.Close() }, nil
