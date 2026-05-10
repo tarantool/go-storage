@@ -1,6 +1,8 @@
 package connect
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	defaultDialTimeout = 5 * time.Second

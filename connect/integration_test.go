@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
 	"go.etcd.io/etcd/client/pkg/v3/transport" //nolint:depguard
+	etcdclient "go.etcd.io/etcd/client/v3"
 	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 	etcdlazy "go.etcd.io/etcd/tests/v3/integration"
 
@@ -69,6 +70,43 @@ func createEtcdTestConfig(t *testing.T) connect.Config {
 	return connect.Config{ //nolint:exhaustruct
 		Endpoints: cluster.EndpointsGRPC(),
 	}
+}
+
+func createEtcdAuthTestConfig(t *testing.T) connect.Config {
+	t.Helper()
+
+	cfg := createEtcdTestConfig(t)
+
+	client, err := etcdclient.New(etcdclient.Config{ //nolint:exhaustruct
+		Endpoints:   cfg.Endpoints,
+		DialTimeout: 5 * time.Second,
+	})
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = client.Auth.UserAdd(ctx, "root", "root")
+	require.NoError(t, err)
+
+	_, err = client.Auth.UserGrantRole(ctx, "root", "root")
+	require.NoError(t, err)
+
+	_, err = client.Auth.UserAdd(ctx, "client", "secret")
+	require.NoError(t, err)
+
+	_, err = client.Auth.UserGrantRole(ctx, "client", "root")
+	require.NoError(t, err)
+
+	_, err = client.Auth.AuthEnable(ctx)
+	require.NoError(t, err)
+
+	cfg.Username = "client"
+	cfg.Password = "secret"
+
+	return cfg
 }
 
 func TestNewEtcdStorage_PutAndGet(t *testing.T) {
@@ -383,6 +421,18 @@ func TestNewEtcdStorage_CanceledContext(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
+func TestNewEtcdStorage_InvalidCredentials(t *testing.T) {
+	cfg := createEtcdAuthTestConfig(t)
+	cfg.Username = "invalid_user"
+	cfg.Password = "invalid_pass"
+
+	ctx := context.Background()
+
+	_, _, err := connect.NewEtcdStorage(ctx, cfg)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "authentication failed, invalid user ID or password")
+}
+
 func TestNewTCSStorage_CanceledContext(t *testing.T) {
 	if !haveTCS {
 		t.Skip("TCS is unsupported or Tarantool isn't found")
@@ -395,6 +445,26 @@ func TestNewTCSStorage_CanceledContext(t *testing.T) {
 		Endpoints: tcsEndpoints,
 	})
 	require.Error(t, err)
+}
+
+func TestNewTCSStorage_InvalidCredentials(t *testing.T) {
+	if !haveTCS {
+		t.Skip("TCS is unsupported or Tarantool isn't found")
+	}
+
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
+	ctx := context.Background()
+
+	_, _, err := connect.NewTCSStorage(ctx, connect.Config{ //nolint:exhaustruct
+		Endpoints: tcsEndpoints,
+		Username:  "invalid_user",
+		Password:  "invalid_pass",
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "supplied credentials are invalid")
 }
 
 func TestNewEtcdStorage_WithTLSEncryptedKeyAndPassword(t *testing.T) {

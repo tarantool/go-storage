@@ -35,6 +35,24 @@ func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher
 		})
 	}
 
+	// Probe the connections to ensure that we have at least one working connection.
+	//
+	// Go-tarantool pool doesn't return connection failures, just logs it.
+	// Check go-tarantool/v2@v2.4.1/pool/connection_pool.go:200,
+	// So we need to check it ourselves.
+	probeCtx, cancel := context.WithTimeout(ctx, cfg.dialTimeout())
+	probeConn, err := tarantool.Connect(probeCtx, instances[0].Dialer, tarantool.Opts{ //nolint:exhaustruct
+		Timeout: cfg.dialTimeout(),
+	})
+
+	cancel()
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", errFailedTarantool, err)
+	}
+
+	_ = probeConn.Close()
+
 	conn, connErr := pool.Connect(ctx, instances)
 	if connErr != nil {
 		return nil, nil, fmt.Errorf("%w: %w", errFailedTarantool, connErr)

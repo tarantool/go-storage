@@ -83,6 +83,8 @@ linters:
             # for etcd LazyCluster reimplementation
             - "go.etcd.io/etcd/client/pkg/v3"
             - "go.etcd.io/etcd/tests/v3/"
+            # for mute etcd warn output
+            - "go.uber.org/zap"
         test:
           files:
             - "$test"
