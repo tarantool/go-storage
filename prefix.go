@@ -19,6 +19,11 @@ import (
 // would produce keys like "/foo//objectLocation/name".
 var ErrPrefixTrailingSlash = errors.New("storage.Prefixed: prefix must not end with '/'")
 
+// ErrPrefixNoLeadingSlash is returned by Prefixed when a non-empty prefix does
+// not start with "/". Keys are rooted at "/", so a prefix must be an absolute
+// path segment.
+var ErrPrefixNoLeadingSlash = errors.New("storage.Prefixed: prefix must start with '/'")
+
 // Prefixed returns a Storage that scopes every operation, predicate, range,
 // and watch under prefix. Keys returned to the caller (RequestResponse.Values,
 // kv.KeyValue, watch.Event.Prefix) have prefix stripped — callers never see
@@ -28,13 +33,20 @@ var ErrPrefixTrailingSlash = errors.New("storage.Prefixed: prefix must not end w
 // Nested wrappers are flattened at construction so the outer prefix is the
 // leftmost segment.
 //
-// An empty prefix yields a transparent wrapper. A non-empty prefix must not
-// end with "/" (returns ErrPrefixTrailingSlash) — the codec namer prepends
-// "/" to every key, so a trailing slash here would produce keys like
-// "/foo//objectLocation/name".
+// An empty prefix yields a transparent wrapper. A non-empty prefix must start
+// with "/" (returns ErrPrefixNoLeadingSlash) and must not end with "/" (returns
+// ErrPrefixTrailingSlash) — the codec namer prepends "/" to every key, so a
+// trailing slash here would produce keys like "/foo//objectLocation/name".
+// Interior "/" separators are allowed (e.g. "/foo/bar").
 func Prefixed(prefix string, inner Storage) (Storage, error) {
-	if prefix != "" && strings.HasSuffix(prefix, "/") {
-		return nil, fmt.Errorf("%w: %q", ErrPrefixTrailingSlash, prefix)
+	if prefix != "" {
+		if !strings.HasPrefix(prefix, "/") {
+			return nil, fmt.Errorf("%w: %q", ErrPrefixNoLeadingSlash, prefix)
+		}
+
+		if strings.HasSuffix(prefix, "/") {
+			return nil, fmt.Errorf("%w: %q", ErrPrefixTrailingSlash, prefix)
+		}
 	}
 
 	if existing, ok := inner.(*prefixed); ok {

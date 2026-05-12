@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- `storage.Prefixed` now rejects a non-empty prefix that does not start with
+  `/`, returning the new `storage.ErrPrefixNoLeadingSlash`. Interior `/`
+  separators remain allowed; a trailing `/` is still rejected with
+  `storage.ErrPrefixTrailingSlash`.
+
 ### Changed
 
 ### Fixed

@@ -114,6 +114,29 @@ func TestPrefixed_RejectsTrailingSlash(t *testing.T) {
 	}
 }
 
+func TestPrefixed_RejectsMissingLeadingSlash(t *testing.T) {
+	t.Parallel()
+
+	inner := &recordingStorage{
+		lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+		txResp:       txPkg.Response{Succeeded: true, Results: nil},
+		txErr:        nil,
+		lastWatchKey: nil,
+		watchEvents:  nil,
+	}
+
+	cases := []string{"ns", "a/b", "ns/"}
+	for _, prefix := range cases {
+		t.Run(prefix, func(t *testing.T) {
+			t.Parallel()
+
+			s, err := storage.Prefixed(prefix, inner)
+			assert.Nil(t, s)
+			require.ErrorIs(t, err, storage.ErrPrefixNoLeadingSlash)
+		})
+	}
+}
+
 func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Parallel()
 
