@@ -51,6 +51,11 @@ type Storage interface {
 	// The context manages timeouts and cancellation for the transaction.
 	Tx(ctx context.Context) txPkg.Tx
 
+	// TxFactory returns a tx.Factory bound to this Storage. Use it to hand
+	// "begin transaction" capability to components that do not need the full
+	// Storage interface.
+	TxFactory() txPkg.Factory
+
 	// Range queries a range of keys with optional filtering.
 	// Options:
 	//   - WithPrefix: filter keys by prefix
@@ -142,6 +147,11 @@ func (s storage) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-
 // Tx implements the Storage interface for transaction creation.
 func (s storage) Tx(ctx context.Context) txPkg.Tx {
 	return newTx(ctx, s.driver)
+}
+
+// TxFactory implements the Storage interface for transaction-factory creation.
+func (s storage) TxFactory() txPkg.Factory {
+	return s.Tx
 }
 
 // Range implements the Storage interface for range queries.
