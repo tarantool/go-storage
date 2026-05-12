@@ -9,83 +9,75 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- namer.Namer: new `Prefixes(val, isPrefix) []string` method returning one
-  range prefix per key category (value, hash, sig). `Prefix` only covered
-  the value layer, which makes `Range` miss hash/sig keys when an integrity
-  validator is attached. Both `DefaultNamer` and `LayeredNamer` implement
-  it; third-party implementations of `Namer` must add the method.
-- namer.LayeredNamer: `objectLocation` may now be a multi-segment path
-  (e.g. `"settings/ldap"`). Previously the segment validator rejected any
-  inner `/`. The reserved-marker check still applies to the first segment,
-  so `objectLocation` values like `"hash/foo"` or `"sig/foo"` remain
-  rejected because they would collide with the hash/sig key dispatch.
-- integrity.SingletonStore[T] + `Codec[T].BindSingleton`: bind a codec to
-  one fixed name at construction time, then call
-  `Get`/`Put`/`Delete`/`Watch` and `TxGet`/`TxPut`/`TxDelete` without
-  threading the name through every call. Suited for configuration
-  objects that live at a single known key (e.g. `/settings/auth`)
-  instead of under a directory of `<objectLocation>/<id>` items. The
-  on-disk layout is identical to `Store[T]` for the same name — no
-  separate codec, no separate namer.
-- namer.LayeredNamer: new `ObjectLocationMissing` sentinel. Passing it as
-  `objectLocation` to `NewLayeredNamer` (or omitting `WithObjectLocation`
-  on `CodecBuilder`) puts the namer in unnamed mode: keys are emitted as
-  `/<name>`, `/hash/<hashLocation>/<name>`, `/sig/<sigLocation>/<name>`,
-  with the per-codec location segment dropped. Object names whose first
+### Changed
+
+### Fixed
+
+## [v1.4.0] - 2026-05-12
+
+This release adds an unnamed codec layout and a `SingletonStore[T]` for
+single-key configuration objects, switches `watch` to a signal-only
+`Event.Prefix` contract, makes `storage.Prefixed` return an error, and
+fixes several cases where `Range` and `Watch` dropped every result under
+integrity.
+
+### Added
+
+- integrity.SingletonStore[T] and `Codec[T].BindSingleton`: bind a codec
+  to one fixed key at construction time, then call
+  `Get`/`Put`/`Delete`/`Watch` (and the `Tx*` variants) without passing a
+  name on every call. Suited for configuration objects that live at a
+  single known key (e.g. `/settings/auth`) rather than under a directory
+  of `<objectLocation>/<id>` items; the on-disk layout matches `Store[T]`
+  for the same name.
+- integrity, namer: unnamed codec layout. A `CodecBuilder` without
+  `WithObjectLocation`, or `NewLayeredNamer` with the new
+  `ObjectLocationMissing` sentinel, emits keys as `/<name>`,
+  `/hash/<hashLocation>/<name>`, `/sig/<sigLocation>/<name>` — the
+  per-codec location segment is dropped. Object names whose first
   slash-separated segment is `hash` or `sig` are rejected to avoid
   colliding with the category markers.
+- namer.LayeredNamer: `objectLocation` may now be a multi-segment path
+  (e.g. `"settings/ldap"`); the reserved `hash`/`sig` marker check
+  applies only to the first segment.
+- namer.Namer: new `Prefixes(val, isPrefix) []string` method returning
+  one range prefix per key category (value, hash, sig). `DefaultNamer`
+  and `LayeredNamer` implement it; third-party `Namer` implementations
+  must add the method.
 
 ### Changed
 
-- integrity.CodecBuilder: a builder that does not call
-  `WithObjectLocation` no longer falls back to `"objects"`; it now
-  produces an unnamed codec (keys at `/<name>` instead of
-  `/objects/<name>`). Callers who relied on the silent default must add
-  `.WithObjectLocation("objects")` (or any other segment) explicitly.
-  This is a breaking change for codecs that omitted `WithObjectLocation`.
-
+- integrity.CodecBuilder: omitting `WithObjectLocation` no longer falls
+  back to `"objects"`; it now produces an unnamed codec (keys at
+  `/<name>` instead of `/objects/<name>`). Callers who relied on the
+  silent default must add `.WithObjectLocation("objects")` explicitly.
+  This is a breaking change.
 - storage.Prefixed: signature is now
   `Prefixed(prefix, inner) (Storage, error)`. A non-empty prefix ending
-  with `/` is rejected with `ErrPrefixTrailingSlash`. The codec namer
-  prepends `/` to every key, so a trailing slash here would silently
-  produce keys like `/foo//objectLocation/name`. Empty prefix still
-  yields a transparent wrapper. Callers must update to handle the
-  returned error.
-- watch: unified all drivers (etcd, dummy, tcs) on a signal-only
-  `Event.Prefix` contract. Every driver now emits the watched key with
-  any trailing `/` stripped — a signal that something at or under the
-  watched key changed, not the per-event changed key. Consumers that
-  need the changed key must follow up with `Range`. tcs's per-watcher
-  buffer is bumped to 16 with a blocking, ctx-aware send so server
-  bursts no longer drop on a full channel.
+  with `/` is rejected with `ErrPrefixTrailingSlash`; an empty prefix
+  still yields a transparent wrapper. This is a breaking change — callers
+  must handle the returned error.
+- watch: all drivers (etcd, dummy, tcs) now follow a signal-only
+  `Event.Prefix` contract. Every driver emits the watched key with any
+  trailing `/` stripped — a signal that something at or under the watched
+  key changed, not the per-event changed key. Consumers that need the
+  changed key must follow up with `Range`. The tcs per-watcher buffer is
+  bumped to 16 with a blocking, ctx-aware send so server bursts no longer
+  drop on a full channel.
 
 ### Fixed
 
 - integrity: `Store[T].Range(ctx, "")` and `Typed[T].Range(ctx, "")`
   returned an empty slice as soon as a hasher or signer/verifier was
-  configured. The empty-name branch fetched only the value-layer prefix,
-  so the validator saw no hash/sig keys and dropped every result with a
-  "missing signature/hash" error. Both methods now fan out across every
-  category prefix via the new `Namer.Prefixes` method. With
-  `LayeredNamer` (the `Codec` default) hash and sig keys live at separate
-  roots, so this reproduced for every empty `Range`; with `DefaultNamer`
-  the bug was masked because all categories share a single root prefix.
-- watch: prefix-shaped Watch calls (e.g. `Watch(ctx, "acl/")`) used to
-  silently drop every event because drivers emitted the watched key
-  with the trailing `/` intact and the integrity layer's `ParseKey`
-  rejected it. Drivers now strip the trailing `/`; the integrity store
-  filter strips it from the user-supplied name as well so the
-  neighbour-codec filter matches both single-key and prefix watches.
-- integrity: `Store[T].Watch(ctx, "")` and `Typed[T].Watch(ctx, "")`
-  (the "watch the whole codec" case) silently dropped every event.
-  Under the signal-only `Event.Prefix` contract drivers always emit
-  the watched prefix verbatim, but the integrity layer was running
-  `ParseKey` on it and dropping anything that did not look like a key
-  — and `/<objectLocation>` is a single segment, which `ParseKey`
-  rejects. The filter was a no-op under the new contract anyway, so
-  both methods now forward driver events as-is.
-- connect: NewEtcdStorage stuck in infinite loop with bad endpoints.
-- connect: NewTCSStorage didn't check credentials validity.
+  configured, because the empty-name branch fetched only the value-layer
+  prefix and the validator then dropped every result as missing its
+  hash/signature. Both methods now fan out across every category prefix.
+- integrity: prefix-shaped `Watch` calls (e.g. `Watch(ctx, "acl/")`) and
+  whole-codec watches (`Watch(ctx, "")`) silently dropped every event.
+  Trailing slashes are now normalised on both the driver and integrity
+  sides, and whole-codec watches forward driver events as-is.
+- connect: `NewEtcdStorage` could spin in an infinite loop with bad
+  endpoints; `NewTCSStorage` now validates credentials.
 
 ## [v1.3.0] - 2026-05-05
 
