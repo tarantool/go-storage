@@ -39,6 +39,10 @@ func (s *recordingStorage) Tx(_ context.Context) txPkg.Tx {
 	return &recordingTx{rec: s, call: recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil}}
 }
 
+func (s *recordingStorage) TxFactory() txPkg.Factory {
+	return s.Tx
+}
+
 func (s *recordingStorage) Range(_ context.Context, _ ...storage.RangeOption) ([]kv.KeyValue, error) {
 	panic("recordingStorage.Range: use DriverMock-based tests for Range")
 }
@@ -533,6 +537,10 @@ func (b *blockingWatchStorage) Tx(_ context.Context) txPkg.Tx {
 	}
 }
 
+func (b *blockingWatchStorage) TxFactory() txPkg.Factory {
+	return b.Tx
+}
+
 func (b *blockingWatchStorage) Range(_ context.Context, _ ...storage.RangeOption) ([]kv.KeyValue, error) {
 	return nil, nil
 }
@@ -723,5 +731,64 @@ func TestPrefixed_ResultKeyStripping(t *testing.T) {
 		assert.Equal(t, []byte("/objects/myname"), kvs[0].Key)
 
 		mockDriver.MinimockFinish()
+	})
+}
+
+func TestPrefixed_TxFactory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	const namespace = "/ns"
+
+	t.Run("factory rewrites operation keys with prefix", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{
+			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+			txResp:       txPkg.Response{Succeeded: true, Results: nil},
+			txErr:        nil,
+			lastWatchKey: nil,
+			watchEvents:  nil,
+		}
+		prefixedStore := mustPrefix(t, namespace, inner)
+
+		factory := prefixedStore.TxFactory()
+		require.NotNil(t, factory)
+
+		_, err := factory(ctx).
+			Then(operation.Put([]byte("key"), []byte("val"))).
+			Commit()
+		require.NoError(t, err)
+
+		require.Len(t, inner.lastTx.thenOps, 1)
+		assert.Equal(t, []byte(namespace+"key"), inner.lastTx.thenOps[0].Key())
+	})
+
+	t.Run("factory survives outliving the Storage handle", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{
+			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+			txResp:       txPkg.Response{Succeeded: true, Results: nil},
+			txErr:        nil,
+			lastWatchKey: nil,
+			watchEvents:  nil,
+		}
+
+		// Bind the factory once, then drop the Storage reference. The closure
+		// over the receiver must keep the prefix-rewrite path alive.
+		factory := func() txPkg.Factory {
+			s := mustPrefix(t, namespace, inner)
+			return s.TxFactory()
+		}()
+
+		_, err := factory(ctx).
+			Then(operation.Delete([]byte("key"))).
+			Commit()
+		require.NoError(t, err)
+
+		require.Len(t, inner.lastTx.thenOps, 1)
+		assert.Equal(t, []byte(namespace+"key"), inner.lastTx.thenOps[0].Key())
 	})
 }

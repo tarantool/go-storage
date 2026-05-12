@@ -30,6 +30,71 @@ func TestStorage_Tx(t *testing.T) {
 	assert.NotNil(t, txInstance)
 }
 
+func TestStorage_TxFactory(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns non-nil factory that produces transactions", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		factory := strg.TxFactory()
+		require.NotNil(t, factory)
+
+		txInstance := factory(ctx)
+		assert.NotNil(t, txInstance)
+	})
+
+	t.Run("factory routes to driver same as Storage.Tx", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		thenOp := operation.Put([]byte("key"), []byte("value"))
+		expected := tx.Response{Succeeded: true, Results: []tx.RequestResponse{}}
+
+		mockDriver.ExecuteMock.Expect(ctx, nil, []operation.Operation{thenOp}, nil).
+			Return(expected, nil)
+
+		factory := strg.TxFactory()
+		resp, err := factory(ctx).Then(thenOp).Commit()
+
+		require.NoError(t, err)
+		assert.Equal(t, expected, resp)
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("each invocation returns an independent transaction", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		factory := strg.TxFactory()
+		tx1 := factory(ctx)
+		tx2 := factory(ctx)
+
+		assert.NotSame(t, tx1, tx2, "factory must produce distinct tx instances")
+	})
+
+	t.Run("Storage.Tx method-value satisfies tx.Factory", func(t *testing.T) {
+		t.Parallel()
+
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		// Compile-time + runtime check: a method value of Tx is assignable to
+		// tx.Factory, which is the documented "alternative way to bind".
+		var factory tx.Factory = strg.Tx
+		require.NotNil(t, factory)
+	})
+}
+
 func TestTx_If(t *testing.T) {
 	t.Parallel()
 

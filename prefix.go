@@ -99,6 +99,10 @@ func (p *prefixed) Tx(ctx context.Context) txPkg.Tx {
 	}
 }
 
+func (p *prefixed) TxFactory() txPkg.Factory {
+	return p.Tx
+}
+
 func (p *prefixed) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error) {
 	rangeOpts := &rangeOptions{Prefix: "", Limit: 0}
 	for _, opt := range opts {
