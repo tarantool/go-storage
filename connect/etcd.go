@@ -24,8 +24,25 @@ func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, Clea
 		return nil, nil, err
 	}
 
+	endpoints := make([]string, len(cfg.Endpoints))
+
+	scheme := "http"
+	if cfg.SSL.Enable {
+		scheme = "https"
+	}
+
+	for idx, endpoint := range cfg.Endpoints {
+		if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
+			endpoint = strings.TrimPrefix(endpoint, "http://")
+			endpoint = strings.TrimPrefix(endpoint, "https://")
+			endpoint = scheme + "://" + endpoint
+		}
+
+		endpoints[idx] = endpoint
+	}
+
 	etcdConfig := etcdclient.Config{ //nolint:exhaustruct
-		Endpoints:   cfg.Endpoints,
+		Endpoints:   endpoints,
 		DialTimeout: cfg.dialTimeout(),
 		Username:    cfg.Username,
 		Password:    cfg.Password,
@@ -49,7 +66,7 @@ func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, Clea
 	statusCtx, statusCancel := context.WithTimeout(ctx, cfg.dialTimeout())
 	defer statusCancel()
 
-	_, statusErr := client.Status(statusCtx, cfg.Endpoints[0])
+	_, statusErr := client.Status(statusCtx, endpoints[0])
 	if statusErr != nil {
 		_ = client.Close()
 

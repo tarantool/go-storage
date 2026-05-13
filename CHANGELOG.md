@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- connect: fix TCS connection failure when endpoint URL contains `http://` or
+  `https://` scheme. Endpoints are now normalized by stripping the scheme
+  prefix; etcd endpoints use `http://` or `https://` based on `SSL.Enable`.
+
 ## [v1.4.0] - 2026-05-12
 
 This release adds an unnamed codec layout and a `SingletonStore[T]` for
