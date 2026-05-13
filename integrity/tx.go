@@ -475,7 +475,15 @@ func (c *Codec[T]) TxRange(
 
 // BindPredicate resolves the value-layer key for name and calls p with it,
 // returning the concrete predicate.Predicate ready for use in Tx.If.
+//
+// Returns ErrInvalidName for empty, leading-slash, or trailing-slash names
+// — the same rule applied by Put/Delete/Get/Watch — and ErrNoValueKey if
+// the namer emits no value-layer key.
 func (c *Codec[T]) BindPredicate(name string, pred Predicate) (predicate.Predicate, error) {
+	if !checkName(name) {
+		return nil, ErrInvalidName
+	}
+
 	keys, err := c.namer.GenerateNames(name)
 	if err != nil {
 		return nil, fmt.Errorf("generate names: %w", err)

@@ -149,6 +149,45 @@ func (s *Store[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, 
 	return s.storage.Watch(ctx, []byte(key)), nil
 }
 
+// ValueKey returns the on-disk value-layer key for name — the namer's
+// value key prefixed with the bound storage's prefix (if it is wrapped
+// with [storage.Prefixed]). See [Codec.ValueKey] for the namer-relative
+// form.
+func (s *Store[T]) ValueKey(name string) (string, error) {
+	key, err := s.codec.ValueKey(name)
+	if err != nil {
+		return "", err
+	}
+
+	if prefix := storage.StoragePrefix(s.storage); len(prefix) > 0 {
+		return string(prefix) + key, nil
+	}
+
+	return key, nil
+}
+
+// FullKeys returns every on-disk key the bound codec would produce for
+// name (value + hashes + signatures), each prefixed with the bound
+// storage's prefix if it is wrapped with [storage.Prefixed]. See
+// [Codec.FullKeys] for the namer-relative form.
+func (s *Store[T]) FullKeys(name string) ([]string, error) {
+	keys, err := s.codec.FullKeys(name)
+	if err != nil {
+		return nil, err
+	}
+
+	prefix := storage.StoragePrefix(s.storage)
+	if len(prefix) == 0 {
+		return keys, nil
+	}
+
+	for i, key := range keys {
+		keys[i] = string(prefix) + key
+	}
+
+	return keys, nil
+}
+
 func (s *Store[T]) bindPredicates(name string, preds []Predicate) ([]predicate.Predicate, error) {
 	boundPreds := make([]predicate.Predicate, 0, len(preds))
 

@@ -585,6 +585,33 @@ func TestBindPredicate_NoValueKey(t *testing.T) {
 	require.ErrorIs(t, err, integrity.ErrNoValueKey)
 }
 
+// TestBindPredicate_InvalidName guards parity with Put/Delete/Get/Watch —
+// a leading or trailing slash silently aliasing to the un-slashed key would
+// let a predicate match a row a sibling call never sees.
+func TestBindPredicate_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	codec := newTestCodec(t)
+
+	for _, testCase := range []struct {
+		label string
+		name  string
+	}{
+		{"empty", ""},
+		{"leading slash", "/foo"},
+		{"trailing slash", "foo/"},
+	} {
+		t.Run(testCase.label, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := codec.BindPredicate(testCase.name, func(key []byte) predicate.Predicate {
+				return predicate.VersionEqual(key, 1)
+			})
+			require.ErrorIs(t, err, integrity.ErrInvalidName)
+		})
+	}
+}
+
 type hashOnlyNamer struct{}
 
 func (n *hashOnlyNamer) GenerateNames(name string) ([]namer.Key, error) {

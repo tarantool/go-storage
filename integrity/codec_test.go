@@ -3,6 +3,7 @@ package integrity_test
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"strings"
 	"testing"
 
@@ -540,4 +541,288 @@ func TestCodecBuilder_MultipleBuildCalls(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotSame(t, codec1, codec2, "each Build call should return a distinct *Codec[T]")
+}
+
+func TestCodec_ValueKey_NamedLocation(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("foo")
+	require.NoError(t, err)
+	assert.Equal(t, "/objects/foo", key)
+}
+
+func TestCodec_ValueKey_UnnamedDefault(t *testing.T) {
+	t.Parallel()
+
+	// No WithObjectLocation — codec is in unnamed mode (no per-codec segment).
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("foo")
+	require.NoError(t, err)
+	assert.Equal(t, "/foo", key)
+}
+
+func TestCodec_ValueKey_MultiSegmentLocation(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("settings/ldap").
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("entry-1")
+	require.NoError(t, err)
+	assert.Equal(t, "/settings/ldap/entry-1", key)
+}
+
+func TestCodec_ValueKey_IgnoresHashAndSigLayers(t *testing.T) {
+	t.Parallel()
+
+	// Adding hashers/signers must not change the value-layer key: ValueKey
+	// is documented to return only the value layer, even when other layers
+	// are present.
+	signerVerifier := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		WithHasher(hasher.NewSHA256Hasher()).
+		WithSignerVerifier(signerVerifier).
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("foo")
+	require.NoError(t, err)
+	assert.Equal(t, "/objects/foo", key, "ValueKey must return only the value-layer key")
+	assert.NotContains(t, key, "/hash/")
+	assert.NotContains(t, key, "/sig/")
+}
+
+func TestCodec_ValueKey_RespectsLocationOverrides(t *testing.T) {
+	t.Parallel()
+
+	// Hash/sig location overrides affect the hash/sig layers only — the
+	// value-layer key must remain /<objectLocation>/<name>.
+	signerVerifier := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		WithHasher(hasher.NewSHA256Hasher()).
+		WithHashLocation("sha256", "checksums").
+		WithSignerVerifier(signerVerifier).
+		WithSignatureLocation(signerVerifier.Name(), "sigs").
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("foo")
+	require.NoError(t, err)
+	assert.Equal(t, "/objects/foo", key)
+}
+
+func TestCodec_ValueKey_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
+	require.NoError(t, err)
+
+	cases := []struct {
+		label string
+		name  string
+	}{
+		{"empty", ""},
+		{"leading slash", "/foo"},
+		{"trailing slash", "foo/"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			t.Parallel()
+
+			key, err := codec.ValueKey(tc.name)
+			require.Error(t, err)
+			require.ErrorIs(t, err, integrity.ErrInvalidName)
+			assert.Empty(t, key)
+		})
+	}
+}
+
+func TestCodec_ValueKey_RoundTripsThroughNamer(t *testing.T) {
+	t.Parallel()
+
+	// ValueKey must produce a key that the codec's own (reproducible) namer
+	// can parse back to the original name with type=value.
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("alpha-beta")
+	require.NoError(t, err)
+
+	reproNamer, err := namer.NewLayeredNamer("objects", nil, nil)
+	require.NoError(t, err)
+
+	parsed, err := reproNamer.ParseKey(key)
+	require.NoError(t, err)
+	assert.Equal(t, namer.KeyTypeValue, parsed.Type())
+	assert.Equal(t, "alpha-beta", parsed.Name())
+}
+
+// fullKeyNoValueNamer always emits a hash-only key set, so ValueKey has no
+// value layer to return and must surface ErrNoValueKey. Reuses the
+// sentinelNamer plumbing but overrides GenerateNames to drop the value key.
+type fullKeyNoValueNamer struct{ sentinelNamer }
+
+func (n *fullKeyNoValueNamer) GenerateNames(name string) ([]namer.Key, error) {
+	return []namer.Key{
+		namer.NewDefaultKey(name, namer.KeyTypeHash, "sha256", "/hash/sha256/"+name),
+	}, nil
+}
+
+func TestCodec_ValueKey_NoValueKey(t *testing.T) {
+	t.Parallel()
+
+	customConstructor := integrity.CodecNamerConstructor(func(
+		_ string,
+		_ []namer.LayeredHashLocation,
+		_ []namer.LayeredSigLocation,
+		_ ...namer.LayeredOption,
+	) (namer.Namer, error) {
+		return &fullKeyNoValueNamer{sentinelNamer: sentinelNamer{called: false}}, nil
+	})
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		WithNamer(customConstructor).
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("foo")
+	require.Error(t, err)
+	require.ErrorIs(t, err, integrity.ErrNoValueKey)
+	assert.Empty(t, key)
+}
+
+// fullKeyErrNamer fails GenerateNames so ValueKey can surface the wrapped
+// namer error path.
+type fullKeyErrNamer struct{ sentinelNamer }
+
+func (n *fullKeyErrNamer) GenerateNames(_ string) ([]namer.Key, error) {
+	return nil, errSentinelNamerFailure
+}
+
+var errSentinelNamerFailure = errors.New("sentinel namer failure")
+
+func TestCodec_ValueKey_NamerError(t *testing.T) {
+	t.Parallel()
+
+	customConstructor := integrity.CodecNamerConstructor(func(
+		_ string,
+		_ []namer.LayeredHashLocation,
+		_ []namer.LayeredSigLocation,
+		_ ...namer.LayeredOption,
+	) (namer.Namer, error) {
+		return &fullKeyErrNamer{sentinelNamer: sentinelNamer{called: false}}, nil
+	})
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		WithNamer(customConstructor).
+		Build()
+	require.NoError(t, err)
+
+	key, err := codec.ValueKey("foo")
+	require.Error(t, err)
+	require.ErrorIs(t, err, errSentinelNamerFailure)
+	assert.Empty(t, key)
+}
+
+func TestCodec_FullKeys_ValueOnly(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		Build()
+	require.NoError(t, err)
+
+	keys, err := codec.FullKeys("foo")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/objects/foo"}, keys)
+}
+
+func TestCodec_FullKeys_ValueHashSig(t *testing.T) {
+	t.Parallel()
+
+	// Adding a hasher and a signer expands the key set to three layers,
+	// in namer-emitted order: value, hash, signature.
+	signerVerifier := newTestRSAPSS(t)
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		WithHasher(hasher.NewSHA256Hasher()).
+		WithSignerVerifier(signerVerifier).
+		Build()
+	require.NoError(t, err)
+
+	keys, err := codec.FullKeys("foo")
+	require.NoError(t, err)
+	require.Len(t, keys, 3)
+	assert.Equal(t, "/objects/foo", keys[0], "value layer first")
+	assert.Contains(t, keys[1], "/foo", "hash layer carries the object name")
+	assert.Contains(t, keys[2], "/foo", "signature layer carries the object name")
+	assert.NotEqual(t, keys[0], keys[1])
+	assert.NotEqual(t, keys[0], keys[2])
+	assert.NotEqual(t, keys[1], keys[2])
+}
+
+func TestCodec_FullKeys_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects").Build()
+	require.NoError(t, err)
+
+	for _, testCase := range []struct {
+		label string
+		name  string
+	}{
+		{"empty", ""},
+		{"leading slash", "/foo"},
+		{"trailing slash", "foo/"},
+	} {
+		t.Run(testCase.label, func(t *testing.T) {
+			t.Parallel()
+
+			keys, err := codec.FullKeys(testCase.name)
+			require.ErrorIs(t, err, integrity.ErrInvalidName)
+			assert.Nil(t, keys)
+		})
+	}
+}
+
+func TestCodec_FullKeys_NamerError(t *testing.T) {
+	t.Parallel()
+
+	customConstructor := integrity.CodecNamerConstructor(func(
+		_ string,
+		_ []namer.LayeredHashLocation,
+		_ []namer.LayeredSigLocation,
+		_ ...namer.LayeredOption,
+	) (namer.Namer, error) {
+		return &fullKeyErrNamer{sentinelNamer: sentinelNamer{called: false}}, nil
+	})
+
+	codec, err := integrity.NewCodecBuilder[codecTestStruct]().
+		WithObjectLocation("objects").
+		WithNamer(customConstructor).
+		Build()
+	require.NoError(t, err)
+
+	keys, err := codec.FullKeys("foo")
+	require.ErrorIs(t, err, errSentinelNamerFailure)
+	assert.Nil(t, keys)
 }

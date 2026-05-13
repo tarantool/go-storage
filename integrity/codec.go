@@ -452,6 +452,63 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 	}, nil
 }
 
+// ValueKey returns the value-layer key for name as produced by the codec's
+// namer — e.g. "/objects/<name>" for a codec built with
+// WithObjectLocation("objects"), or "/<name>" for an unnamed codec.
+//
+// The returned key is namer-relative: it does NOT include any prefix added
+// by a [storage.Prefixed] wrapper — for the on-disk key, use
+// [Store.ValueKey]. Hash and signature keys are not included; use
+// [Codec.FullKeys] for those.
+//
+// Returns ErrInvalidName for empty, leading-slash, or trailing-slash names,
+// and ErrNoValueKey if the namer emits no value-layer key.
+func (c *Codec[T]) ValueKey(name string) (string, error) {
+	if !checkName(name) {
+		return "", ErrInvalidName
+	}
+
+	keys, err := c.namer.GenerateNames(name)
+	if err != nil {
+		return "", fmt.Errorf("generate names: %w", err)
+	}
+
+	for _, key := range keys {
+		if key.Type() == namer.KeyTypeValue {
+			return key.Build(), nil
+		}
+	}
+
+	return "", ErrNoValueKey
+}
+
+// FullKeys returns every key the codec's namer would emit for name — the
+// value-layer key plus one key per configured hash and signature layer.
+// The order matches [namer.Namer.GenerateNames]: value first, then hashes,
+// then signatures.
+//
+// Returned keys are namer-relative — use [Store.FullKeys] for keys that
+// include any [storage.Prefixed] wrapper's prefix.
+//
+// Returns ErrInvalidName for empty, leading-slash, or trailing-slash names.
+func (c *Codec[T]) FullKeys(name string) ([]string, error) {
+	if !checkName(name) {
+		return nil, ErrInvalidName
+	}
+
+	keys, err := c.namer.GenerateNames(name)
+	if err != nil {
+		return nil, fmt.Errorf("generate names: %w", err)
+	}
+
+	out := make([]string, len(keys))
+	for i, key := range keys {
+		out[i] = key.Build()
+	}
+
+	return out, nil
+}
+
 // Bind creates a new Store[T] by binding c to the given storage. Bind is a
 // cheap struct literal — no caching, no validation.
 func (c *Codec[T]) Bind(s storage.Storage) *Store[T] {

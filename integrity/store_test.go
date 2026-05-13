@@ -1879,3 +1879,151 @@ func TestStore_CrossCodec_AtomicCommit(t *testing.T) {
 
 // Compile-time check: dummy.New() used in newTestStorage (tx_test.go) is available.
 var _ = dummy.New
+
+func TestStore_ValueKey_IncludesPrefix(t *testing.T) {
+	t.Parallel()
+
+	// Store.ValueKey must include the storage's own prefix — it returns the
+	// on-disk key, in contrast to Codec.ValueKey which is namer-relative.
+	driverMock := mocks.NewDriverMock(t)
+	codec := newStoreCodec(t)
+	store := newMockedStore(t, codec, driverMock)
+
+	storeKey, err := store.ValueKey("foo")
+	require.NoError(t, err)
+
+	codecKey, err := codec.ValueKey("foo")
+	require.NoError(t, err)
+
+	assert.Equal(t, "/objects/foo", codecKey,
+		"Codec.ValueKey stays namer-relative")
+	assert.Equal(t, storeTestPrefix+"/objects/foo", storeKey,
+		"Store.ValueKey must prepend the bound storage's prefix")
+}
+
+func TestStore_ValueKey_NoPrefix(t *testing.T) {
+	t.Parallel()
+
+	// Without a Prefixed wrapper, Store.ValueKey returns the namer-relative
+	// key — same shape as Codec.ValueKey.
+	driverMock := mocks.NewDriverMock(t)
+	codec := newStoreCodec(t)
+	store := codec.Bind(storage.NewStorage(driverMock))
+
+	key, err := store.ValueKey("foo")
+	require.NoError(t, err)
+	assert.Equal(t, "/objects/foo", key)
+}
+
+func TestStore_ValueKey_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
+
+	cases := []struct {
+		label string
+		name  string
+	}{
+		{"empty", ""},
+		{"leading slash", "/foo"},
+		{"trailing slash", "foo/"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			t.Parallel()
+
+			key, err := store.ValueKey(tc.name)
+			require.Error(t, err)
+			require.ErrorIs(t, err, integrity.ErrInvalidName)
+			assert.Empty(t, key)
+		})
+	}
+}
+
+// TestStore_ValueKey_MatchesWrittenKey is the integration-style check: the
+// key returned by ValueKey is byte-equal to the value-layer key the store
+// actually writes during Put — including the storage prefix.
+func TestStore_ValueKey_MatchesWrittenKey(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	codec := newStoreCodec(t)
+	store := newMockedStore(t, codec, driverMock)
+
+	const name = "alpha"
+
+	valueKey, err := store.ValueKey(name)
+	require.NoError(t, err)
+
+	driverMock.ExecuteMock.Set(func(
+		_ context.Context,
+		_ []predicate.Predicate,
+		thenOps []operation.Operation,
+		_ []operation.Operation,
+	) (tx.Response, error) {
+		require.NotEmpty(t, thenOps)
+
+		var sawValueKey bool
+
+		for _, op := range thenOps {
+			// The driver mock sees absolute keys with the storage prefix
+			// prepended. Store.ValueKey now also returns the absolute key,
+			// so compare directly.
+			if op.Type() == operation.TypePut && string(op.Key()) == valueKey {
+				sawValueKey = true
+			}
+		}
+
+		assert.True(t, sawValueKey, "Put must write a value-layer key matching Store.ValueKey(name)")
+
+		return tx.Response{
+			Succeeded: true,
+			Results:   make([]tx.RequestResponse, len(thenOps)),
+		}, nil
+	})
+
+	err = store.Put(context.Background(), name, SimpleStruct{Name: "x", Value: 1})
+	require.NoError(t, err)
+}
+
+func TestStore_FullKeys_IncludesPrefix(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	codec := newStoreCodecWithHasher(t, hasher.NewSHA256Hasher())
+	store := newMockedStore(t, codec, driverMock)
+
+	keys, err := store.FullKeys("foo")
+	require.NoError(t, err)
+	require.Len(t, keys, 2, "value + one hash layer")
+
+	for _, k := range keys {
+		assert.True(t, strings.HasPrefix(k, storeTestPrefix+"/"),
+			"every Store.FullKeys entry must start with the bound storage prefix, got %q", k)
+	}
+}
+
+func TestStore_FullKeys_NoPrefix(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	codec := newStoreCodec(t)
+	store := codec.Bind(storage.NewStorage(driverMock))
+
+	keys, err := store.FullKeys("foo")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"/objects/foo"}, keys)
+}
+
+func TestStore_FullKeys_InvalidName(t *testing.T) {
+	t.Parallel()
+
+	driverMock := mocks.NewDriverMock(t)
+	store := newMockedStore(t, newStoreCodec(t), driverMock)
+
+	keys, err := store.FullKeys("")
+	require.ErrorIs(t, err, integrity.ErrInvalidName)
+	assert.Nil(t, keys)
+}

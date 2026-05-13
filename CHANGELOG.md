@@ -24,6 +24,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `CodecNamerConstructor`.
 - `locker.Do(ctx, f, name, fn, opts...)`: helper that creates a Locker via the supplied `Factory`, acquires it, runs `fn` while the lock is held, and releases the lock on return. `fn`'s error leads any joined Unlock error so `errors.Is` against domain errors works without peeling off lock-machinery wrappers; Unlock always runs after `fn` regardless of `fn`'s result.
 - `locker.Prefixed(prefix, inner)`: Factory-level name-scoping helper that concatenates `prefix` to every caller-supplied lock name before delegating to `inner`, mirroring `storage.Prefixed`'s rewrite convention. Lets a component receive a name-scoped `locker.Factory` without seeing the full `Storage`; an empty prefix is a transparent passthrough, and a non-empty prefix must start with `/` (`ErrPrefixNoLeadingSlash`) and not end with `/` (`ErrPrefixTrailingSlash`).
+- integrity.Codec: `ValueKey(name)` returns the namer-relative value-layer
+  key; `FullKeys(name)` returns every key the codec's namer would emit
+  (value + hashes + signatures), in namer-emitted order. Both reject
+  empty, leading-slash, and trailing-slash names with `ErrInvalidName`,
+  matching the rule applied by `Put`/`Delete`/`Get`/`Watch`.
+- integrity.Store: `ValueKey(name)` and `FullKeys(name)` mirror the codec
+  methods but return on-disk keys — when the storage is wrapped with
+  `storage.Prefixed`, the wrapper's prefix is prepended.
+- integrity.SingletonStore: no-arg `ValueKey()` and `FullKeys()` delegate
+  to the inner `Store` with the bound name.
+- storage.Prefixer: optional interface implemented by `Prefixed` storages
+  to expose their key prefix. `storage.StoragePrefix(s)` returns the
+  prefix or `nil` for storages that are not wrapped.
 
 ### Changed
 
@@ -31,6 +44,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `locker.Factory` and `Storage.LockerFactory()`: a lightweight "create a lock" surface for components that do not need the full `Storage` interface. `Prefixed` implements it so factory-issued lockers keep the prefix-rewrite path that scopes lock names under the wrapper's namespace. **Breaking change:** `locker.Factory` is now an interface with a `NewLocker(ctx, name, opts...) (Locker, error)` method instead of a function type. `Storage` and the `Prefixed` wrapper already satisfy it via their `NewLocker` method; adapt a bare function with the new `locker.FactoryFunc` (mirrors `http.HandlerFunc`). `locker.Prefixed` composition is now flattened at construction and is outer-first — `locker.Prefixed("/a", locker.Prefixed("/b", inner))` is equivalent to `locker.Prefixed("/a/b", inner)`, matching `storage.Prefixed`.
 
 ### Fixed
+
+- integrity.Codec.BindPredicate now rejects empty, leading-slash, and
+  trailing-slash names with `ErrInvalidName`, matching `Put`/`Delete`/
+  `Get`/`Watch`. Without it, a leading slash was silently stripped by
+  the namer and aliased `"/foo"` to `"foo"`, letting a predicate match
+  a row no sibling call could see.
 
 ## [v1.5.0] - 2026-05-15
 

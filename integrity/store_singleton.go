@@ -88,3 +88,15 @@ func (s *SingletonStore[T]) TxDelete(
 func (s *SingletonStore[T]) BindPredicate(pred Predicate) (predicate.Predicate, error) {
 	return s.store.codec.BindPredicate(s.name, pred)
 }
+
+// ValueKey returns the on-disk value-layer key for the singleton's bound
+// name. See [Store.ValueKey].
+func (s *SingletonStore[T]) ValueKey() (string, error) {
+	return s.store.ValueKey(s.name)
+}
+
+// FullKeys returns every on-disk key the bound codec would produce for the
+// singleton (value + hashes + signatures). See [Store.FullKeys].
+func (s *SingletonStore[T]) FullKeys() ([]string, error) {
+	return s.store.FullKeys(s.name)
+}

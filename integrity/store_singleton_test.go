@@ -259,3 +259,51 @@ func TestSingletonStore_Watch(t *testing.T) {
 		t.Fatal("timed out waiting for watch event")
 	}
 }
+
+func TestSingletonStore_ValueKey(t *testing.T) {
+	t.Parallel()
+
+	codec, _ := newSingletonCodec(t)
+	auth, err := codec.BindSingleton(storage.NewStorage(dummy.New()), "auth")
+	require.NoError(t, err)
+
+	key, err := auth.ValueKey()
+	require.NoError(t, err)
+	assert.Equal(t, "/settings/auth", key)
+}
+
+func TestSingletonStore_ValueKey_IncludesStoragePrefix(t *testing.T) {
+	t.Parallel()
+
+	codec, _ := newSingletonCodec(t)
+	wrapped, err := storage.Prefixed("/scope", storage.NewStorage(dummy.New()))
+	require.NoError(t, err)
+
+	auth, err := codec.BindSingleton(wrapped, "auth")
+	require.NoError(t, err)
+
+	key, err := auth.ValueKey()
+	require.NoError(t, err)
+	assert.Equal(t, "/scope/settings/auth", key,
+		"SingletonStore.ValueKey must include the bound storage's prefix")
+}
+
+func TestSingletonStore_FullKeys(t *testing.T) {
+	t.Parallel()
+
+	codec, _ := newSingletonCodec(t)
+	wrapped, err := storage.Prefixed("/scope", storage.NewStorage(dummy.New()))
+	require.NoError(t, err)
+
+	auth, err := codec.BindSingleton(wrapped, "auth")
+	require.NoError(t, err)
+
+	keys, err := auth.FullKeys()
+	require.NoError(t, err)
+	require.Len(t, keys, 3, "value + sha256 hash + rsa-pss signature")
+
+	for _, k := range keys {
+		assert.True(t, len(k) > len("/scope") && k[:len("/scope")] == "/scope",
+			"every SingletonStore.FullKeys entry must start with /scope, got %q", k)
+	}
+}
