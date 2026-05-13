@@ -75,6 +75,33 @@ type prefixed struct {
 
 var _ Storage = (*prefixed)(nil)
 
+// Prefixer is implemented by storages that carry a key prefix applied by
+// [Prefixed]. The base storage does not implement it. Callers that want to
+// discover the prefix without depending on the unexported wrapper type
+// should use [StoragePrefix].
+type Prefixer interface {
+	Prefix() []byte
+}
+
+// Prefix returns a copy of the prefix this wrapper prepends to every key.
+func (p *prefixed) Prefix() []byte {
+	out := make([]byte, len(p.prefix))
+	copy(out, p.prefix)
+
+	return out
+}
+
+// StoragePrefix returns the prefix applied to s by [Prefixed], or nil if s
+// is not a [Prefixer]. Use it to reconstruct on-disk keys for storages that
+// may or may not be wrapped — e.g. printing a key for logs or external refs.
+func StoragePrefix(s Storage) []byte {
+	if p, ok := s.(Prefixer); ok {
+		return p.Prefix()
+	}
+
+	return nil
+}
+
 func (p *prefixed) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event {
 	absKey := concatKey(p.prefix, key)
 	innerCh := p.inner.Watch(ctx, absKey, opts...)
