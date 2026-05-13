@@ -178,13 +178,13 @@ func TestGeneratorGenerate_SuccessWithHashes(t *testing.T) {
 	hashPairs := 0
 
 	for _, pair := range pairs {
-		if string(pair.Key) == "/test/hash/sha256/my-object" {
+		if string(pair.Key) == "/test/hashes/sha256/my-object" {
 			hashPairs++
 
 			assert.Equal(t, "mock-hash-sha256", string(pair.Value))
 		}
 
-		if string(pair.Key) == "/test/hash/md5/my-object" {
+		if string(pair.Key) == "/test/hashes/md5/my-object" {
 			hashPairs++
 
 			assert.Equal(t, "mock-hash-md5", string(pair.Value))
@@ -271,7 +271,7 @@ func TestGeneratorGenerate_SuccessWithHashesAndSignatures(t *testing.T) {
 	}
 
 	assert.True(t, keys["/test/my-object"])
-	assert.True(t, keys["/test/hash/sha256/my-object"])
+	assert.True(t, keys["/test/hashes/sha256/my-object"])
 	assert.True(t, keys["/test/sig/rsa/my-object"])
 }
 
@@ -404,9 +404,9 @@ func TestGeneratorGenerate_OutputStructure(t *testing.T) {
 
 	// Verify key patterns.
 	expectedKeys := map[string]bool{
-		"/storage/config/app":             true,
-		"/storage/hash/sha256/config/app": true,
-		"/storage/sig/rsa/config/app":     true,
+		"/storage/config/app":               true,
+		"/storage/hashes/sha256/config/app": true,
+		"/storage/sig/rsa/config/app":       true,
 	}
 
 	for _, pair := range pairs {

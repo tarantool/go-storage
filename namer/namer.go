@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	hashName      = "hash"
+	hashName      = "hashes"
 	signatureName = "sig"
 	maxKeyParts   = 3
 )

@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **BREAKING:** namer: hash key path marker changed from `hash` to
+  `hashes`. The default layout is now
+  `/<objectLocation>/hashes/<hashLocation>/<name>` (default namer) and
+  `/hashes/<hashLocation>/<objectLocation>/<name>` (layered namer); the
+  unnamed-layered and compact-hash variants follow the same rename.
+  Existing keys written under `/hash/...` will not be parsed by the new
+  namer — operators upgrading must migrate stored keys to the new prefix.
+  The reserved-marker check on `objectLocation` and the unnamed-mode
+  reserved-first-segment check now reject `hashes` instead of `hash`.
+
 ### Fixed
 
 ## [v1.4.0] - 2026-05-12

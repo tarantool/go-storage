@@ -440,16 +440,16 @@ The new API uses `namer.LayeredNamer` by default, which places each key
 category under its own top-level location segment:
 
 ```
-/<objectLocation>/<name>                       (value)
-/hash/<hashLocation>/<objectLocation>/<name>   (one per hasher)
-/sig/<sigLocation>/<objectLocation>/<name>     (one per signer)
+/<objectLocation>/<name>                         (value)
+/hashes/<hashLocation>/<objectLocation>/<name>   (one per hasher)
+/sig/<sigLocation>/<objectLocation>/<name>       (one per signer)
 ```
 
 `objectLocation` may itself be a multi-segment path (e.g. `"settings/ldap"`)
 — useful when the on-disk hierarchy of a feature is fixed at codec build
 time rather than per item. `hashLocation` and `sigLocation` are still
 single tokens because they index per-hasher / per-signer maps. The first
-segment of `objectLocation` must not equal the reserved markers `hash` or
+segment of `objectLocation` must not equal the reserved markers `hashes` or
 `sig` (they would collide with the parser's category dispatch).
 
 `namer.CompactSingleHash()` and `namer.CompactSingleSig()` drop the
@@ -480,9 +480,9 @@ if err != nil {
 }
 
 // Wire layout:
-//   /settings/auth                      (value)
-//   /hash/<hashLoc>/settings/auth       (hash, per hasher)
-//   /sig/<sigLoc>/settings/auth         (sig,  per signer)
+//   /settings/auth                        (value)
+//   /hashes/<hashLoc>/settings/auth       (hash, per hasher)
+//   /sig/<sigLoc>/settings/auth           (sig,  per signer)
 
 if err := auth.Put(ctx, AuthConfig{Issuer: "example"}); err != nil {
     log.Fatal(err)

@@ -10,7 +10,7 @@ import (
 // ExampleNewLayeredNamer demonstrates the default layered key layout:
 //
 //	/<obj>/<name>                       (value)
-//	/hash/<hashLoc>/<obj>/<name>        (one per hasher)
+//	/hashes/<hashLoc>/<obj>/<name>        (one per hasher)
 //	/sig/<sigLoc>/<obj>/<name>          (one per signer)
 func ExampleNewLayeredNamer() {
 	layered, err := namer.NewLayeredNamer(
@@ -33,7 +33,7 @@ func ExampleNewLayeredNamer() {
 
 	// Output:
 	// KeyTypeValue -> /objects/alice
-	// KeyTypeHash -> /hash/sha256/objects/alice
+	// KeyTypeHash -> /hashes/sha256/objects/alice
 	// KeyTypeSignature -> /sig/rsa/objects/alice
 }
 
@@ -61,7 +61,7 @@ func ExampleCompactSingleHash() {
 
 	// Output:
 	// KeyTypeValue -> /objects/alice
-	// KeyTypeHash -> /hash/objects/alice
+	// KeyTypeHash -> /hashes/objects/alice
 }
 
 // ExampleCompactSingleSig shows the compact sig layout, which drops the
@@ -105,7 +105,7 @@ func ExampleNewLayeredNamer_parse() {
 
 	for _, raw := range []string{
 		"/objects/alice",
-		"/hash/sha256/objects/alice",
+		"/hashes/sha256/objects/alice",
 	} {
 		k, err := layered.ParseKey(raw)
 		if err != nil {
