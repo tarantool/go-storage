@@ -528,3 +528,70 @@ func TestNewEtcdStorage_WithTLSEncryptedKeyAndPasswordFile(t *testing.T) {
 	require.NotEmpty(t, kvs)
 	assert.Equal(t, []byte("password-file-test"), kvs[0].Value)
 }
+
+func TestNewTCSStorage_HTTPEndpointScheme(t *testing.T) {
+	if !haveTCS {
+		t.Skip("TCS is unsupported or Tarantool isn't found")
+	}
+
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
+	endpoints := make([]string, len(tcsEndpoints))
+	for i, ep := range tcsEndpoints {
+		endpoints[i] = "http://" + ep
+	}
+
+	ctx := context.Background()
+	stor, cancel, err := connect.NewTCSStorage(ctx, connect.Config{ //nolint:exhaustruct
+		Endpoints: endpoints,
+		Username:  "client",
+		Password:  "secret",
+	})
+	require.NoError(t, err)
+
+	defer cancel()
+
+	prefix := "/" + t.Name() + "/test"
+	key := []byte(prefix + "/value")
+
+	_, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit()
+	defer func() { _, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit() }()
+
+	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("http-scheme-test"))).Commit()
+	require.NoError(t, err)
+
+	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
+	require.NoError(t, err)
+	require.NotEmpty(t, kvs)
+	assert.Equal(t, []byte("http-scheme-test"), kvs[0].Value)
+}
+
+func TestNewEtcdStorage_HTTPSEndpointScheme(t *testing.T) {
+	cluster := createEtcdTLSCluster(t)
+	tlsDir := tlsDir(t)
+
+	ctx := context.Background()
+	stor, cleanup, err := connect.NewEtcdStorage(ctx, connect.Config{ //nolint:exhaustruct
+		Endpoints: cluster.EndpointsGRPC(),
+		SSL: connect.SSLConfig{ //nolint:exhaustruct
+			Enable: true,
+			CaFile: filepath.Join(tlsDir, "ca.crt"),
+		},
+	})
+	require.NoError(t, err)
+
+	defer cleanup()
+
+	prefix := "/" + t.Name() + "/test"
+	key := []byte(prefix + "/value")
+
+	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("https-scheme-test"))).Commit()
+	require.NoError(t, err)
+
+	kvs, err := stor.Range(ctx, storage.WithPrefix(prefix))
+	require.NoError(t, err)
+	require.NotEmpty(t, kvs)
+	assert.Equal(t, []byte("https-scheme-test"), kvs[0].Value)
+}

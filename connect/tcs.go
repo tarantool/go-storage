@@ -3,6 +3,7 @@ package connect
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/tarantool/go-tarantool/v2"
 	"github.com/tarantool/go-tarantool/v2/pool"
@@ -23,6 +24,9 @@ func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher
 	instances := make([]pool.Instance, 0, len(cfg.Endpoints))
 
 	for idx, addr := range cfg.Endpoints {
+		addr = strings.TrimPrefix(addr, "http://")
+		addr = strings.TrimPrefix(addr, "https://")
+
 		instDialer, dialerErr := newDialerForAddress(cfg, addr)
 		if dialerErr != nil {
 			return nil, nil, dialerErr
