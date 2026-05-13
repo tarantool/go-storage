@@ -47,7 +47,7 @@ func TestDefaultNamer_GenerateNames_Success(t *testing.T) {
 					"all",
 					namer.KeyTypeHash,
 					"sha256",
-					"/storage/hash/sha256/all",
+					"/storage/hashes/sha256/all",
 				),
 				namer.NewDefaultKey(
 					"all",
@@ -73,7 +73,7 @@ func TestDefaultNamer_GenerateNames_Success(t *testing.T) {
 					"all_keys/",
 					namer.KeyTypeHash,
 					"sha256",
-					"/storage/hash/sha256/all_keys/",
+					"/storage/hashes/sha256/all_keys/",
 				),
 				namer.NewDefaultKey(
 					"all_keys/",
@@ -116,7 +116,7 @@ func TestDefaultNamer_ParseKey_Success(t *testing.T) {
 			property: "",
 		},
 		{
-			input:    "/storage/hash/sha256/all",
+			input:    "/storage/hashes/sha256/all",
 			name:     "all",
 			tp:       namer.KeyTypeHash,
 			property: "sha256",
@@ -152,11 +152,11 @@ func TestDefaultNamer_ParseKey_Failed(t *testing.T) {
 
 	tests := []string{
 		"/not-storage/value",
-		"/storage/hash",
-		"/storage/hash/sha256",
-		"/storage/hash//all",
-		"/storage/hash/sha256/",
-		"/storage/hash/sha256/suffix/",
+		"/storage/hashes",
+		"/storage/hashes/sha256",
+		"/storage/hashes//all",
+		"/storage/hashes/sha256/",
+		"/storage/hashes/sha256/suffix/",
 		"/storage/sig",
 		"/storage/sig/rsa",
 		"/storage/sig//all",
@@ -192,7 +192,7 @@ func TestDefaultNamer_ParseKeys_Success(t *testing.T) {
 			input: []string{
 				"/storage/value",
 				"/storage/sig/signame/value",
-				"/storage/hash/hashname/value",
+				"/storage/hashes/hashname/value",
 			},
 			countMap:   map[string]int{"value": 3},
 			singleName: "value",
@@ -202,10 +202,10 @@ func TestDefaultNamer_ParseKeys_Success(t *testing.T) {
 			input: []string{
 				"/storage/key1",
 				"/storage/sig/rsa/key1",
-				"/storage/hash/sha256/key1",
+				"/storage/hashes/sha256/key1",
 				"/storage/key2",
 				"/storage/sig/rsa/key2",
-				"/storage/hash/sha256/key2",
+				"/storage/hashes/sha256/key2",
 			},
 			countMap:   map[string]int{"key1": 3, "key2": 3},
 			singleName: "",
@@ -384,7 +384,7 @@ func TestDefaultNamer_Prefixes(t *testing.T) {
 			isPrefix:  true,
 			expected: []string{
 				"/storage/alice/",
-				"/storage/hash/sha256/alice/",
+				"/storage/hashes/sha256/alice/",
 				"/storage/sig/rsa/alice/",
 			},
 		},
@@ -397,7 +397,7 @@ func TestDefaultNamer_Prefixes(t *testing.T) {
 			isPrefix:  false,
 			expected: []string{
 				"/storage/alice",
-				"/storage/hash/sha256/alice",
+				"/storage/hashes/sha256/alice",
 				"/storage/sig/rsa/alice",
 			},
 		},

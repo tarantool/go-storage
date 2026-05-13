@@ -39,7 +39,7 @@ func TestUnnamedLayeredNamer_GenerateNames(t *testing.T) {
 	assert.Equal(t, namer.KeyTypeValue, keys[0].Type())
 	assert.Equal(t, "alice", keys[0].Name())
 
-	assert.Equal(t, "/hash/sha256/alice", keys[1].Build())
+	assert.Equal(t, "/hashes/sha256/alice", keys[1].Build())
 	assert.Equal(t, namer.KeyTypeHash, keys[1].Type())
 	assert.Equal(t, "sha256", keys[1].Property())
 
@@ -56,7 +56,7 @@ func TestUnnamedLayeredNamer_GenerateNames_RejectsReservedFirstSegment(t *testin
 		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
-	cases := []string{"hash", "sig", "hash/foo", "sig/bar/baz"}
+	cases := []string{"hashes", "sig", "hashes/foo", "sig/bar/baz"}
 
 	for _, name := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestUnnamedLayeredNamer_ParseKey_HashAndSig(t *testing.T) {
 		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
-	parsed, err := nmr.ParseKey("/hash/sha256/alice")
+	parsed, err := nmr.ParseKey("/hashes/sha256/alice")
 	require.NoError(t, err)
 	assert.Equal(t, "alice", parsed.Name())
 	assert.Equal(t, namer.KeyTypeHash, parsed.Type())
@@ -132,9 +132,9 @@ func TestUnnamedLayeredNamer_ParseKey_Errors(t *testing.T) {
 	cases := []string{
 		"",
 		"/",
-		"/hash/",
-		"/hash/sha256/",
-		"/hash/unknown/alice",
+		"/hashes/",
+		"/hashes/sha256/",
+		"/hashes/unknown/alice",
 		"/sig/",
 		"/sig/unknown/alice",
 		"/alice/",
@@ -199,7 +199,7 @@ func TestUnnamedLayeredNamer_Compact(t *testing.T) {
 	require.Len(t, keys, 3)
 
 	assert.Equal(t, "/alice", keys[0].Build())
-	assert.Equal(t, "/hash/alice", keys[1].Build())
+	assert.Equal(t, "/hashes/alice", keys[1].Build())
 	assert.Equal(t, "/sig/alice", keys[2].Build())
 
 	for _, key := range keys {
@@ -221,7 +221,7 @@ func TestUnnamedLayeredNamer_Compact_ParseErrors(t *testing.T) {
 	)
 
 	// Compact + unnamed: hash/<name> must not be empty or end with '/'.
-	cases := []string{"/hash/", "/hash/alice/", "/sig/", "/sig/alice/"}
+	cases := []string{"/hashes/", "/hashes/alice/", "/sig/", "/sig/alice/"}
 
 	for _, raw := range cases {
 		t.Run(raw, func(t *testing.T) {
@@ -241,15 +241,15 @@ func TestUnnamedLayeredNamer_Prefixes(t *testing.T) {
 		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
-	// Unnamed-mode roots: value at "/", hash at "/hash/<loc>/", sig at "/sig/<loc>/".
+	// Unnamed-mode roots: value at "/", hash at "/hashes/<loc>/", sig at "/sig/<loc>/".
 	prefixes := nmr.Prefixes("", true)
-	assert.Equal(t, []string{"/", "/hash/sha256/", "/sig/ed25519/"}, prefixes)
+	assert.Equal(t, []string{"/", "/hashes/sha256/", "/sig/ed25519/"}, prefixes)
 
 	prefixes = nmr.Prefixes("alice", false)
-	assert.Equal(t, []string{"/alice", "/hash/sha256/alice", "/sig/ed25519/alice"}, prefixes)
+	assert.Equal(t, []string{"/alice", "/hashes/sha256/alice", "/sig/ed25519/alice"}, prefixes)
 
 	prefixes = nmr.Prefixes("alice", true)
-	assert.Equal(t, []string{"/alice/", "/hash/sha256/alice/", "/sig/ed25519/alice/"}, prefixes)
+	assert.Equal(t, []string{"/alice/", "/hashes/sha256/alice/", "/sig/ed25519/alice/"}, prefixes)
 }
 
 func TestUnnamedLayeredNamer_Compact_Prefixes(t *testing.T) {
@@ -264,5 +264,5 @@ func TestUnnamedLayeredNamer_Compact_Prefixes(t *testing.T) {
 
 	// Compact + unnamed: hashLocation / sigLocation segments are also dropped.
 	prefixes := nmr.Prefixes("", true)
-	assert.Equal(t, []string{"/", "/hash/", "/sig/"}, prefixes)
+	assert.Equal(t, []string{"/", "/hashes/", "/sig/"}, prefixes)
 }

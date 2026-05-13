@@ -11,7 +11,7 @@ import (
 // segment sits between the marker and the objectLocation. Mirrors the
 // hashName / signatureName constants used by DefaultNamer.
 const (
-	layeredHashMarker = "hash"
+	layeredHashMarker = "hashes"
 	layeredSigMarker  = "sig"
 )
 
@@ -19,12 +19,12 @@ const (
 // argument to NewLayeredNamer to omit the per-codec objectLocation segment
 // from every generated key. The resulting layout is:
 //
-//	/<name>                          (value)
-//	/hash/<hashLocation>/<name>      (hash)
-//	/sig/<sigLocation>/<name>        (sig)
+//	/<name>                            (value)
+//	/hashes/<hashLocation>/<name>      (hash)
+//	/sig/<sigLocation>/<name>          (sig)
 //
 // In this mode object names whose first slash-separated segment equals
-// "hash" or "sig" are rejected by GenerateNames to avoid collision with
+// "hashes" or "sig" are rejected by GenerateNames to avoid collision with
 // the category markers.
 const ObjectLocationMissing = ""
 
@@ -45,10 +45,10 @@ var (
 	// ErrSegmentInnerSlash is returned when a segment contains '/'.
 	ErrSegmentInnerSlash = errors.New("namer: segment must not contain '/'")
 	// ErrObjectLocationReserved is returned when objectLocation's first segment
-	// is one of the reserved category markers ("hash" or "sig"), which would
+	// is one of the reserved category markers ("hashes" or "sig"), which would
 	// collide with hash/sig key paths during parsing.
 	ErrObjectLocationReserved = errors.New(
-		"namer: objectLocation must not start with reserved segment \"hash\" or \"sig\"")
+		"namer: objectLocation must not start with reserved segment \"hashes\" or \"sig\"")
 	// ErrCompactSingleHashCardinality is returned when CompactSingleHash is set
 	// but the configured hash list does not have exactly one entry.
 	ErrCompactSingleHashCardinality = errors.New("namer: CompactSingleHash requires exactly one hash entry")
@@ -78,7 +78,7 @@ type layeredOpts struct {
 }
 
 // CompactSingleHash drops the per-hasher location segment in generated and
-// parsed hash keys. Layout becomes /hash/<objectLocation>/<name>.
+// parsed hash keys. Layout becomes /hashes/<objectLocation>/<name>.
 // NewLayeredNamer returns ErrCompactSingleHashCardinality if the hash list
 // does not have exactly one entry.
 func CompactSingleHash() LayeredOption {
@@ -114,9 +114,9 @@ type layeredNamer struct {
 //
 // Layout (default):
 //
-//	/<objectLocation>/<name>                          (value)
-//	/hash/<hashLocation>/<objectLocation>/<name>      (hash, one per hasher)
-//	/sig/<sigLocation>/<objectLocation>/<name>        (sig, one per signer)
+//	/<objectLocation>/<name>                            (value)
+//	/hashes/<hashLocation>/<objectLocation>/<name>      (hash, one per hasher)
+//	/sig/<sigLocation>/<objectLocation>/<name>          (sig, one per signer)
 //
 // objectLocation may itself be a multi-segment path (e.g. "settings/ldap").
 // hashLocation and sigLocation are still single tokens since they index
@@ -131,7 +131,7 @@ type layeredNamer struct {
 // Validation rules:
 //   - hashLocation / sigLocation must be a single non-empty segment with no '/'.
 //   - objectLocation must not start or end with '/' and must not contain
-//     empty inner segments ("//"). Its first segment must not be "hash" or
+//     empty inner segments ("//"). Its first segment must not be "hashes" or
 //     "sig". An empty objectLocation (ObjectLocationMissing) selects unnamed
 //     mode and skips these checks.
 //   - hashLocations must be unique within hashes; sigLocations must be unique within sigs.
@@ -221,7 +221,7 @@ func NewLayeredNamer(
 }
 
 // isReservedFirstSegment reports whether name's first slash-separated
-// segment equals one of the reserved category markers ("hash" or "sig").
+// segment equals one of the reserved category markers ("hashes" or "sig").
 // In unnamed mode such names would collide with the value-key parser.
 func isReservedFirstSegment(name string) bool {
 	first, _, found := strings.Cut(name, "/")
@@ -279,7 +279,7 @@ func validateObjectLocation(seg string) error {
 // name must be non-empty; a leading "/" is stripped.
 //
 // In unnamed mode (objectLocation == ObjectLocationMissing) the first
-// slash-separated segment of name must not equal "hash" or "sig" — those
+// slash-separated segment of name must not equal "hashes" or "sig" — those
 // would collide with the category markers used to dispatch ParseKey.
 func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 	if name == "" {
@@ -290,7 +290,7 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 
 	if n.unnamed && isReservedFirstSegment(name) {
 		return nil, errInvalidName(name,
-			"first segment must not be \"hash\" or \"sig\" in unnamed mode")
+			"first segment must not be \"hashes\" or \"sig\" in unnamed mode")
 	}
 
 	out := make([]Key, 0, 1+len(n.hashLocations)+len(n.sigLocations))
@@ -327,9 +327,9 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 //
 // Recognized shapes (must match the namer's configured layout):
 //
-//	/<objectLocation>/<name>                          → KeyTypeValue
-//	/hash/<hashLocation>/<objectLocation>/<name>      → KeyTypeHash
-//	/sig/<sigLocation>/<objectLocation>/<name>        → KeyTypeSignature
+//	/<objectLocation>/<name>                            → KeyTypeValue
+//	/hashes/<hashLocation>/<objectLocation>/<name>      → KeyTypeHash
+//	/sig/<sigLocation>/<objectLocation>/<name>          → KeyTypeSignature
 //
 // With CompactSingleHash / CompactSingleSig the corresponding location
 // segment is absent.
@@ -351,7 +351,7 @@ func (n *layeredNamer) ParseKey(raw string) (DefaultKey, error) {
 
 	switch first {
 	case layeredHashMarker:
-		// stripped starts with "hash/"; hand the hash parser the
+		// stripped starts with "hashes/"; hand the hash parser the
 		// remainder after the marker.
 		_, rest, _ := strings.Cut(stripped, "/")
 
@@ -424,11 +424,11 @@ func (n *layeredNamer) Prefix(val string, isPrefix bool) string {
 
 // Prefixes returns one range prefix per key category — value, then one per
 // configured hasher, then one per configured signer. Hash and sig keys live
-// under their own roots (/hash/... and /sig/...), so a single Prefix() call
+// under their own roots (/hashes/... and /sig/...), so a single Prefix() call
 // covering only /<objectLocation>/ misses them; this method emits the full
 // fan-out a validating range walk needs.
 //
-// In unnamed mode the per-category roots become "/", "/hash/<hashLocation>/"
+// In unnamed mode the per-category roots become "/", "/hashes/<hashLocation>/"
 // and "/sig/<sigLocation>/" (the <objectLocation>/ segment is dropped). The
 // value root "/" covers the entire storage including hash/sig keys, but the
 // integrity Validator filters them by category via ParseKey.
@@ -536,7 +536,7 @@ func (n *layeredNamer) buildSigKey(sigLocation, name string) string {
 func (n *layeredNamer) parseValueKey(raw, stripped string) (DefaultKey, error) {
 	if n.unnamed {
 		// In unnamed mode the entire stripped path is the name; the
-		// dispatcher already excluded "hash" / "sig" first segments.
+		// dispatcher already excluded "hashes" / "sig" first segments.
 		if strings.HasSuffix(raw, "/") {
 			return DefaultKey{}, errInvalidKey(raw, "key name should not be prefix")
 		}

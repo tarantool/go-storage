@@ -68,8 +68,8 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "objectLocation reserved: hash",
-			args:    args{objectLocation: "hash", hashLocations: nil, sigLocations: nil, opts: nil},
+			name:    "objectLocation reserved: hashes",
+			args:    args{objectLocation: "hashes", hashLocations: nil, sigLocations: nil, opts: nil},
 			wantErr: true,
 		},
 		{
@@ -78,8 +78,8 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "objectLocation with reserved first segment: hash/foo",
-			args:    args{objectLocation: "hash/foo", hashLocations: nil, sigLocations: nil, opts: nil},
+			name:    "objectLocation with reserved first segment: hashes/foo",
+			args:    args{objectLocation: "hashes/foo", hashLocations: nil, sigLocations: nil, opts: nil},
 			wantErr: true,
 		},
 		{
@@ -362,7 +362,7 @@ func TestLayeredNamer_Constructor_CompactErrors_Sentinels(t *testing.T) {
 	t.Run("reserved objectLocation error is sentinel", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := namer.NewLayeredNamer("hash", nil, nil)
+		_, err := namer.NewLayeredNamer("hashes", nil, nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, namer.ErrObjectLocationReserved)
 	})
@@ -397,7 +397,7 @@ func TestLayeredNamer_GenerateNames_Success(t *testing.T) {
 		name     string
 	}{
 		{"/objects/alice", namer.KeyTypeValue, "", "alice"},
-		{"/hash/sha256/objects/alice", namer.KeyTypeHash, "sha256", "alice"},
+		{"/hashes/sha256/objects/alice", namer.KeyTypeHash, "sha256", "alice"},
 		{"/sig/ed25519/objects/alice", namer.KeyTypeSignature, "ed25519", "alice"},
 	}
 
@@ -453,7 +453,7 @@ func TestLayeredNamer_GenerateNames_Compact(t *testing.T) {
 		require.Len(t, keys, 2)
 
 		assert.Equal(t, "/objects/alice", keys[0].Build())
-		assert.Equal(t, "/hash/objects/alice", keys[1].Build())
+		assert.Equal(t, "/hashes/objects/alice", keys[1].Build())
 		assert.Equal(t, namer.KeyTypeHash, keys[1].Type())
 		assert.Equal(t, "sha256", keys[1].Property())
 	})
@@ -496,7 +496,7 @@ func TestLayeredNamer_GenerateNames_Compact(t *testing.T) {
 		require.Len(t, keys, 3)
 
 		assert.Equal(t, "/objects/alice", keys[0].Build())
-		assert.Equal(t, "/hash/objects/alice", keys[1].Build())
+		assert.Equal(t, "/hashes/objects/alice", keys[1].Build())
 		assert.Equal(t, "/sig/objects/alice", keys[2].Build())
 	})
 }
@@ -585,19 +585,19 @@ func TestLayeredNamer_ParseKey_Errors(t *testing.T) {
 		},
 		{
 			name: "hash key with unknown hashLocation",
-			raw:  "/hash/unknown/objects/alice",
+			raw:  "/hashes/unknown/objects/alice",
 		},
 		{
 			name: "hash key with mismatched objectLocation",
-			raw:  "/hash/sha256/wrong/alice",
+			raw:  "/hashes/sha256/wrong/alice",
 		},
 		{
 			name: "hash key missing objectLocation segment",
-			raw:  "/hash/sha256/alice",
+			raw:  "/hashes/sha256/alice",
 		},
 		{
 			name: "hash key missing name",
-			raw:  "/hash/sha256/objects",
+			raw:  "/hashes/sha256/objects",
 		},
 		{
 			name: "hash key missing hashLocation",
@@ -637,10 +637,10 @@ func TestLayeredNamer_ParseKeys_Grouping(t *testing.T) {
 
 		input := []string{
 			"/objects/alice",
-			"/hash/sha256/objects/alice",
+			"/hashes/sha256/objects/alice",
 			"/sig/ed25519/objects/alice",
 			"/objects/bob",
-			"/hash/sha256/objects/bob",
+			"/hashes/sha256/objects/bob",
 			"/sig/ed25519/objects/bob",
 		}
 
@@ -662,7 +662,7 @@ func TestLayeredNamer_ParseKeys_Grouping(t *testing.T) {
 
 		input := []string{
 			"/objects/alice",
-			"/hash/sha256/objects/alice",
+			"/hashes/sha256/objects/alice",
 			"/sig/ed25519/objects/alice",
 		}
 
@@ -773,7 +773,7 @@ func TestLayeredNamer_Prefixes(t *testing.T) {
 			isPrefix: true,
 			expected: []string{
 				"/objects/",
-				"/hash/sha256/objects/",
+				"/hashes/sha256/objects/",
 				"/sig/ed25519/objects/",
 			},
 		},
@@ -783,7 +783,7 @@ func TestLayeredNamer_Prefixes(t *testing.T) {
 			isPrefix: true,
 			expected: []string{
 				"/objects/alice/",
-				"/hash/sha256/objects/alice/",
+				"/hashes/sha256/objects/alice/",
 				"/sig/ed25519/objects/alice/",
 			},
 		},
@@ -793,7 +793,7 @@ func TestLayeredNamer_Prefixes(t *testing.T) {
 			isPrefix: false,
 			expected: []string{
 				"/objects/alice",
-				"/hash/sha256/objects/alice",
+				"/hashes/sha256/objects/alice",
 				"/sig/ed25519/objects/alice",
 			},
 		},
@@ -822,7 +822,7 @@ func TestLayeredNamer_Prefixes_Compact(t *testing.T) {
 
 	expected := []string{
 		"/objects/",
-		"/hash/objects/",
+		"/hashes/objects/",
 		"/sig/objects/",
 	}
 	assert.Equal(t, expected, layeredN.Prefixes("", true))
@@ -867,7 +867,7 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, keys, 3)
 		assert.Equal(t, "/settings/ldap/entry-1", keys[0].Build())
-		assert.Equal(t, "/hash/sha256/settings/ldap/entry-1", keys[1].Build())
+		assert.Equal(t, "/hashes/sha256/settings/ldap/entry-1", keys[1].Build())
 		assert.Equal(t, "/sig/ed25519/settings/ldap/entry-1", keys[2].Build())
 
 		// Round-trip each key.
@@ -896,7 +896,7 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, keys, 3)
 		assert.Equal(t, "/settings/ldap/entry-1", keys[0].Build())
-		assert.Equal(t, "/hash/settings/ldap/entry-1", keys[1].Build())
+		assert.Equal(t, "/hashes/settings/ldap/entry-1", keys[1].Build())
 		assert.Equal(t, "/sig/settings/ldap/entry-1", keys[2].Build())
 
 		for _, k := range keys {

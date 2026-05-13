@@ -118,12 +118,12 @@ func TestCodecBuilder_WithHasher(t *testing.T) {
 	var foundHash bool
 
 	for _, k := range keys {
-		if k.Build() == "/hash/sha256/objects/foo" {
+		if k.Build() == "/hashes/sha256/objects/foo" {
 			foundHash = true
 		}
 	}
 
-	assert.True(t, foundHash, "expected hash key at /hash/sha256/objects/foo")
+	assert.True(t, foundHash, "expected hash key at /hashes/sha256/objects/foo")
 }
 
 func TestCodecBuilder_WithHashLocation(t *testing.T) {
@@ -147,12 +147,12 @@ func TestCodecBuilder_WithHashLocation(t *testing.T) {
 	var foundCustom bool
 
 	for _, k := range keys {
-		if k.Build() == "/hash/checksums/objects/foo" {
+		if k.Build() == "/hashes/checksums/objects/foo" {
 			foundCustom = true
 		}
 	}
 
-	assert.True(t, foundCustom, "expected hash key at /hash/checksums/objects/foo")
+	assert.True(t, foundCustom, "expected hash key at /hashes/checksums/objects/foo")
 }
 
 func TestCodecBuilder_WithSigner(t *testing.T) {
@@ -248,7 +248,7 @@ func TestCodecBuilder_StaleSigLocationKey(t *testing.T) {
 func TestCodecBuilder_ReservedObjectLocation(t *testing.T) {
 	t.Parallel()
 
-	for _, reserved := range []string{"hash", "sig"} {
+	for _, reserved := range []string{"hashes", "sig"} {
 		t.Run(reserved, func(t *testing.T) {
 			t.Parallel()
 

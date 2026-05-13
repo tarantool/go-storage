@@ -17,7 +17,7 @@ import (
 
 // newSingletonCodec builds a Codec[SimpleStruct] with objectLocation="settings",
 // one hasher, and one signer/verifier — enough to exercise all three key
-// layers (value/hash/sig).
+// layers (value/hashes/sig).
 func newSingletonCodec(t *testing.T) (*integrity.Codec[SimpleStruct], string) {
 	t.Helper()
 
@@ -76,7 +76,7 @@ func TestSingletonStore_WireLayout(t *testing.T) {
 	sort.Strings(keys)
 
 	want := []string{
-		"/hash/sha256/settings/auth",
+		"/hashes/sha256/settings/auth",
 		"/settings/auth",
 		"/sig/" + sigName + "/settings/auth",
 	}

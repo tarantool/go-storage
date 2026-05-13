@@ -13,7 +13,7 @@ const (
 	defaultName     = "all"
 	defaultType     = namer.KeyTypeHash
 	defaultProperty = "sha256"
-	defaultRaw      = "/config/hash/sha256/all"
+	defaultRaw      = "/config/hashes/sha256/all"
 )
 
 func TestNewDefaultKey(t *testing.T) {

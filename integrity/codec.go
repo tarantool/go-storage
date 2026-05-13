@@ -245,7 +245,7 @@ func (b CodecBuilder[T]) WithNamer(f CodecNamerConstructor) CodecBuilder[T] {
 }
 
 // WithSingleHashCompact opts the codec into the compact hash key layout
-// (/hash/<objectLocation>/<name>, dropping the per-hasher segment). Build
+// (/hashes/<objectLocation>/<name>, dropping the per-hasher segment). Build
 // returns ErrSingleHashCompactCardinality if exactly one hasher is not
 // configured.
 func (b CodecBuilder[T]) WithSingleHashCompact() CodecBuilder[T] {

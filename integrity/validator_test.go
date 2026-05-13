@@ -65,7 +65,7 @@ func TestValidatorValidate_Success(t *testing.T) {
 			ModRevision: expectedModRevision,
 		},
 		{
-			Key: []byte("/test/hash/sha256/my-object"),
+			Key: []byte("/test/hashes/sha256/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -114,7 +114,7 @@ func TestValidatorValidate_MissingHash(t *testing.T) {
 			Value:       []byte("name: test\nvalue: 42\n"),
 			ModRevision: 0,
 		},
-		// Missing hash key: /test/hash/sha256/my-object.
+		// Missing hash key: /test/hashes/sha256/my-object.
 	}
 
 	// Should fail because sha256 hash is expected but missing.
@@ -155,7 +155,7 @@ func TestValidatorValidate_HashMismatch(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hash/sha256/my-object"),
+			Key:         []byte("/test/hashes/sha256/my-object"),
 			Value:       []byte("corrupted-hash"), // Wrong hash.
 			ModRevision: 0,
 		},
@@ -199,7 +199,7 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/object1"),
+			Key: []byte("/test/hashes/sha256/object1"),
 			Value: []byte{
 				0xf3, 0x88, 0x82, 0x49, 0x59, 0x8f, 0xbf, 0x4e, 0xcd, 0x8a, 0x47, 0x7a, 0x6b, 0xc3, 0x83, 0xe9, 0xa8,
 				0x8f, 0x6c, 0x13, 0xd7, 0x2a, 0x44, 0x86, 0xba, 0x6d, 0xe4, 0xf0, 0xbe, 0x7d, 0x18, 0xa9,
@@ -213,7 +213,7 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/object2"),
+			Key: []byte("/test/hashes/sha256/object2"),
 			Value: []byte{
 				0x1c, 0x47, 0x13, 0x01, 0xf9, 0x1b, 0x97, 0x9e, 0xa2, 0x92, 0x3e, 0xd2, 0x95, 0x67, 0x46, 0x6c, 0xad,
 				0x09, 0x7d, 0xc6, 0x33, 0xb4, 0x10, 0xac, 0x9d, 0x88, 0xdb, 0xc8, 0xf2, 0xb2, 0x3f, 0x7b,
@@ -278,7 +278,7 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/object1"),
+			Key: []byte("/test/hashes/sha256/object1"),
 			Value: []byte{
 				0xf3, 0x88, 0x82, 0x49, 0x59, 0x8f, 0xbf, 0x4e, 0xcd, 0x8a, 0x47, 0x7a, 0x6b, 0xc3, 0x83, 0xe9, 0xa8,
 				0x8f, 0x6c, 0x13, 0xd7, 0x2a, 0x44, 0x86, 0xba, 0x6d, 0xe4, 0xf0, 0xbe, 0x7d, 0x18, 0xa9,
@@ -292,7 +292,7 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hash/sha256/object2"),
+			Key:         []byte("/test/hashes/sha256/object2"),
 			Value:       []byte("corrupted-hash"), // Wrong hash.
 			ModRevision: 0,
 		},
@@ -442,7 +442,7 @@ func TestValidatorValidate_HashComputationError(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/my-object"),
+			Key: []byte("/test/hashes/sha256/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -510,7 +510,7 @@ func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/my-object"),
+			Key: []byte("/test/hashes/sha256/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -518,7 +518,7 @@ func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hash/sha1/my-object"),
+			Key:         []byte("/test/hashes/sha1/my-object"),
 			Value:       []byte("mock-sha1-hash"),
 			ModRevision: 0,
 		},
@@ -629,7 +629,7 @@ func TestValidatorValidate_MissingValueKey(t *testing.T) {
 
 	// Create KVs with only hash key, no value key.
 	missingValueKVs := []kv.KeyValue{
-		{Key: []byte("/test/hash/sha256/my-object"), Value: []byte("some-hash"), ModRevision: 0},
+		{Key: []byte("/test/hashes/sha256/my-object"), Value: []byte("some-hash"), ModRevision: 0},
 	}
 
 	// Should fail because value key is missing.
@@ -673,7 +673,7 @@ func TestValidatorValidate_UnmarshalError(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/my-object"),
+			Key: []byte("/test/hashes/sha256/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -716,14 +716,14 @@ func TestValidatorValidate_HashKeyNotFound(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hash/sha256/my-object"),
+			Key: []byte("/test/hashes/sha256/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
 			},
 			ModRevision: 0,
 		},
-		// Missing sha1 hash key: /test/hash/sha1/my-object .
+		// Missing sha1 hash key: /test/hashes/sha1/my-object .
 	}
 
 	// Should fail because sha1 hash key is missing.
