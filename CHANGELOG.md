@@ -9,20 +9,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
-- `storage.Prefixed` now rejects a non-empty prefix that does not start with
-  `/`, returning the new `storage.ErrPrefixNoLeadingSlash`. Interior `/`
-  separators remain allowed; a trailing `/` is still rejected with
+### Changed
+
+### Fixed
+
+## [v1.5.0] - 2026-05-15
+
+This release renames the namer's hash key path marker from `hash` to
+`hashes`, adds `tx.Factory` for handing transaction-begin capability
+to components without exposing the full `Storage` interface,
+introduces a `LegacyHashSigLayout` namer option for compatibility with
+the legacy product layout, tightens `storage.Prefixed` to require a
+leading `/`, and makes the `connect` package accept scheme-prefixed
+endpoint URLs and probe every configured endpoint before failing.
+
+### Added
+
+- tx.Factory and `Storage.TxFactory()`: a lightweight "begin a
+  transaction" surface for components that do not need the full
+  `Storage` interface. `Prefixed` implements it so factory-issued
+  transactions keep the prefix-rewrite path.
+- `storage.Prefixed` now rejects a non-empty prefix that does not start
+  with `/`, returning the new `storage.ErrPrefixNoLeadingSlash`. Interior
+  `/` separators remain allowed; a trailing `/` is still rejected with
   `storage.ErrPrefixTrailingSlash`.
-- namer.LayeredNamer: `LegacyHashSigLayout()` option emits hash and signature
-  keys without the per-codec `objectLocation` segment (value keys keep it) to
-  match the layout produced by the legacy product:
+- namer.LayeredNamer: `LegacyHashSigLayout()` option emits hash and
+  signature keys without the per-codec `objectLocation` segment (value
+  keys keep it) to match the layout produced by the legacy product:
 
       /<objectLocation>/<name>
       /hashes/<hashLocation>/<name>
       /sig/<sigLocation>/<name>
 
-  Composes with `CompactSingleHash` / `CompactSingleSig` and is a no-op in
-  unnamed mode.
+  Composes with `CompactSingleHash` / `CompactSingleSig` and is a no-op
+  in unnamed mode.
 
 ### Changed
 
@@ -38,9 +58,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
-- connect: fix TCS connection failure when endpoint URL contains `http://` or
-  `https://` scheme. Endpoints are now normalized by stripping the scheme
-  prefix; etcd endpoints use `http://` or `https://` based on `SSL.Enable`.
+- connect: TCS connection failure when an endpoint URL contained
+  `http://` or `https://` scheme. Endpoints are now normalized by
+  stripping the scheme prefix; etcd endpoints use `http://` or
+  `https://` based on `SSL.Enable`.
+- connect: a configured endpoint list is now probed in order — the
+  first reachable endpoint wins and the client/pool is returned.
+  Previously only `Endpoints[0]` was probed, so the connection failed
+  if the first endpoint was down even when later ones were healthy.
+  When every endpoint fails, a single joined error is returned.
 
 ## [v1.4.0] - 2026-05-12
 
