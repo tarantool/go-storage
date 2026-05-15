@@ -91,6 +91,34 @@ func ExampleCompactSingleSig() {
 	// KeyTypeSignature -> /sig/objects/alice
 }
 
+// ExampleLegacyHashSigLayout shows the legacy product layout: hash and sig
+// keys drop the objectLocation segment while value keys keep it.
+func ExampleLegacyHashSigLayout() {
+	layered, err := namer.NewLayeredNamer(
+		"config",
+		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		namer.LegacyHashSigLayout(),
+	)
+	if err != nil {
+		log.Fatalf("new namer: %v", err)
+	}
+
+	keys, err := layered.GenerateNames("all")
+	if err != nil {
+		log.Fatalf("generate: %v", err)
+	}
+
+	for _, k := range keys {
+		fmt.Printf("%s -> %s\n", k.Type(), k.Build())
+	}
+
+	// Output:
+	// KeyTypeValue -> /config/all
+	// KeyTypeHash -> /hashes/sha256/all
+	// KeyTypeSignature -> /sig/ed25519/all
+}
+
 // ExampleNewLayeredNamer_parse shows how ParseKey resolves a raw key path
 // back into its category and object name.
 func ExampleNewLayeredNamer_parse() {
