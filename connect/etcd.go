@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,17 +64,26 @@ func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, Clea
 		return nil, nil, fmt.Errorf("%w: %w", errFailedEtcdClient, clientErr)
 	}
 
-	statusCtx, statusCancel := context.WithTimeout(ctx, cfg.dialTimeout())
-	defer statusCancel()
+	probeErrs := make([]error, 0, len(endpoints))
 
-	_, statusErr := client.Status(statusCtx, endpoints[0])
-	if statusErr != nil {
-		_ = client.Close()
+	for _, endpoint := range endpoints {
+		statusCtx, statusCancel := context.WithTimeout(ctx, cfg.dialTimeout())
 
-		return nil, nil, fmt.Errorf("%w: %w", errFailedEtcdClient, statusErr)
+		_, statusErr := client.Status(statusCtx, endpoint)
+
+		statusCancel()
+
+		if statusErr == nil {
+			return client, func() { _ = client.Close() }, nil
+		}
+
+		probeErrs = append(probeErrs, fmt.Errorf("%s: %w", endpoint, statusErr))
 	}
 
-	return client, func() { _ = client.Close() }, nil
+	_ = client.Close()
+
+	return nil, nil, fmt.Errorf("%w: failed to connect to %v: %w",
+		errFailedEtcdClient, endpoints, errors.Join(probeErrs...))
 }
 
 func validateSSLConfig(cfg SSLConfig) error {
