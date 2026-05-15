@@ -75,6 +75,7 @@ type LayeredOption func(*layeredOpts)
 type layeredOpts struct {
 	compactHash bool
 	compactSig  bool
+	legacy      bool
 }
 
 // CompactSingleHash drops the per-hasher location segment in generated and
@@ -93,6 +94,23 @@ func CompactSingleSig() LayeredOption {
 	return func(o *layeredOpts) { o.compactSig = true }
 }
 
+// LegacyHashSigLayout drops the per-codec objectLocation segment from hash
+// and signature keys (but keeps it for value keys), matching the layout
+// emitted by the legacy product. The resulting layout is:
+//
+//	/<objectLocation>/<name>            (value)
+//	/hashes/<hashLocation>/<name>       (hash)
+//	/sig/<sigLocation>/<name>           (sig)
+//
+// Composes with CompactSingleHash / CompactSingleSig as expected — the
+// <hashLocation> / <sigLocation> segments are dropped independently of
+// this option. Has no effect in unnamed mode (objectLocation ==
+// ObjectLocationMissing) since the unnamed layout already omits the
+// objectLocation segment.
+func LegacyHashSigLayout() LayeredOption {
+	return func(o *layeredOpts) { o.legacy = true }
+}
+
 type layeredNamer struct {
 	objectLocation string
 	hashLocations  []LayeredHashLocation
@@ -103,6 +121,10 @@ type layeredNamer struct {
 	// mode the objectLocation segment is omitted from every emitted key
 	// and from the parser's expected layout.
 	unnamed bool
+	// legacy is set by LegacyHashSigLayout(). It drops the objectLocation
+	// segment from hash and signature keys (but keeps it for value keys)
+	// to match the layout emitted by the legacy product.
+	legacy bool
 	// Reverse maps populated once at construction so ParseKey is O(1)
 	// regardless of hash/sig list size.
 	hashIndex map[string]string // hashLocation -> hasherName.
@@ -127,6 +149,10 @@ type layeredNamer struct {
 //
 // Pass ObjectLocationMissing as objectLocation to drop the per-codec
 // segment entirely; see ObjectLocationMissing for the resulting layout.
+//
+// With LegacyHashSigLayout, the per-codec <objectLocation> segment is
+// dropped from hash and sig keys (but kept for value keys) to match the
+// legacy product layout.
 //
 // Validation rules:
 //   - hashLocation / sigLocation must be a single non-empty segment with no '/'.
@@ -215,6 +241,7 @@ func NewLayeredNamer(
 		compactHash:    resolved.compactHash,
 		compactSig:     resolved.compactSig,
 		unnamed:        unnamed,
+		legacy:         resolved.legacy,
 		hashIndex:      hashIndex,
 		sigIndex:       sigIndex,
 	}, nil
@@ -449,6 +476,15 @@ func (n *layeredNamer) Prefixes(val string, isPrefix bool) []string {
 	return out
 }
 
+// omitObjLocFromHashSig reports whether hash and signature keys must be
+// emitted/parsed without the per-codec objectLocation segment. This is the
+// case in unnamed mode (objectLocation == ObjectLocationMissing) — there
+// is no objectLocation to insert — and also when LegacyHashSigLayout() is
+// set, which deliberately drops the segment.
+func (n *layeredNamer) omitObjLocFromHashSig() bool {
+	return n.unnamed || n.legacy
+}
+
 func (n *layeredNamer) valueRoot() string {
 	if n.unnamed {
 		return "/"
@@ -463,7 +499,7 @@ func (n *layeredNamer) hashRoot(hashLocation string) string {
 		root += hashLocation + "/"
 	}
 
-	if !n.unnamed {
+	if !n.omitObjLocFromHashSig() {
 		root += n.objectLocation + "/"
 	}
 
@@ -476,7 +512,7 @@ func (n *layeredNamer) sigRoot(sigLocation string) string {
 		root += sigLocation + "/"
 	}
 
-	if !n.unnamed {
+	if !n.omitObjLocFromHashSig() {
 		root += n.objectLocation + "/"
 	}
 
@@ -508,12 +544,14 @@ func (n *layeredNamer) buildValueKey(name string) string {
 }
 
 func (n *layeredNamer) buildHashKey(hashLocation, name string) string {
+	omitObj := n.omitObjLocFromHashSig()
+
 	switch {
-	case n.compactHash && n.unnamed:
+	case n.compactHash && omitObj:
 		return "/" + layeredHashMarker + "/" + name
 	case n.compactHash:
 		return "/" + layeredHashMarker + "/" + n.objectLocation + "/" + name
-	case n.unnamed:
+	case omitObj:
 		return "/" + layeredHashMarker + "/" + hashLocation + "/" + name
 	}
 
@@ -521,12 +559,14 @@ func (n *layeredNamer) buildHashKey(hashLocation, name string) string {
 }
 
 func (n *layeredNamer) buildSigKey(sigLocation, name string) string {
+	omitObj := n.omitObjLocFromHashSig()
+
 	switch {
-	case n.compactSig && n.unnamed:
+	case n.compactSig && omitObj:
 		return "/" + layeredSigMarker + "/" + name
 	case n.compactSig:
 		return "/" + layeredSigMarker + "/" + n.objectLocation + "/" + name
-	case n.unnamed:
+	case omitObj:
 		return "/" + layeredSigMarker + "/" + sigLocation + "/" + name
 	}
 
@@ -575,7 +615,7 @@ func (n *layeredNamer) parseHashKey(raw, rest string) (DefaultKey, error) {
 }
 
 func (n *layeredNamer) parseCompactHashKey(raw, rest string) (DefaultKey, error) {
-	if n.unnamed {
+	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, rest, "hash")
 		if err != nil {
 			return DefaultKey{}, err
@@ -609,7 +649,7 @@ func (n *layeredNamer) parseFullHashKey(raw, rest string) (DefaultKey, error) {
 		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown hash location %q", hashLoc))
 	}
 
-	if n.unnamed {
+	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, afterLoc, "hash")
 		if err != nil {
 			return DefaultKey{}, err
@@ -641,7 +681,7 @@ func (n *layeredNamer) parseSigKey(raw, rest string) (DefaultKey, error) {
 }
 
 func (n *layeredNamer) parseCompactSigKey(raw, rest string) (DefaultKey, error) {
-	if n.unnamed {
+	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, rest, "sig")
 		if err != nil {
 			return DefaultKey{}, err
@@ -675,7 +715,7 @@ func (n *layeredNamer) parseFullSigKey(raw, rest string) (DefaultKey, error) {
 		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown sig location %q", sigLoc))
 	}
 
-	if n.unnamed {
+	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, afterLoc, "sig")
 		if err != nil {
 			return DefaultKey{}, err

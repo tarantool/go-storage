@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `/`, returning the new `storage.ErrPrefixNoLeadingSlash`. Interior `/`
   separators remain allowed; a trailing `/` is still rejected with
   `storage.ErrPrefixTrailingSlash`.
+- namer.LayeredNamer: `LegacyHashSigLayout()` option emits hash and signature
+  keys without the per-codec `objectLocation` segment (value keys keep it) to
+  match the layout produced by the legacy product:
+
+      /<objectLocation>/<name>
+      /hashes/<hashLocation>/<name>
+      /sig/<sigLocation>/<name>
+
+  Composes with `CompactSingleHash` / `CompactSingleSig` and is a no-op in
+  unnamed mode.
 
 ### Changed
 
