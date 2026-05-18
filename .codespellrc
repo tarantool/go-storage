@@ -1,5 +1,5 @@
 [codespell]
 
 skip = ./vendor,./.git
-# ignore-words-list =
+ignore-words-list = clienta
 check-filenames = true
