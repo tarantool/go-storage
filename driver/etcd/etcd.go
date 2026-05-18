@@ -32,7 +32,7 @@ type Client interface {
 // Driver is an etcd implementation of the storage driver interface.
 // It uses etcd as the underlying key-value storage backend.
 type Driver struct {
-	client Client // etcd client interface.
+	client Client
 }
 
 var (
@@ -49,6 +49,11 @@ var (
 
 // New creates a new etcd driver instance using an existing etcd client.
 // The client should be properly configured and connected to an etcd cluster.
+//
+// NewLocker is only supported when client is a concrete *etcd.Client — the
+// concurrency package needs the concrete type which the Client interface does
+// not expose. Drivers built from a non-concrete Client return
+// locker.ErrUnsupported from NewLocker.
 func New(client Client) *Driver {
 	return &Driver{
 		client: client,
