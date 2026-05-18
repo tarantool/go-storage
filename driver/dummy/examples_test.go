@@ -3,10 +3,12 @@ package dummy_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/tarantool/go-storage/driver/dummy"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 )
@@ -313,4 +315,65 @@ func ExampleDriver_Watch() {
 	// Received watch event for prefix: /config/database
 	// Started watch with manual control
 	// Stopping watch gracefully...
+}
+
+// ExampleDriver_NewLocker demonstrates acquiring a named lock with the dummy
+// driver, observing contention from a second Locker on the same name, and
+// releasing the lock so the contender can proceed.
+func ExampleDriver_NewLocker() {
+	ctx := context.Background()
+	driver := dummy.New()
+
+	holder, err := driver.NewLocker(ctx, "/locks/leader")
+	if err != nil {
+		log.Printf("NewLocker (holder) failed: %v", err)
+		return
+	}
+
+	err = holder.Lock(ctx)
+	if err != nil {
+		log.Printf("Lock failed: %v", err)
+		return
+	}
+
+	fmt.Println("holder acquired:", holder.Key())
+
+	contender, err := driver.NewLocker(ctx, "/locks/leader")
+	if err != nil {
+		log.Printf("NewLocker (contender) failed: %v", err)
+		return
+	}
+
+	err = contender.TryLock(ctx)
+	if errors.Is(err, locker.ErrLocked) {
+		fmt.Println("contender saw the lock as held")
+	}
+
+	err = holder.Unlock(ctx)
+	if err != nil {
+		log.Printf("Unlock failed: %v", err)
+		return
+	}
+
+	fmt.Println("holder released")
+
+	err = contender.TryLock(ctx)
+	if err != nil {
+		log.Printf("contender TryLock after release failed: %v", err)
+		return
+	}
+
+	fmt.Println("contender acquired:", contender.Key())
+
+	err = contender.Unlock(ctx)
+	if err != nil {
+		log.Printf("Unlock failed: %v", err)
+		return
+	}
+
+	// Output:
+	// holder acquired: /locks/leader
+	// contender saw the lock as held
+	// holder released
+	// contender acquired: /locks/leader
 }
