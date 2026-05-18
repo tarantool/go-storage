@@ -2,6 +2,7 @@ package tcs_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/tarantool/go-storage/driver/tcs"
 	gsTesting "github.com/tarantool/go-storage/internal/testing"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 )
@@ -441,4 +443,127 @@ func ExampleDriver_Watch() {
 	// Event 3: change detected on /config/database
 	// Started watch with manual control
 	// Stopping watch gracefully...
+}
+
+// lockerMockResponse builds a raw config.storage.* response (an outer
+// single-element list wrapping body) as the typed locker decoders expect.
+func lockerMockResponse(body any) *gsTesting.MockResponse {
+	return gsTesting.NewMockResponse(gsTesting.NewT(), []any{body})
+}
+
+// createTCSDriverNewLocker scripts a MockDoer that mimics a TCS server
+// advertising features.ttl + features.keepalive, then walks two Lockers
+// through one round of contention plus a clean handover.
+func createTCSDriverNewLocker() *tcs.Driver {
+	infoFeatures := map[string]any{
+		"features": map[string]any{"ttl": true, "keepalive": true},
+	}
+
+	getEntry := func(path string, modRev int64) any {
+		return map[string]any{"path": path, "value": "", "mod_revision": modRev}
+	}
+
+	getResponse := func(entries ...any) any {
+		return map[string]any{"data": entries, "revision": int64(1000)}
+	}
+
+	mock := gsTesting.NewMockDoer(gsTesting.NewT(),
+		// Holder NewLocker probes features.
+		lockerMockResponse(infoFeatures),
+		// Holder TryLock: put → get(only-self) → smallest, held.
+		lockerMockResponse(map[string]any{"revision": int64(10)}),
+		lockerMockResponse(getResponse(getEntry("/locks/leader/h", 10))),
+
+		// Contender NewLocker probes features.
+		lockerMockResponse(infoFeatures),
+		// Contender TryLock: put → get(holder+self) → not smallest → ErrLocked
+		// → cleanup delete of contender's failed key.
+		lockerMockResponse(map[string]any{"revision": int64(20)}),
+		lockerMockResponse(getResponse(
+			getEntry("/locks/leader/h", 10),
+			getEntry("/locks/leader/c", 20),
+		)),
+		lockerMockResponse(map[string]any{}),
+
+		// Holder Unlock deletes its key.
+		lockerMockResponse(map[string]any{}),
+
+		// Contender TryLock again: put → get(only-self) → smallest, held.
+		lockerMockResponse(map[string]any{"revision": int64(30)}),
+		lockerMockResponse(getResponse(getEntry("/locks/leader/c2", 30))),
+
+		// Contender Unlock deletes its key.
+		lockerMockResponse(map[string]any{}),
+	)
+
+	return tcs.New(gsTesting.NewMockDoerWithWatcher(mock, nil))
+}
+
+// ExampleDriver_NewLocker demonstrates acquiring a TCS-backed distributed
+// lock, observing contention from a second Locker on the same name, and
+// releasing the lock so the contender can proceed.
+//
+// The TCS server must advertise features.ttl and features.keepalive — on
+// older schemas NewLocker returns tcs.ErrUnsupportedFeatures.
+func ExampleDriver_NewLocker() {
+	ctx := context.Background()
+
+	driver := createTCSDriverNewLocker()
+
+	// A long TTL keeps the keepalive ticker (ttl/3) from firing during the
+	// example, so the scripted MockDoer only sees the calls illustrated below.
+	const ttl = 120 * time.Second
+
+	holder, err := driver.NewLocker(ctx, "/locks/leader", locker.WithTTL(ttl))
+	if err != nil {
+		log.Printf("NewLocker (holder) failed: %v", err)
+		return
+	}
+
+	err = holder.TryLock(ctx)
+	if err != nil {
+		log.Printf("holder TryLock failed: %v", err)
+		return
+	}
+
+	fmt.Println("holder acquired:", holder.Key() != "")
+
+	contender, err := driver.NewLocker(ctx, "/locks/leader", locker.WithTTL(ttl))
+	if err != nil {
+		log.Printf("NewLocker (contender) failed: %v", err)
+		return
+	}
+
+	err = contender.TryLock(ctx)
+	if errors.Is(err, locker.ErrLocked) {
+		fmt.Println("contender saw the lock as held")
+	}
+
+	err = holder.Unlock(ctx)
+	if err != nil {
+		log.Printf("Unlock failed: %v", err)
+		return
+	}
+
+	fmt.Println("holder released")
+
+	err = contender.TryLock(ctx)
+	if err != nil {
+		log.Printf("contender TryLock after release failed: %v", err)
+		return
+	}
+
+	fmt.Println("contender acquired:", contender.Key() != "")
+
+	err = contender.Unlock(ctx)
+	if err != nil {
+		log.Printf("Unlock failed: %v", err)
+		return
+	}
+
+	// Output:
+	// holder acquired: true
+	// contender saw the lock as held
+	// holder released
+	// contender acquired: true
 }
