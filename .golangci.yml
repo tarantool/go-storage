@@ -72,6 +72,7 @@ linters:
             - "!$test"
           allow:
             - $gostd
+            - "github.com/google/uuid"
             - "github.com/tarantool/go-iproto"
             - "github.com/tarantool/go-option"
             - "github.com/tarantool/go-storage"
