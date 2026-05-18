@@ -115,6 +115,7 @@ type CodecBuilder[T any] struct {
 	namerFunc      CodecNamerConstructor
 	compactHash    bool
 	compactSig     bool
+	keyPrefix      string
 }
 
 // NewCodecBuilder returns a new CodecBuilder with sensible defaults.
@@ -135,6 +136,7 @@ func NewCodecBuilder[T any]() CodecBuilder[T] {
 		namerFunc:      nil,
 		compactHash:    false,
 		compactSig:     false,
+		keyPrefix:      "",
 	}
 }
 
@@ -153,6 +155,7 @@ func (b CodecBuilder[T]) copy() CodecBuilder[T] {
 		namerFunc:      b.namerFunc,
 		compactHash:    b.compactHash,
 		compactSig:     b.compactSig,
+		keyPrefix:      b.keyPrefix,
 	}
 }
 
@@ -264,6 +267,27 @@ func (b CodecBuilder[T]) WithSingleSigCompact() CodecBuilder[T] {
 	out := b.copy()
 
 	out.compactSig = true
+
+	return out
+}
+
+// WithKeyPrefix prepends the given path prefix to every key the codec emits
+// and parses. This lets multiple codecs share a single storage.Storage while
+// keeping their keys in disjoint sub-trees — and therefore stay atomic in a
+// single integrity.Tx, which cannot span multiple storage handles.
+//
+// The prefix must start with '/' and must not end with '/'; empty is a no-op.
+// The validation runs in Build via the underlying namer, which returns
+// namer.ErrKeyPrefixNoLeadingSlash or namer.ErrKeyPrefixTrailingSlash on
+// malformed input.
+//
+// Custom namers passed through WithNamer receive the prefix as an extra
+// namer.LayeredOption. Namers that ignore LayeredOptions silently drop the
+// prefix; the default namer.NewLayeredNamer honours it.
+func (b CodecBuilder[T]) WithKeyPrefix(prefix string) CodecBuilder[T] {
+	out := b.copy()
+
+	out.keyPrefix = prefix
 
 	return out
 }
@@ -394,6 +418,10 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 		}
 
 		opts = append(opts, namer.CompactSingleSig())
+	}
+
+	if b.keyPrefix != "" {
+		opts = append(opts, namer.WithKeyPrefix(b.keyPrefix))
 	}
 
 	genNamer, err := namerFn(objLoc, genHashLocs, genSigLocs, opts...)

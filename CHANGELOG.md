@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- namer.LayeredNamer: `WithKeyPrefix(prefix)` option prepends a fixed path
+  prefix to every emitted/parsed key. Lets two codecs sit in disjoint
+  sub-trees of a single `storage.Storage` so they can be committed atomically
+  in one `integrity.Tx` (which cannot span multiple storage handles, the way
+  `storage.Prefixed` wrappers can). Validation matches `storage.Prefixed`:
+  must start with `/`, must not end with `/`; an empty prefix is a no-op.
+  Returns `namer.ErrKeyPrefixNoLeadingSlash` / `namer.ErrKeyPrefixTrailingSlash`
+  on malformed input; `ParseKey` returns `namer.ErrKeyPrefixMissing` for
+  keys that do not start with the configured prefix.
+- integrity.CodecBuilder: `WithKeyPrefix(prefix)` threads the namer option
+  through to the underlying `namer.NewLayeredNamer`, so codecs can be
+  built directly with a prefix without writing a custom
+  `CodecNamerConstructor`.
+
 ### Changed
 
 ### Fixed
