@@ -14,6 +14,13 @@ var (
 	ErrSessionExpired = errors.New("locker: session expired")
 	ErrLockReleased   = errors.New("locker: lock already released")
 	ErrUnsupported    = errors.New("locker: not supported by this driver instance")
+
+	// ErrPrefixTrailingSlash is returned by Prefixed when prefix ends with "/".
+	ErrPrefixTrailingSlash = errors.New("locker: prefix must not end with '/'")
+
+	// ErrPrefixNoLeadingSlash is returned by Prefixed when a non-empty prefix
+	// does not start with "/".
+	ErrPrefixNoLeadingSlash = errors.New("locker: prefix must start with '/'")
 )
 
 // Locker acquires and releases a named distributed lock. A single Locker
@@ -26,6 +33,16 @@ type Locker interface {
 	TryLock(ctx context.Context) error
 	Unlock(ctx context.Context) error
 	Key() string
+
+	// Done returns a channel that is closed when this Locker is no longer
+	// holding the lock — either because Unlock was called or because the
+	// backend's session was lost (TTL elapsed without renewal, connection
+	// dropped, etc.). The channel returned by Done corresponds to the most
+	// recent successful Lock/TryLock call; calling Done before any successful
+	// acquire returns an already-closed channel. The signal does not
+	// distinguish voluntary release from involuntary loss; callers that need
+	// to tell them apart must track that themselves.
+	Done() <-chan struct{}
 }
 
 // Factory creates new Lockers bound to a storage instance.
@@ -33,9 +50,23 @@ type Locker interface {
 // It is the lightest "create a lock" surface — bind once via
 // Storage.LockerFactory and pass the resulting Factory around to components
 // that only need to acquire locks, instead of handing out the full Storage.
-// A Storage's NewLocker method satisfies this signature directly, so a
-// Factory can also be obtained as a method value: var f locker.Factory = s.NewLocker.
-type Factory func(ctx context.Context, name string, opts ...Option) (Locker, error)
+//
+// Any type with a NewLocker method matching this signature satisfies Factory,
+// so Storage and Prefixed are already Factory values — no adapter needed for
+// production wiring. FactoryFunc adapts a bare function for ad-hoc cases.
+type Factory interface {
+	NewLocker(ctx context.Context, name string, opts ...Option) (Locker, error)
+}
+
+// FactoryFunc adapts a bare function to the Factory interface, mirroring the
+// http.HandlerFunc pattern. Use it when you don't have a type with a NewLocker
+// method handy — e.g. in tests.
+type FactoryFunc func(ctx context.Context, name string, opts ...Option) (Locker, error)
+
+// NewLocker satisfies Factory by invoking f.
+func (f FactoryFunc) NewLocker(ctx context.Context, name string, opts ...Option) (Locker, error) {
+	return f(ctx, name, opts...)
+}
 
 // Options holds configuration for a Locker instance.
 type Options struct {

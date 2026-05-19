@@ -34,13 +34,22 @@ type tcsLocker struct {
 	//nolint:containedctx // lifeCtx scopes the locker; cancellation aborts a blocking Lock.
 	lifeCtx context.Context
 
-	mu      sync.Mutex
-	held    bool
-	myKey   string
-	myRev   int64
-	stopKA  chan struct{}
-	expired chan struct{}
+	mu          sync.Mutex
+	held        bool
+	myKey       string
+	myRev       int64
+	stopKA      chan struct{}
+	expired     chan struct{}
+	expiredOnce *sync.Once
 }
+
+//nolint:gochecknoglobals // shared pre-closed channel returned when no acquire has happened.
+var closedDone = func() chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+
+	return ch
+}()
 
 var _ locker.Locker = (*tcsLocker)(nil)
 
@@ -93,8 +102,9 @@ func (l *tcsLocker) Lock(ctx context.Context) error {
 
 	stopKA := make(chan struct{})
 	expired := make(chan struct{})
+	expiredOnce := &sync.Once{}
 
-	go l.keepaliveLoop(myKey, stopKA, expired)
+	go l.keepaliveLoop(myKey, stopKA, expired, expiredOnce)
 
 	cleanupOnFail := func() { //nolint:contextcheck // cleanup must run even when ctx is already canceled.
 		close(stopKA)
@@ -116,6 +126,7 @@ func (l *tcsLocker) Lock(ctx context.Context) error {
 			l.myRev = myRev
 			l.stopKA = stopKA
 			l.expired = expired
+			l.expiredOnce = expiredOnce
 			l.mu.Unlock()
 
 			return nil
@@ -190,8 +201,9 @@ func (l *tcsLocker) TryLock(ctx context.Context) error {
 
 	stopKA := make(chan struct{})
 	expired := make(chan struct{})
+	expiredOnce := &sync.Once{}
 
-	go l.keepaliveLoop(myKey, stopKA, expired)
+	go l.keepaliveLoop(myKey, stopKA, expired, expiredOnce)
 
 	l.mu.Lock()
 	l.held = true
@@ -199,6 +211,7 @@ func (l *tcsLocker) TryLock(ctx context.Context) error {
 	l.myRev = myRev
 	l.stopKA = stopKA
 	l.expired = expired
+	l.expiredOnce = expiredOnce
 	l.mu.Unlock()
 
 	return nil
@@ -213,6 +226,7 @@ func (l *tcsLocker) Unlock(ctx context.Context) error {
 	}
 
 	close(l.stopKA)
+	l.expiredOnce.Do(func() { close(l.expired) })
 
 	myKey := l.myKey
 
@@ -220,7 +234,6 @@ func (l *tcsLocker) Unlock(ctx context.Context) error {
 	l.myKey = ""
 	l.myRev = 0
 	l.stopKA = nil
-	l.expired = nil
 
 	err := deletePath(ctx, l.conn, myKey)
 	if err != nil {
@@ -228,6 +241,17 @@ func (l *tcsLocker) Unlock(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (l *tcsLocker) Done() <-chan struct{} {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if l.expired == nil {
+		return closedDone
+	}
+
+	return l.expired
 }
 
 func (l *tcsLocker) Key() string {
@@ -241,7 +265,7 @@ func (l *tcsLocker) Key() string {
 // must satisfy replication_synchro_timeout + RTT < ttl/keepaliveDivisor.
 const keepaliveDivisor = 3
 
-func (l *tcsLocker) keepaliveLoop(myKey string, stop <-chan struct{}, expired chan<- struct{}) {
+func (l *tcsLocker) keepaliveLoop(myKey string, stop <-chan struct{}, expired chan struct{}, once *sync.Once) {
 	interval := max(time.Duration(l.ttlSec)*time.Second/keepaliveDivisor, time.Second)
 
 	ticker := time.NewTicker(interval)
@@ -256,7 +280,7 @@ func (l *tcsLocker) keepaliveLoop(myKey string, stop <-chan struct{}, expired ch
 		case <-ticker.C:
 			err := keepalivePath(l.lifeCtx, l.conn, myKey, l.ttlSec)
 			if err != nil {
-				close(expired)
+				once.Do(func() { close(expired) })
 				return
 			}
 		}

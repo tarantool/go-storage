@@ -58,7 +58,7 @@ func (s *recordingStorage) NewLocker(_ context.Context, name string, _ ...locker
 }
 
 func (s *recordingStorage) LockerFactory() locker.Factory {
-	return s.NewLocker
+	return s
 }
 
 func (s *recordingStorage) Watch(_ context.Context, key []byte, _ ...watch.Option) <-chan watch.Event {
@@ -593,7 +593,7 @@ func (b *blockingWatchStorage) NewLocker(_ context.Context, _ string, _ ...locke
 }
 
 func (b *blockingWatchStorage) LockerFactory() locker.Factory {
-	return b.NewLocker
+	return b
 }
 
 func (b *blockingWatchStorage) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan watch.Event {
@@ -949,7 +949,7 @@ func TestPrefixed_LockerFactory(t *testing.T) {
 		factory := prefixedStore.LockerFactory()
 		require.NotNil(t, factory)
 
-		_, err := factory(ctx, "/lock")
+		_, err := factory.NewLocker(ctx, "/lock")
 		require.NoError(t, err)
 
 		assert.Equal(t, namespace+"/lock", inner.lastLockerName)
@@ -969,14 +969,14 @@ func TestPrefixed_LockerFactory(t *testing.T) {
 			lockerErr:      nil,
 		}
 
-		// Bind the factory once, then drop the Storage reference. The closure
+		// Bind the factory once, then drop the Storage reference. The wrapper
 		// over the receiver must keep the prefix-rewrite path alive.
 		factory := func() locker.Factory {
 			s := mustPrefix(t, namespace, inner)
 			return s.LockerFactory()
 		}()
 
-		_, err := factory(ctx, "/lock")
+		_, err := factory.NewLocker(ctx, "/lock")
 		require.NoError(t, err)
 
 		assert.Equal(t, namespace+"/lock", inner.lastLockerName)

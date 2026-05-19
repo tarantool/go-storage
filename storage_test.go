@@ -600,7 +600,7 @@ func TestStorage_LockerFactory(t *testing.T) {
 		factory := strg.LockerFactory()
 		require.NotNil(t, factory)
 
-		lk, err := factory(ctx, "my-lock")
+		lk, err := factory.NewLocker(ctx, "my-lock")
 		require.NoError(t, err)
 		assert.Equal(t, driverLocker, lk)
 
@@ -621,23 +621,22 @@ func TestStorage_LockerFactory(t *testing.T) {
 		lk1, err := strg.NewLocker(ctx, "shared")
 		require.NoError(t, err)
 
-		lk2, err := strg.LockerFactory()(ctx, "shared")
+		lk2, err := strg.LockerFactory().NewLocker(ctx, "shared")
 		require.NoError(t, err)
 
 		assert.Equal(t, lk1, lk2)
 		mockDriver.MinimockFinish()
 	})
 
-	t.Run("Storage.NewLocker method-value satisfies locker.Factory", func(t *testing.T) {
+	t.Run("Storage satisfies locker.Factory directly", func(t *testing.T) {
 		t.Parallel()
 
 		mockDriver := mocks.NewDriverMock(t)
 		strg := storage.NewStorage(mockDriver)
 
-		// Compile-time + runtime check: a method value of NewLocker is
-		// assignable to locker.Factory, which is the documented "alternative
-		// way to bind".
-		var factory locker.Factory = strg.NewLocker
+		// Compile-time + runtime check: a Storage value satisfies locker.Factory
+		// because it has the matching NewLocker method.
+		var factory locker.Factory = strg
 		require.NotNil(t, factory)
 	})
 }

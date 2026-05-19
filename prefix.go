@@ -136,7 +136,7 @@ func (p *prefixed) NewLocker(ctx context.Context, name string, opts ...locker.Op
 // prefix-scoping logic in NewLocker is preserved for callers that only need a
 // lock binder.
 func (p *prefixed) LockerFactory() locker.Factory {
-	return p.NewLocker
+	return p
 }
 
 func (p *prefixed) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error) {

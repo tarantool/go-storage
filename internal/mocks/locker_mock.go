@@ -16,6 +16,14 @@ type LockerMock struct {
 	t          minimock.Tester
 	finishOnce sync.Once
 
+	funcDone func() (ch1 <-chan struct {
+	})
+	funcDoneOrigin    string
+	inspectFuncDone   func()
+	afterDoneCounter  uint64
+	beforeDoneCounter uint64
+	DoneMock          mLockerMockDone
+
 	funcKey          func() (s1 string)
 	funcKeyOrigin    string
 	inspectFuncKey   func()
@@ -53,6 +61,8 @@ func NewLockerMock(t minimock.Tester) *LockerMock {
 		controller.RegisterMocker(m)
 	}
 
+	m.DoneMock = mLockerMockDone{mock: m}
+
 	m.KeyMock = mLockerMockKey{mock: m}
 
 	m.LockMock = mLockerMockLock{mock: m}
@@ -67,6 +77,196 @@ func NewLockerMock(t minimock.Tester) *LockerMock {
 	t.Cleanup(m.MinimockFinish)
 
 	return m
+}
+
+type mLockerMockDone struct {
+	optional           bool
+	mock               *LockerMock
+	defaultExpectation *LockerMockDoneExpectation
+	expectations       []*LockerMockDoneExpectation
+
+	expectedInvocations       uint64
+	expectedInvocationsOrigin string
+}
+
+// LockerMockDoneExpectation specifies expectation struct of the Locker.Done
+type LockerMockDoneExpectation struct {
+	mock *LockerMock
+
+	results      *LockerMockDoneResults
+	returnOrigin string
+	Counter      uint64
+}
+
+// LockerMockDoneResults contains results of the Locker.Done
+type LockerMockDoneResults struct {
+	ch1 <-chan struct {
+	}
+}
+
+// Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
+// the test will fail minimock's automatic final call check if the mocked method was not called at least once.
+// Optional() makes method check to work in '0 or more' mode.
+// It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
+// catch the problems when the expected method call is totally skipped during test run.
+func (mmDone *mLockerMockDone) Optional() *mLockerMockDone {
+	mmDone.optional = true
+	return mmDone
+}
+
+// Expect sets up expected params for Locker.Done
+func (mmDone *mLockerMockDone) Expect() *mLockerMockDone {
+	if mmDone.mock.funcDone != nil {
+		mmDone.mock.t.Fatalf("LockerMock.Done mock is already set by Set")
+	}
+
+	if mmDone.defaultExpectation == nil {
+		mmDone.defaultExpectation = &LockerMockDoneExpectation{}
+	}
+
+	return mmDone
+}
+
+// Inspect accepts an inspector function that has same arguments as the Locker.Done
+func (mmDone *mLockerMockDone) Inspect(f func()) *mLockerMockDone {
+	if mmDone.mock.inspectFuncDone != nil {
+		mmDone.mock.t.Fatalf("Inspect function is already set for LockerMock.Done")
+	}
+
+	mmDone.mock.inspectFuncDone = f
+
+	return mmDone
+}
+
+// Return sets up results that will be returned by Locker.Done
+func (mmDone *mLockerMockDone) Return(ch1 <-chan struct {
+}) *LockerMock {
+	if mmDone.mock.funcDone != nil {
+		mmDone.mock.t.Fatalf("LockerMock.Done mock is already set by Set")
+	}
+
+	if mmDone.defaultExpectation == nil {
+		mmDone.defaultExpectation = &LockerMockDoneExpectation{mock: mmDone.mock}
+	}
+	mmDone.defaultExpectation.results = &LockerMockDoneResults{ch1}
+	mmDone.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
+	return mmDone.mock
+}
+
+// Set uses given function f to mock the Locker.Done method
+func (mmDone *mLockerMockDone) Set(f func() (ch1 <-chan struct {
+})) *LockerMock {
+	if mmDone.defaultExpectation != nil {
+		mmDone.mock.t.Fatalf("Default expectation is already set for the Locker.Done method")
+	}
+
+	if len(mmDone.expectations) > 0 {
+		mmDone.mock.t.Fatalf("Some expectations are already set for the Locker.Done method")
+	}
+
+	mmDone.mock.funcDone = f
+	mmDone.mock.funcDoneOrigin = minimock.CallerInfo(1)
+	return mmDone.mock
+}
+
+// Times sets number of times Locker.Done should be invoked
+func (mmDone *mLockerMockDone) Times(n uint64) *mLockerMockDone {
+	if n == 0 {
+		mmDone.mock.t.Fatalf("Times of LockerMock.Done mock can not be zero")
+	}
+	mm_atomic.StoreUint64(&mmDone.expectedInvocations, n)
+	mmDone.expectedInvocationsOrigin = minimock.CallerInfo(1)
+	return mmDone
+}
+
+func (mmDone *mLockerMockDone) invocationsDone() bool {
+	if len(mmDone.expectations) == 0 && mmDone.defaultExpectation == nil && mmDone.mock.funcDone == nil {
+		return true
+	}
+
+	totalInvocations := mm_atomic.LoadUint64(&mmDone.mock.afterDoneCounter)
+	expectedInvocations := mm_atomic.LoadUint64(&mmDone.expectedInvocations)
+
+	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
+}
+
+// Done implements mm_locker.Locker
+func (mmDone *LockerMock) Done() (ch1 <-chan struct {
+}) {
+	mm_atomic.AddUint64(&mmDone.beforeDoneCounter, 1)
+	defer mm_atomic.AddUint64(&mmDone.afterDoneCounter, 1)
+
+	mmDone.t.Helper()
+
+	if mmDone.inspectFuncDone != nil {
+		mmDone.inspectFuncDone()
+	}
+
+	if mmDone.DoneMock.defaultExpectation != nil {
+		mm_atomic.AddUint64(&mmDone.DoneMock.defaultExpectation.Counter, 1)
+
+		mm_results := mmDone.DoneMock.defaultExpectation.results
+		if mm_results == nil {
+			mmDone.t.Fatal("No results are set for the LockerMock.Done")
+		}
+		return (*mm_results).ch1
+	}
+	if mmDone.funcDone != nil {
+		return mmDone.funcDone()
+	}
+	mmDone.t.Fatalf("Unexpected call to LockerMock.Done.")
+	return
+}
+
+// DoneAfterCounter returns a count of finished LockerMock.Done invocations
+func (mmDone *LockerMock) DoneAfterCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmDone.afterDoneCounter)
+}
+
+// DoneBeforeCounter returns a count of LockerMock.Done invocations
+func (mmDone *LockerMock) DoneBeforeCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmDone.beforeDoneCounter)
+}
+
+// MinimockDoneDone returns true if the count of the Done invocations corresponds
+// the number of defined expectations
+func (m *LockerMock) MinimockDoneDone() bool {
+	if m.DoneMock.optional {
+		// Optional methods provide '0 or more' call count restriction.
+		return true
+	}
+
+	for _, e := range m.DoneMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	return m.DoneMock.invocationsDone()
+}
+
+// MinimockDoneInspect logs each unmet expectation
+func (m *LockerMock) MinimockDoneInspect() {
+	for _, e := range m.DoneMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Error("Expected call to LockerMock.Done")
+		}
+	}
+
+	afterDoneCounter := mm_atomic.LoadUint64(&m.afterDoneCounter)
+	// if default expectation was set then invocations count should be greater than zero
+	if m.DoneMock.defaultExpectation != nil && afterDoneCounter < 1 {
+		m.t.Errorf("Expected call to LockerMock.Done at\n%s", m.DoneMock.defaultExpectation.returnOrigin)
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcDone != nil && afterDoneCounter < 1 {
+		m.t.Errorf("Expected call to LockerMock.Done at\n%s", m.funcDoneOrigin)
+	}
+
+	if !m.DoneMock.invocationsDone() && afterDoneCounter > 0 {
+		m.t.Errorf("Expected %d calls to LockerMock.Done at\n%s but found %d calls",
+			mm_atomic.LoadUint64(&m.DoneMock.expectedInvocations), m.DoneMock.expectedInvocationsOrigin, afterDoneCounter)
+	}
 }
 
 type mLockerMockKey struct {
@@ -1192,6 +1392,8 @@ func (m *LockerMock) MinimockUnlockInspect() {
 func (m *LockerMock) MinimockFinish() {
 	m.finishOnce.Do(func() {
 		if !m.minimockDone() {
+			m.MinimockDoneInspect()
+
 			m.MinimockKeyInspect()
 
 			m.MinimockLockInspect()
@@ -1222,6 +1424,7 @@ func (m *LockerMock) MinimockWait(timeout mm_time.Duration) {
 func (m *LockerMock) minimockDone() bool {
 	done := true
 	return done &&
+		m.MinimockDoneDone() &&
 		m.MinimockKeyDone() &&
 		m.MinimockLockDone() &&
 		m.MinimockTryLockDone() &&
