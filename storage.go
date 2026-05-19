@@ -209,7 +209,7 @@ func (s storage) NewLocker(ctx context.Context, name string, opts ...locker.Opti
 
 // LockerFactory implements the Storage interface for locker-factory creation.
 func (s storage) LockerFactory() locker.Factory {
-	return s.NewLocker
+	return s
 }
 
 // NewStorage creates a new Storage instance with the specified driver.

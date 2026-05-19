@@ -263,6 +263,62 @@ func TestLocker_CtxCancellation_AbortsLock(t *testing.T) {
 	require.NoError(t, lockC.Unlock(ctx))
 }
 
+func TestLocker_Done_NeverLocked_IsClosed(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
+	t.Cleanup(cancel)
+
+	driver, _ := createTestDriverConcrete(t)
+
+	lock, err := driver.NewLocker(ctx, testLockName(t))
+	require.NoError(t, err)
+
+	select {
+	case <-lock.Done():
+	default:
+		t.Fatal("Done() on a never-locked locker must be already closed")
+	}
+}
+
+func TestLocker_Done_WhileHeld_IsOpen(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
+	t.Cleanup(cancel)
+
+	driver, _ := createTestDriverConcrete(t)
+
+	lock, err := driver.NewLocker(ctx, testLockName(t))
+	require.NoError(t, err)
+
+	require.NoError(t, lock.Lock(ctx))
+	t.Cleanup(func() { _ = lock.Unlock(ctx) })
+
+	select {
+	case <-lock.Done():
+		t.Fatal("Done() must not be closed while the lock is held")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestLocker_Done_ClosedAfterUnlock(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
+	t.Cleanup(cancel)
+
+	driver, _ := createTestDriverConcrete(t)
+
+	lock, err := driver.NewLocker(ctx, testLockName(t))
+	require.NoError(t, err)
+
+	require.NoError(t, lock.Lock(ctx))
+
+	doneCh := lock.Done()
+	require.NoError(t, lock.Unlock(ctx))
+
+	select {
+	case <-doneCh:
+	case <-time.After(lockerTestTimeout):
+		t.Fatal("Done() channel must be closed after Unlock")
+	}
+}
+
 func TestLocker_NewLockerOnNonConcreteClient_ReturnsErrUnsupported(t *testing.T) {
 	mc := minimock.NewController(t)
 

@@ -17,9 +17,18 @@ type etcdLocker struct {
 	mu      *concurrency.Mutex
 	name    string
 
-	stateMu sync.Mutex
-	held    bool
+	stateMu      sync.Mutex
+	held         bool
+	everAcquired bool
 }
+
+//nolint:gochecknoglobals // shared pre-closed channel returned when no acquire has happened.
+var closedDone = func() chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+
+	return ch
+}()
 
 var _ locker.Locker = (*etcdLocker)(nil)
 
@@ -72,6 +81,7 @@ func (l *etcdLocker) Lock(ctx context.Context) error {
 
 	l.stateMu.Lock()
 	l.held = true
+	l.everAcquired = true
 	l.stateMu.Unlock()
 
 	return nil
@@ -97,6 +107,7 @@ func (l *etcdLocker) TryLock(ctx context.Context) error {
 
 	l.stateMu.Lock()
 	l.held = true
+	l.everAcquired = true
 	l.stateMu.Unlock()
 
 	return nil
@@ -129,4 +140,19 @@ func (l *etcdLocker) Unlock(ctx context.Context) error {
 
 func (l *etcdLocker) Key() string {
 	return l.mu.Key()
+}
+
+// Done returns the session's Done channel after the first successful
+// Lock/TryLock. Because Unlock closes the underlying session, this Locker can
+// only be acquired once; after Unlock the returned channel is the now-closed
+// session.Done(), and a fresh acquire requires a new Locker via NewLocker.
+func (l *etcdLocker) Done() <-chan struct{} {
+	l.stateMu.Lock()
+	defer l.stateMu.Unlock()
+
+	if !l.everAcquired {
+		return closedDone
+	}
+
+	return l.session.Done()
 }

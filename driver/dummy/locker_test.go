@@ -205,6 +205,49 @@ func TestDummyLocker_TwoLockers_DifferentNames_DoNotContend(t *testing.T) {
 	require.NoError(t, lockB.Unlock(ctx))
 }
 
+func TestDummyLocker_Done_NeverLocked_IsClosed(t *testing.T) {
+	t.Parallel()
+
+	lock := newLocker(t, "done-never")
+
+	select {
+	case <-lock.Done():
+	default:
+		t.Fatal("Done() on a never-locked locker must be already closed")
+	}
+}
+
+func TestDummyLocker_Done_WhileHeld_IsOpen(t *testing.T) {
+	t.Parallel()
+
+	lock := newLocker(t, "done-held")
+	require.NoError(t, lock.Lock(context.Background()))
+
+	t.Cleanup(func() { _ = lock.Unlock(context.Background()) })
+
+	select {
+	case <-lock.Done():
+		t.Fatal("Done() must not be closed while the lock is held")
+	default:
+	}
+}
+
+func TestDummyLocker_Done_ClosedAfterUnlock(t *testing.T) {
+	t.Parallel()
+
+	lock := newLocker(t, "done-unlock")
+	require.NoError(t, lock.Lock(context.Background()))
+
+	done := lock.Done()
+	require.NoError(t, lock.Unlock(context.Background()))
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Done() channel must be closed after Unlock")
+	}
+}
+
 func TestDummyLocker_LifeCtxCancellation_AbortsBlockingLock(t *testing.T) {
 	t.Parallel()
 

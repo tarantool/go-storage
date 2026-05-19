@@ -31,7 +31,16 @@ type dummyLocker struct {
 	mu   sync.Mutex
 	held bool
 	key  string
+	done chan struct{}
 }
+
+//nolint:gochecknoglobals // shared pre-closed channel returned when no acquire has happened.
+var closedDone = func() chan struct{} {
+	ch := make(chan struct{})
+	close(ch)
+
+	return ch
+}()
 
 var _ locker.Locker = (*dummyLocker)(nil)
 
@@ -68,6 +77,7 @@ func (dl *dummyLocker) Lock(ctx context.Context) error {
 		dl.mu.Lock()
 		dl.held = true
 		dl.key = dl.name
+		dl.done = make(chan struct{})
 		dl.mu.Unlock()
 
 		return nil
@@ -106,6 +116,7 @@ func (dl *dummyLocker) TryLock(ctx context.Context) error {
 	dl.mu.Lock()
 	dl.held = true
 	dl.key = dl.name
+	dl.done = make(chan struct{})
 	dl.mu.Unlock()
 
 	return nil
@@ -121,9 +132,21 @@ func (dl *dummyLocker) Unlock(_ context.Context) error {
 
 	dl.held = false
 	dl.key = ""
+	close(dl.done)
 	dl.entry.mu.Unlock()
 
 	return nil
+}
+
+func (dl *dummyLocker) Done() <-chan struct{} {
+	dl.mu.Lock()
+	defer dl.mu.Unlock()
+
+	if dl.done == nil {
+		return closedDone
+	}
+
+	return dl.done
 }
 
 func (dl *dummyLocker) Key() string {

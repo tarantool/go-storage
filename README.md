@@ -260,6 +260,10 @@ single key or a prefix.
 
 `Storage.NewLocker(ctx, name, opts...)` returns a `locker.Locker` backed by the underlying driver — etcd uses `concurrency.Mutex`, TCS layers a "smallest mod_revision wins" protocol over its config-storage primitives, and the dummy driver provides an in-memory implementation suitable for tests. The `ctx` passed to `NewLocker` is the locker-lifetime context: cancelling it stops any keepalive goroutine and aborts a blocking `Lock`. Lock names live in the same key-space as values, so `storage.Prefixed` scopes them under its namespace too.
 
+`locker.Do(ctx, factory, name, fn, opts...)` is the recommended pattern when the lifetime of the lock matches a single function call: it creates the Locker via the supplied `locker.Factory`, acquires it, runs `fn` while the lock is held, and releases the lock on return — even if `fn` errors. Use the manual `Lock`/`Unlock` dance only when the lock must outlive a single function (e.g. leader election).
+
+`locker.Prefixed(prefix, inner)` is the Factory-level counterpart to `storage.Prefixed`: it returns a `locker.Factory` that namespaces every caller-supplied lock name under `prefix`, so a subcomponent can be handed a scoped lock binder without being given the full `Storage`. The same `/`-rooted, no-trailing-slash rules apply as for `storage.Prefixed`.
+
 ```go
 ctx := context.Background()
 
@@ -271,15 +275,13 @@ if err != nil {
 }
 defer cleanup()
 
-lk, err := stor.NewLocker(ctx, "/locks/leader")
+err = locker.Do(ctx, stor.LockerFactory(), "/locks/leader", func(ctx context.Context) error {
+    // critical section
+    return nil
+})
 if err != nil {
     log.Fatal(err)
 }
-
-if err := lk.Lock(ctx); err != nil {
-    log.Fatal(err)
-}
-defer lk.Unlock(ctx)
 ```
 
 #### Data Integrity with Typed Storage
