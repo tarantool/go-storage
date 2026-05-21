@@ -11,6 +11,7 @@ import (
 	storage "github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/internal/mocks"
 	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	txPkg "github.com/tarantool/go-storage/tx"
@@ -31,6 +32,10 @@ type recordingStorage struct {
 	lastWatchKey []byte
 	watchEvents  []watch.Event
 
+	lastLockerName string
+	lockerResp     locker.Locker
+	lockerErr      error
+
 	// Range is exercised through DriverMock (see TestPrefixed_Range), so this
 	// stub does not implement it.
 }
@@ -45,6 +50,15 @@ func (s *recordingStorage) TxFactory() txPkg.Factory {
 
 func (s *recordingStorage) Range(_ context.Context, _ ...storage.RangeOption) ([]kv.KeyValue, error) {
 	panic("recordingStorage.Range: use DriverMock-based tests for Range")
+}
+
+func (s *recordingStorage) NewLocker(_ context.Context, name string, _ ...locker.Option) (locker.Locker, error) {
+	s.lastLockerName = name
+	return s.lockerResp, s.lockerErr
+}
+
+func (s *recordingStorage) LockerFactory() locker.Factory {
+	return s.NewLocker
 }
 
 func (s *recordingStorage) Watch(_ context.Context, key []byte, _ ...watch.Option) <-chan watch.Event {
@@ -99,11 +113,14 @@ func TestPrefixed_RejectsTrailingSlash(t *testing.T) {
 	t.Parallel()
 
 	inner := &recordingStorage{
-		lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
-		txResp:       txPkg.Response{Succeeded: true, Results: nil},
-		txErr:        nil,
-		lastWatchKey: nil,
-		watchEvents:  nil,
+		lastTx:         recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+		txResp:         txPkg.Response{Succeeded: true, Results: nil},
+		txErr:          nil,
+		lastWatchKey:   nil,
+		watchEvents:    nil,
+		lastLockerName: "",
+		lockerResp:     nil,
+		lockerErr:      nil,
 	}
 
 	cases := []string{"/", "/ns/", "/a/b/"}
@@ -122,11 +139,14 @@ func TestPrefixed_RejectsMissingLeadingSlash(t *testing.T) {
 	t.Parallel()
 
 	inner := &recordingStorage{
-		lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
-		txResp:       txPkg.Response{Succeeded: true, Results: nil},
-		txErr:        nil,
-		lastWatchKey: nil,
-		watchEvents:  nil,
+		lastTx:         recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+		txResp:         txPkg.Response{Succeeded: true, Results: nil},
+		txErr:          nil,
+		lastWatchKey:   nil,
+		watchEvents:    nil,
+		lastLockerName: "",
+		lockerResp:     nil,
+		lockerErr:      nil,
 	}
 
 	cases := []string{"ns", "a/b", "ns/"}
@@ -151,7 +171,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Run("Put in Then", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -176,7 +196,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Run("Get in Then", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -200,7 +220,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Run("Delete in Else", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -224,7 +244,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Run("empty prefix is transparent", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -245,7 +265,7 @@ func TestPrefixed_OperationKeyPrefixing(t *testing.T) {
 	t.Run("multiple ops in Then and Else", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -336,7 +356,7 @@ func TestPrefixed_PredicateKeyPrefixing(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			inner := &recordingStorage{
+			inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 				lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 				txResp:       txPkg.Response{Succeeded: true, Results: nil},
 				txErr:        nil,
@@ -465,7 +485,7 @@ func TestPrefixed_Watch(t *testing.T) {
 		// concatKey concatenates raw bytes with no separator: "/test"+"foo"
 		// = "/testfoo". The inner emits an event keyed at the absolute path,
 		// which the wrapper strips back down to "foo" for the caller.
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: false, Results: nil},
 			txErr:        nil,
@@ -493,7 +513,7 @@ func TestPrefixed_Watch(t *testing.T) {
 	t.Run("Watch channel closes when inner channel closes", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: false, Results: nil},
 			txErr:        nil,
@@ -549,7 +569,7 @@ type blockingWatchStorage struct {
 
 func (b *blockingWatchStorage) Tx(_ context.Context) txPkg.Tx {
 	return &recordingTx{
-		rec: &recordingStorage{
+		rec: &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: false, Results: nil},
 			txErr:        nil,
@@ -568,6 +588,14 @@ func (b *blockingWatchStorage) Range(_ context.Context, _ ...storage.RangeOption
 	return nil, nil
 }
 
+func (b *blockingWatchStorage) NewLocker(_ context.Context, _ string, _ ...locker.Option) (locker.Locker, error) {
+	panic("blockingWatchStorage.NewLocker: not implemented in this test helper")
+}
+
+func (b *blockingWatchStorage) LockerFactory() locker.Factory {
+	return b.NewLocker
+}
+
 func (b *blockingWatchStorage) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan watch.Event {
 	return b.ch
 }
@@ -580,7 +608,7 @@ func TestPrefixed_Composition(t *testing.T) {
 	t.Run("flattened at construction: Put lands at combined prefix", func(t *testing.T) {
 		t.Parallel()
 
-		base := &recordingStorage{
+		base := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -602,14 +630,14 @@ func TestPrefixed_Composition(t *testing.T) {
 	t.Run("equivalent to single Prefixed with concatenated prefix", func(t *testing.T) {
 		t.Parallel()
 
-		base1 := &recordingStorage{
+		base1 := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
 			lastWatchKey: nil,
 			watchEvents:  nil,
 		}
-		base2 := &recordingStorage{
+		base2 := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -639,7 +667,7 @@ func TestPrefixed_Composition(t *testing.T) {
 	t.Run("three levels", func(t *testing.T) {
 		t.Parallel()
 
-		base := &recordingStorage{
+		base := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp:       txPkg.Response{Succeeded: true, Results: nil},
 			txErr:        nil,
@@ -658,6 +686,80 @@ func TestPrefixed_Composition(t *testing.T) {
 	})
 }
 
+func TestPrefixed_NewLocker(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	t.Run("lock name is prefixed with the wrapper namespace", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{} //nolint:exhaustruct
+		prefixedStore := mustPrefix(t, "/ns", inner)
+
+		_, err := prefixedStore.NewLocker(ctx, "/lock")
+		require.NoError(t, err)
+
+		assert.Equal(t, "/ns/lock", inner.lastLockerName,
+			"prefixed lock name must be the namespace concatenated with the caller name")
+	})
+
+	t.Run("two wrappers with different prefixes do not collide", func(t *testing.T) {
+		t.Parallel()
+
+		innerA := &recordingStorage{} //nolint:exhaustruct
+		innerB := &recordingStorage{} //nolint:exhaustruct
+
+		_, errA := mustPrefix(t, "/vault-a", innerA).NewLocker(ctx, "/shared")
+		_, errB := mustPrefix(t, "/vault-b", innerB).NewLocker(ctx, "/shared")
+
+		require.NoError(t, errA)
+		require.NoError(t, errB)
+
+		assert.NotEqual(t, innerA.lastLockerName, innerB.lastLockerName,
+			"identical caller names under different prefixes must produce distinct inner names")
+		assert.Equal(t, "/vault-a/shared", innerA.lastLockerName)
+		assert.Equal(t, "/vault-b/shared", innerB.lastLockerName)
+	})
+
+	t.Run("empty prefix is a transparent passthrough", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{} //nolint:exhaustruct
+		prefixedStore := mustPrefix(t, "", inner)
+
+		_, err := prefixedStore.NewLocker(ctx, "/lock")
+		require.NoError(t, err)
+
+		assert.Equal(t, "/lock", inner.lastLockerName)
+	})
+
+	t.Run("nested wrappers compose like Tx prefixes", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{} //nolint:exhaustruct
+		nested := mustPrefix(t, "/a", mustPrefix(t, "/b", inner))
+
+		_, err := nested.NewLocker(ctx, "/lock")
+		require.NoError(t, err)
+
+		assert.Equal(t, "/a/b/lock", inner.lastLockerName,
+			"composed prefixes must concatenate left-to-right with no separator")
+	})
+
+	t.Run("driver error is propagated unchanged", func(t *testing.T) {
+		t.Parallel()
+
+		sentinel := locker.ErrUnsupported
+		inner := &recordingStorage{lockerErr: sentinel} //nolint:exhaustruct
+		prefixedStore := mustPrefix(t, "/ns", inner)
+
+		lk, err := prefixedStore.NewLocker(ctx, "/lock")
+		require.ErrorIs(t, err, sentinel)
+		assert.Nil(t, lk)
+	})
+}
+
 func TestPrefixed_ResultKeyStripping(t *testing.T) {
 	t.Parallel()
 
@@ -668,7 +770,7 @@ func TestPrefixed_ResultKeyStripping(t *testing.T) {
 	t.Run("Tx.Commit Values keys are stripped", func(t *testing.T) {
 		t.Parallel()
 
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx: recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp: txPkg.Response{
 				Succeeded: true,
@@ -707,7 +809,7 @@ func TestPrefixed_ResultKeyStripping(t *testing.T) {
 
 		// If the inner storage returns a key that does not carry the expected
 		// prefix (e.g. a driver bug), the wrapper must not corrupt it.
-		inner := &recordingStorage{
+		inner := &recordingStorage{ //nolint:exhaustruct // intentional zero defaults.
 			lastTx: recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
 			txResp: txPkg.Response{
 				Succeeded: true,
@@ -768,11 +870,14 @@ func TestPrefixed_TxFactory(t *testing.T) {
 		t.Parallel()
 
 		inner := &recordingStorage{
-			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
-			txResp:       txPkg.Response{Succeeded: true, Results: nil},
-			txErr:        nil,
-			lastWatchKey: nil,
-			watchEvents:  nil,
+			lastTx:         recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+			txResp:         txPkg.Response{Succeeded: true, Results: nil},
+			txErr:          nil,
+			lastWatchKey:   nil,
+			watchEvents:    nil,
+			lastLockerName: "",
+			lockerResp:     nil,
+			lockerErr:      nil,
 		}
 		prefixedStore := mustPrefix(t, namespace, inner)
 
@@ -792,11 +897,14 @@ func TestPrefixed_TxFactory(t *testing.T) {
 		t.Parallel()
 
 		inner := &recordingStorage{
-			lastTx:       recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
-			txResp:       txPkg.Response{Succeeded: true, Results: nil},
-			txErr:        nil,
-			lastWatchKey: nil,
-			watchEvents:  nil,
+			lastTx:         recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+			txResp:         txPkg.Response{Succeeded: true, Results: nil},
+			txErr:          nil,
+			lastWatchKey:   nil,
+			watchEvents:    nil,
+			lastLockerName: "",
+			lockerResp:     nil,
+			lockerErr:      nil,
 		}
 
 		// Bind the factory once, then drop the Storage reference. The closure
@@ -813,5 +921,64 @@ func TestPrefixed_TxFactory(t *testing.T) {
 
 		require.Len(t, inner.lastTx.thenOps, 1)
 		assert.Equal(t, []byte(namespace+"key"), inner.lastTx.thenOps[0].Key())
+	})
+}
+
+func TestPrefixed_LockerFactory(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	const namespace = "/ns"
+
+	t.Run("factory rewrites lock names with prefix", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{
+			lastTx:         recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+			txResp:         txPkg.Response{Succeeded: true, Results: nil},
+			txErr:          nil,
+			lastWatchKey:   nil,
+			watchEvents:    nil,
+			lastLockerName: "",
+			lockerResp:     nil,
+			lockerErr:      nil,
+		}
+		prefixedStore := mustPrefix(t, namespace, inner)
+
+		factory := prefixedStore.LockerFactory()
+		require.NotNil(t, factory)
+
+		_, err := factory(ctx, "/lock")
+		require.NoError(t, err)
+
+		assert.Equal(t, namespace+"/lock", inner.lastLockerName)
+	})
+
+	t.Run("factory survives outliving the Storage handle", func(t *testing.T) {
+		t.Parallel()
+
+		inner := &recordingStorage{
+			lastTx:         recordedTxCall{predicates: nil, thenOps: nil, elseOps: nil},
+			txResp:         txPkg.Response{Succeeded: true, Results: nil},
+			txErr:          nil,
+			lastWatchKey:   nil,
+			watchEvents:    nil,
+			lastLockerName: "",
+			lockerResp:     nil,
+			lockerErr:      nil,
+		}
+
+		// Bind the factory once, then drop the Storage reference. The closure
+		// over the receiver must keep the prefix-rewrite path alive.
+		factory := func() locker.Factory {
+			s := mustPrefix(t, namespace, inner)
+			return s.LockerFactory()
+		}()
+
+		_, err := factory(ctx, "/lock")
+		require.NoError(t, err)
+
+		assert.Equal(t, namespace+"/lock", inner.lastLockerName)
 	})
 }

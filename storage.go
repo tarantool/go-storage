@@ -10,6 +10,7 @@ import (
 
 	"github.com/tarantool/go-storage/driver"
 	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	txPkg "github.com/tarantool/go-storage/tx"
@@ -61,6 +62,15 @@ type Storage interface {
 	//   - WithPrefix: filter keys by prefix
 	//   - WithLimit: limit the number of results returned
 	Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error)
+
+	// NewLocker creates a Locker for name. ctx is the locker-lifetime context:
+	// cancelling it stops any keepalive goroutine and aborts a blocking Lock.
+	NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error)
+
+	// LockerFactory returns a locker.Factory bound to this Storage. Use it to
+	// hand "create a lock" capability to components that do not need the full
+	// Storage interface.
+	LockerFactory() locker.Factory
 }
 
 // storageOptions contains configuration options for storage instances.
@@ -89,6 +99,8 @@ func WithRetry() Option {
 type storage struct {
 	driver driver.Driver // Underlying storage driver.
 }
+
+var _ Storage = (*storage)(nil)
 
 // Watch implements the Storage interface for watching key changes.
 func (s storage) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event {
@@ -184,6 +196,20 @@ func (s storage) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue,
 	}
 
 	return kvs, nil
+}
+
+func (s storage) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+	lock, err := s.driver.NewLocker(ctx, name, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("new-locker: %w", err)
+	}
+
+	return lock, nil
+}
+
+// LockerFactory implements the Storage interface for locker-factory creation.
+func (s storage) LockerFactory() locker.Factory {
+	return s.NewLocker
 }
 
 // NewStorage creates a new Storage instance with the specified driver.

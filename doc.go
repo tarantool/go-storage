@@ -3,4 +3,7 @@
 //
 // See the [github.com/tarantool/go-storage/integrity] package for high-level
 // typed storage with automatic hash and signature verification.
+//
+// See the [github.com/tarantool/go-storage/locker] package for the distributed
+// lock interface backed by the same drivers.
 package storage
