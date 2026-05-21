@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	txPkg "github.com/tarantool/go-storage/tx"
@@ -72,6 +73,8 @@ type prefixed struct {
 	inner  Storage
 }
 
+var _ Storage = (*prefixed)(nil)
+
 func (p *prefixed) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event {
 	absKey := concatKey(p.prefix, key)
 	innerCh := p.inner.Watch(ctx, absKey, opts...)
@@ -113,6 +116,27 @@ func (p *prefixed) Tx(ctx context.Context) txPkg.Tx {
 
 func (p *prefixed) TxFactory() txPkg.Factory {
 	return p.Tx
+}
+
+// NewLocker scopes the lock name under the wrapper's prefix so that locks
+// created through different Prefixed wrappers cannot collide. The prefix is
+// concatenated to name with no separator, matching the key-space convention
+// used by Tx and Range — Prefixed("/ns", inner).NewLocker(ctx, "/lock") asks
+// the inner Storage for a lock named "/ns/lock".
+func (p *prefixed) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+	lock, err := p.inner.NewLocker(ctx, string(p.prefix)+name, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("new-locker: %w", err)
+	}
+
+	return lock, nil
+}
+
+// LockerFactory returns a locker.Factory bound to this Prefixed wrapper so the
+// prefix-scoping logic in NewLocker is preserved for callers that only need a
+// lock binder.
+func (p *prefixed) LockerFactory() locker.Factory {
+	return p.NewLocker
 }
 
 func (p *prefixed) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error) {

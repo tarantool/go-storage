@@ -5,6 +5,7 @@ package driver
 import (
 	"context"
 
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
@@ -29,4 +30,8 @@ type Driver interface {
 	// The returned cleanup function should be called to stop the watch and release resources.
 	// An error is returned if the watch could not be established.
 	Watch(ctx context.Context, key []byte, opts ...watch.Option) (<-chan watch.Event, func(), error)
+
+	// NewLocker creates a Locker for name. ctx is the locker-lifetime context:
+	// cancelling it stops any keepalive goroutine and aborts a blocking Lock.
+	NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error)
 }

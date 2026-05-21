@@ -12,6 +12,7 @@ import (
 	"github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/internal/mocks"
 	"github.com/tarantool/go-storage/kv"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
@@ -539,6 +540,105 @@ func TestStorage_Watch(t *testing.T) {
 		}
 
 		mockDriver.MinimockFinish()
+	})
+}
+
+func TestStorage_NewLocker(t *testing.T) {
+	t.Parallel()
+
+	t.Run("delegates to driver and returns locker on success", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		// We use a nil locker.Locker here because the dummy is tested separately;
+		// we only care that Storage.NewLocker calls through to the driver.
+		var driverLocker locker.Locker // nil — just a placeholder for the mock return.
+		mockDriver.NewLockerMock.Expect(ctx, "my-lock").Return(driverLocker, nil)
+
+		lk, err := strg.NewLocker(ctx, "my-lock")
+		require.NoError(t, err)
+		assert.Equal(t, driverLocker, lk)
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("propagates driver error", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		driverErr := errors.New("locker creation failed")
+		mockDriver.NewLockerMock.Expect(ctx, "fail-lock").Return(nil, driverErr)
+
+		lk, err := strg.NewLocker(ctx, "fail-lock")
+		require.Error(t, err)
+		require.ErrorIs(t, err, driverErr)
+		assert.Nil(t, lk)
+
+		mockDriver.MinimockFinish()
+	})
+}
+
+func TestStorage_LockerFactory(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns non-nil factory that produces a Locker", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		var driverLocker locker.Locker // nil — just a placeholder for the mock return.
+		mockDriver.NewLockerMock.Expect(ctx, "my-lock").Return(driverLocker, nil)
+
+		factory := strg.LockerFactory()
+		require.NotNil(t, factory)
+
+		lk, err := factory(ctx, "my-lock")
+		require.NoError(t, err)
+		assert.Equal(t, driverLocker, lk)
+
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("factory routes to driver same as Storage.NewLocker", func(t *testing.T) {
+		t.Parallel()
+
+		ctx := context.Background()
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		var driverLocker locker.Locker
+		// Expect two calls — once via Storage.NewLocker and once via the factory.
+		mockDriver.NewLockerMock.Expect(ctx, "shared").Return(driverLocker, nil)
+
+		lk1, err := strg.NewLocker(ctx, "shared")
+		require.NoError(t, err)
+
+		lk2, err := strg.LockerFactory()(ctx, "shared")
+		require.NoError(t, err)
+
+		assert.Equal(t, lk1, lk2)
+		mockDriver.MinimockFinish()
+	})
+
+	t.Run("Storage.NewLocker method-value satisfies locker.Factory", func(t *testing.T) {
+		t.Parallel()
+
+		mockDriver := mocks.NewDriverMock(t)
+		strg := storage.NewStorage(mockDriver)
+
+		// Compile-time + runtime check: a method value of NewLocker is
+		// assignable to locker.Factory, which is the documented "alternative
+		// way to bind".
+		var factory locker.Factory = strg.NewLocker
+		require.NotNil(t, factory)
 	})
 }
 

@@ -9,6 +9,7 @@ import (
 	mm_time "time"
 
 	"github.com/gojuno/minimock/v3"
+	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
 	"github.com/tarantool/go-storage/tx"
@@ -26,6 +27,13 @@ type DriverMock struct {
 	afterExecuteCounter  uint64
 	beforeExecuteCounter uint64
 	ExecuteMock          mDriverMockExecute
+
+	funcNewLocker          func(ctx context.Context, name string, opts ...locker.Option) (l1 locker.Locker, err error)
+	funcNewLockerOrigin    string
+	inspectFuncNewLocker   func(ctx context.Context, name string, opts ...locker.Option)
+	afterNewLockerCounter  uint64
+	beforeNewLockerCounter uint64
+	NewLockerMock          mDriverMockNewLocker
 
 	funcWatch          func(ctx context.Context, key []byte, opts ...watch.Option) (ch1 <-chan watch.Event, f1 func(), err error)
 	funcWatchOrigin    string
@@ -45,6 +53,9 @@ func NewDriverMock(t minimock.Tester) *DriverMock {
 
 	m.ExecuteMock = mDriverMockExecute{mock: m}
 	m.ExecuteMock.callArgs = []*DriverMockExecuteParams{}
+
+	m.NewLockerMock = mDriverMockNewLocker{mock: m}
+	m.NewLockerMock.callArgs = []*DriverMockNewLockerParams{}
 
 	m.WatchMock = mDriverMockWatch{mock: m}
 	m.WatchMock.callArgs = []*DriverMockWatchParams{}
@@ -459,6 +470,380 @@ func (m *DriverMock) MinimockExecuteInspect() {
 	}
 }
 
+type mDriverMockNewLocker struct {
+	optional           bool
+	mock               *DriverMock
+	defaultExpectation *DriverMockNewLockerExpectation
+	expectations       []*DriverMockNewLockerExpectation
+
+	callArgs []*DriverMockNewLockerParams
+	mutex    sync.RWMutex
+
+	expectedInvocations       uint64
+	expectedInvocationsOrigin string
+}
+
+// DriverMockNewLockerExpectation specifies expectation struct of the Driver.NewLocker
+type DriverMockNewLockerExpectation struct {
+	mock               *DriverMock
+	params             *DriverMockNewLockerParams
+	paramPtrs          *DriverMockNewLockerParamPtrs
+	expectationOrigins DriverMockNewLockerExpectationOrigins
+	results            *DriverMockNewLockerResults
+	returnOrigin       string
+	Counter            uint64
+}
+
+// DriverMockNewLockerParams contains parameters of the Driver.NewLocker
+type DriverMockNewLockerParams struct {
+	ctx  context.Context
+	name string
+	opts []locker.Option
+}
+
+// DriverMockNewLockerParamPtrs contains pointers to parameters of the Driver.NewLocker
+type DriverMockNewLockerParamPtrs struct {
+	ctx  *context.Context
+	name *string
+	opts *[]locker.Option
+}
+
+// DriverMockNewLockerResults contains results of the Driver.NewLocker
+type DriverMockNewLockerResults struct {
+	l1  locker.Locker
+	err error
+}
+
+// DriverMockNewLockerOrigins contains origins of expectations of the Driver.NewLocker
+type DriverMockNewLockerExpectationOrigins struct {
+	origin     string
+	originCtx  string
+	originName string
+	originOpts string
+}
+
+// Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
+// the test will fail minimock's automatic final call check if the mocked method was not called at least once.
+// Optional() makes method check to work in '0 or more' mode.
+// It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
+// catch the problems when the expected method call is totally skipped during test run.
+func (mmNewLocker *mDriverMockNewLocker) Optional() *mDriverMockNewLocker {
+	mmNewLocker.optional = true
+	return mmNewLocker
+}
+
+// Expect sets up expected params for Driver.NewLocker
+func (mmNewLocker *mDriverMockNewLocker) Expect(ctx context.Context, name string, opts ...locker.Option) *mDriverMockNewLocker {
+	if mmNewLocker.mock.funcNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Set")
+	}
+
+	if mmNewLocker.defaultExpectation == nil {
+		mmNewLocker.defaultExpectation = &DriverMockNewLockerExpectation{}
+	}
+
+	if mmNewLocker.defaultExpectation.paramPtrs != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by ExpectParams functions")
+	}
+
+	mmNewLocker.defaultExpectation.params = &DriverMockNewLockerParams{ctx, name, opts}
+	mmNewLocker.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
+	for _, e := range mmNewLocker.expectations {
+		if minimock.Equal(e.params, mmNewLocker.defaultExpectation.params) {
+			mmNewLocker.mock.t.Fatalf("Expectation set by When has same params: %#v", *mmNewLocker.defaultExpectation.params)
+		}
+	}
+
+	return mmNewLocker
+}
+
+// ExpectCtxParam1 sets up expected param ctx for Driver.NewLocker
+func (mmNewLocker *mDriverMockNewLocker) ExpectCtxParam1(ctx context.Context) *mDriverMockNewLocker {
+	if mmNewLocker.mock.funcNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Set")
+	}
+
+	if mmNewLocker.defaultExpectation == nil {
+		mmNewLocker.defaultExpectation = &DriverMockNewLockerExpectation{}
+	}
+
+	if mmNewLocker.defaultExpectation.params != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Expect")
+	}
+
+	if mmNewLocker.defaultExpectation.paramPtrs == nil {
+		mmNewLocker.defaultExpectation.paramPtrs = &DriverMockNewLockerParamPtrs{}
+	}
+	mmNewLocker.defaultExpectation.paramPtrs.ctx = &ctx
+	mmNewLocker.defaultExpectation.expectationOrigins.originCtx = minimock.CallerInfo(1)
+
+	return mmNewLocker
+}
+
+// ExpectNameParam2 sets up expected param name for Driver.NewLocker
+func (mmNewLocker *mDriverMockNewLocker) ExpectNameParam2(name string) *mDriverMockNewLocker {
+	if mmNewLocker.mock.funcNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Set")
+	}
+
+	if mmNewLocker.defaultExpectation == nil {
+		mmNewLocker.defaultExpectation = &DriverMockNewLockerExpectation{}
+	}
+
+	if mmNewLocker.defaultExpectation.params != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Expect")
+	}
+
+	if mmNewLocker.defaultExpectation.paramPtrs == nil {
+		mmNewLocker.defaultExpectation.paramPtrs = &DriverMockNewLockerParamPtrs{}
+	}
+	mmNewLocker.defaultExpectation.paramPtrs.name = &name
+	mmNewLocker.defaultExpectation.expectationOrigins.originName = minimock.CallerInfo(1)
+
+	return mmNewLocker
+}
+
+// ExpectOptsParam3 sets up expected param opts for Driver.NewLocker
+func (mmNewLocker *mDriverMockNewLocker) ExpectOptsParam3(opts ...locker.Option) *mDriverMockNewLocker {
+	if mmNewLocker.mock.funcNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Set")
+	}
+
+	if mmNewLocker.defaultExpectation == nil {
+		mmNewLocker.defaultExpectation = &DriverMockNewLockerExpectation{}
+	}
+
+	if mmNewLocker.defaultExpectation.params != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Expect")
+	}
+
+	if mmNewLocker.defaultExpectation.paramPtrs == nil {
+		mmNewLocker.defaultExpectation.paramPtrs = &DriverMockNewLockerParamPtrs{}
+	}
+	mmNewLocker.defaultExpectation.paramPtrs.opts = &opts
+	mmNewLocker.defaultExpectation.expectationOrigins.originOpts = minimock.CallerInfo(1)
+
+	return mmNewLocker
+}
+
+// Inspect accepts an inspector function that has same arguments as the Driver.NewLocker
+func (mmNewLocker *mDriverMockNewLocker) Inspect(f func(ctx context.Context, name string, opts ...locker.Option)) *mDriverMockNewLocker {
+	if mmNewLocker.mock.inspectFuncNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("Inspect function is already set for DriverMock.NewLocker")
+	}
+
+	mmNewLocker.mock.inspectFuncNewLocker = f
+
+	return mmNewLocker
+}
+
+// Return sets up results that will be returned by Driver.NewLocker
+func (mmNewLocker *mDriverMockNewLocker) Return(l1 locker.Locker, err error) *DriverMock {
+	if mmNewLocker.mock.funcNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Set")
+	}
+
+	if mmNewLocker.defaultExpectation == nil {
+		mmNewLocker.defaultExpectation = &DriverMockNewLockerExpectation{mock: mmNewLocker.mock}
+	}
+	mmNewLocker.defaultExpectation.results = &DriverMockNewLockerResults{l1, err}
+	mmNewLocker.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
+	return mmNewLocker.mock
+}
+
+// Set uses given function f to mock the Driver.NewLocker method
+func (mmNewLocker *mDriverMockNewLocker) Set(f func(ctx context.Context, name string, opts ...locker.Option) (l1 locker.Locker, err error)) *DriverMock {
+	if mmNewLocker.defaultExpectation != nil {
+		mmNewLocker.mock.t.Fatalf("Default expectation is already set for the Driver.NewLocker method")
+	}
+
+	if len(mmNewLocker.expectations) > 0 {
+		mmNewLocker.mock.t.Fatalf("Some expectations are already set for the Driver.NewLocker method")
+	}
+
+	mmNewLocker.mock.funcNewLocker = f
+	mmNewLocker.mock.funcNewLockerOrigin = minimock.CallerInfo(1)
+	return mmNewLocker.mock
+}
+
+// When sets expectation for the Driver.NewLocker which will trigger the result defined by the following
+// Then helper
+func (mmNewLocker *mDriverMockNewLocker) When(ctx context.Context, name string, opts ...locker.Option) *DriverMockNewLockerExpectation {
+	if mmNewLocker.mock.funcNewLocker != nil {
+		mmNewLocker.mock.t.Fatalf("DriverMock.NewLocker mock is already set by Set")
+	}
+
+	expectation := &DriverMockNewLockerExpectation{
+		mock:               mmNewLocker.mock,
+		params:             &DriverMockNewLockerParams{ctx, name, opts},
+		expectationOrigins: DriverMockNewLockerExpectationOrigins{origin: minimock.CallerInfo(1)},
+	}
+	mmNewLocker.expectations = append(mmNewLocker.expectations, expectation)
+	return expectation
+}
+
+// Then sets up Driver.NewLocker return parameters for the expectation previously defined by the When method
+func (e *DriverMockNewLockerExpectation) Then(l1 locker.Locker, err error) *DriverMock {
+	e.results = &DriverMockNewLockerResults{l1, err}
+	return e.mock
+}
+
+// Times sets number of times Driver.NewLocker should be invoked
+func (mmNewLocker *mDriverMockNewLocker) Times(n uint64) *mDriverMockNewLocker {
+	if n == 0 {
+		mmNewLocker.mock.t.Fatalf("Times of DriverMock.NewLocker mock can not be zero")
+	}
+	mm_atomic.StoreUint64(&mmNewLocker.expectedInvocations, n)
+	mmNewLocker.expectedInvocationsOrigin = minimock.CallerInfo(1)
+	return mmNewLocker
+}
+
+func (mmNewLocker *mDriverMockNewLocker) invocationsDone() bool {
+	if len(mmNewLocker.expectations) == 0 && mmNewLocker.defaultExpectation == nil && mmNewLocker.mock.funcNewLocker == nil {
+		return true
+	}
+
+	totalInvocations := mm_atomic.LoadUint64(&mmNewLocker.mock.afterNewLockerCounter)
+	expectedInvocations := mm_atomic.LoadUint64(&mmNewLocker.expectedInvocations)
+
+	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
+}
+
+// NewLocker implements mm_driver.Driver
+func (mmNewLocker *DriverMock) NewLocker(ctx context.Context, name string, opts ...locker.Option) (l1 locker.Locker, err error) {
+	mm_atomic.AddUint64(&mmNewLocker.beforeNewLockerCounter, 1)
+	defer mm_atomic.AddUint64(&mmNewLocker.afterNewLockerCounter, 1)
+
+	mmNewLocker.t.Helper()
+
+	if mmNewLocker.inspectFuncNewLocker != nil {
+		mmNewLocker.inspectFuncNewLocker(ctx, name, opts...)
+	}
+
+	mm_params := DriverMockNewLockerParams{ctx, name, opts}
+
+	// Record call args
+	mmNewLocker.NewLockerMock.mutex.Lock()
+	mmNewLocker.NewLockerMock.callArgs = append(mmNewLocker.NewLockerMock.callArgs, &mm_params)
+	mmNewLocker.NewLockerMock.mutex.Unlock()
+
+	for _, e := range mmNewLocker.NewLockerMock.expectations {
+		if minimock.Equal(*e.params, mm_params) {
+			mm_atomic.AddUint64(&e.Counter, 1)
+			return e.results.l1, e.results.err
+		}
+	}
+
+	if mmNewLocker.NewLockerMock.defaultExpectation != nil {
+		mm_atomic.AddUint64(&mmNewLocker.NewLockerMock.defaultExpectation.Counter, 1)
+		mm_want := mmNewLocker.NewLockerMock.defaultExpectation.params
+		mm_want_ptrs := mmNewLocker.NewLockerMock.defaultExpectation.paramPtrs
+
+		mm_got := DriverMockNewLockerParams{ctx, name, opts}
+
+		if mm_want_ptrs != nil {
+
+			if mm_want_ptrs.ctx != nil && !minimock.Equal(*mm_want_ptrs.ctx, mm_got.ctx) {
+				mmNewLocker.t.Errorf("DriverMock.NewLocker got unexpected parameter ctx, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmNewLocker.NewLockerMock.defaultExpectation.expectationOrigins.originCtx, *mm_want_ptrs.ctx, mm_got.ctx, minimock.Diff(*mm_want_ptrs.ctx, mm_got.ctx))
+			}
+
+			if mm_want_ptrs.name != nil && !minimock.Equal(*mm_want_ptrs.name, mm_got.name) {
+				mmNewLocker.t.Errorf("DriverMock.NewLocker got unexpected parameter name, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmNewLocker.NewLockerMock.defaultExpectation.expectationOrigins.originName, *mm_want_ptrs.name, mm_got.name, minimock.Diff(*mm_want_ptrs.name, mm_got.name))
+			}
+
+			if mm_want_ptrs.opts != nil && !minimock.Equal(*mm_want_ptrs.opts, mm_got.opts) {
+				mmNewLocker.t.Errorf("DriverMock.NewLocker got unexpected parameter opts, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+					mmNewLocker.NewLockerMock.defaultExpectation.expectationOrigins.originOpts, *mm_want_ptrs.opts, mm_got.opts, minimock.Diff(*mm_want_ptrs.opts, mm_got.opts))
+			}
+
+		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
+			mmNewLocker.t.Errorf("DriverMock.NewLocker got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+				mmNewLocker.NewLockerMock.defaultExpectation.expectationOrigins.origin, *mm_want, mm_got, minimock.Diff(*mm_want, mm_got))
+		}
+
+		mm_results := mmNewLocker.NewLockerMock.defaultExpectation.results
+		if mm_results == nil {
+			mmNewLocker.t.Fatal("No results are set for the DriverMock.NewLocker")
+		}
+		return (*mm_results).l1, (*mm_results).err
+	}
+	if mmNewLocker.funcNewLocker != nil {
+		return mmNewLocker.funcNewLocker(ctx, name, opts...)
+	}
+	mmNewLocker.t.Fatalf("Unexpected call to DriverMock.NewLocker. %v %v %v", ctx, name, opts)
+	return
+}
+
+// NewLockerAfterCounter returns a count of finished DriverMock.NewLocker invocations
+func (mmNewLocker *DriverMock) NewLockerAfterCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmNewLocker.afterNewLockerCounter)
+}
+
+// NewLockerBeforeCounter returns a count of DriverMock.NewLocker invocations
+func (mmNewLocker *DriverMock) NewLockerBeforeCounter() uint64 {
+	return mm_atomic.LoadUint64(&mmNewLocker.beforeNewLockerCounter)
+}
+
+// Calls returns a list of arguments used in each call to DriverMock.NewLocker.
+// The list is in the same order as the calls were made (i.e. recent calls have a higher index)
+func (mmNewLocker *mDriverMockNewLocker) Calls() []*DriverMockNewLockerParams {
+	mmNewLocker.mutex.RLock()
+
+	argCopy := make([]*DriverMockNewLockerParams, len(mmNewLocker.callArgs))
+	copy(argCopy, mmNewLocker.callArgs)
+
+	mmNewLocker.mutex.RUnlock()
+
+	return argCopy
+}
+
+// MinimockNewLockerDone returns true if the count of the NewLocker invocations corresponds
+// the number of defined expectations
+func (m *DriverMock) MinimockNewLockerDone() bool {
+	if m.NewLockerMock.optional {
+		// Optional methods provide '0 or more' call count restriction.
+		return true
+	}
+
+	for _, e := range m.NewLockerMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	return m.NewLockerMock.invocationsDone()
+}
+
+// MinimockNewLockerInspect logs each unmet expectation
+func (m *DriverMock) MinimockNewLockerInspect() {
+	for _, e := range m.NewLockerMock.expectations {
+		if mm_atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Errorf("Expected call to DriverMock.NewLocker at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
+		}
+	}
+
+	afterNewLockerCounter := mm_atomic.LoadUint64(&m.afterNewLockerCounter)
+	// if default expectation was set then invocations count should be greater than zero
+	if m.NewLockerMock.defaultExpectation != nil && afterNewLockerCounter < 1 {
+		if m.NewLockerMock.defaultExpectation.params == nil {
+			m.t.Errorf("Expected call to DriverMock.NewLocker at\n%s", m.NewLockerMock.defaultExpectation.returnOrigin)
+		} else {
+			m.t.Errorf("Expected call to DriverMock.NewLocker at\n%s with params: %#v", m.NewLockerMock.defaultExpectation.expectationOrigins.origin, *m.NewLockerMock.defaultExpectation.params)
+		}
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcNewLocker != nil && afterNewLockerCounter < 1 {
+		m.t.Errorf("Expected call to DriverMock.NewLocker at\n%s", m.funcNewLockerOrigin)
+	}
+
+	if !m.NewLockerMock.invocationsDone() && afterNewLockerCounter > 0 {
+		m.t.Errorf("Expected %d calls to DriverMock.NewLocker at\n%s but found %d calls",
+			mm_atomic.LoadUint64(&m.NewLockerMock.expectedInvocations), m.NewLockerMock.expectedInvocationsOrigin, afterNewLockerCounter)
+	}
+}
+
 type mDriverMockWatch struct {
 	optional           bool
 	mock               *DriverMock
@@ -840,6 +1225,8 @@ func (m *DriverMock) MinimockFinish() {
 		if !m.minimockDone() {
 			m.MinimockExecuteInspect()
 
+			m.MinimockNewLockerInspect()
+
 			m.MinimockWatchInspect()
 		}
 	})
@@ -865,5 +1252,6 @@ func (m *DriverMock) minimockDone() bool {
 	done := true
 	return done &&
 		m.MinimockExecuteDone() &&
+		m.MinimockNewLockerDone() &&
 		m.MinimockWatchDone()
 }

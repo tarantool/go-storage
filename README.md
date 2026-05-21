@@ -36,6 +36,7 @@ safety are critical.
   plus multi-key atomic transactions via `Tx`
 - Namespace Scoping: `Prefixed` wrapper that scopes every operation under a
   key prefix
+- Distributed Locks: `Locker` interface for cross-process mutual exclusion, backed by the same drivers (etcd's `concurrency.Mutex`, a TCS "smallest mod_revision wins" protocol, and an in-memory dummy)
 - Key‑Value Operations: Get, Put, Delete with prefix support
 - Range Queries: Efficient scanning of keys with filters
 - Extensible Drivers: Easy to add new storage backends
@@ -211,6 +212,7 @@ The core `Storage` interface (`storage.Storage`) provides high‑level methods:
 - `Watch(ctx, key, opts) <-chan watch.Event` – watch for changes
 - `Tx(ctx) tx.Tx` – create a transaction builder
 - `Range(ctx, opts) ([]kv.KeyValue, error)` – range query with prefix/limit
+- `NewLocker(ctx, name, opts) (locker.Locker, error)` – create a distributed lock bound to this storage
 
 #### Namespace Scoping with `Prefixed`
 
@@ -253,6 +255,32 @@ The `predicate` package provides value and version comparisons:
 #### Watch
 The `watch` package delivers real‑time change events. Watch can be set on a
 single key or a prefix.
+
+#### Distributed Locks
+
+`Storage.NewLocker(ctx, name, opts...)` returns a `locker.Locker` backed by the underlying driver — etcd uses `concurrency.Mutex`, TCS layers a "smallest mod_revision wins" protocol over its config-storage primitives, and the dummy driver provides an in-memory implementation suitable for tests. The `ctx` passed to `NewLocker` is the locker-lifetime context: cancelling it stops any keepalive goroutine and aborts a blocking `Lock`. Lock names live in the same key-space as values, so `storage.Prefixed` scopes them under its namespace too.
+
+```go
+ctx := context.Background()
+
+stor, cleanup, err := connect.NewEtcdStorage(ctx, connect.Config{
+    Endpoints: []string{"localhost:2379"},
+})
+if err != nil {
+    log.Fatal(err)
+}
+defer cleanup()
+
+lk, err := stor.NewLocker(ctx, "/locks/leader")
+if err != nil {
+    log.Fatal(err)
+}
+
+if err := lk.Lock(ctx); err != nil {
+    log.Fatal(err)
+}
+defer lk.Unlock(ctx)
+```
 
 #### Data Integrity with Typed Storage
 The [`integrity`](https://pkg.go.dev/github.com/tarantool/go-storage/integrity)

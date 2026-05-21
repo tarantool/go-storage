@@ -28,6 +28,15 @@ type Locker interface {
 	Key() string
 }
 
+// Factory creates new Lockers bound to a storage instance.
+//
+// It is the lightest "create a lock" surface — bind once via
+// Storage.LockerFactory and pass the resulting Factory around to components
+// that only need to acquire locks, instead of handing out the full Storage.
+// A Storage's NewLocker method satisfies this signature directly, so a
+// Factory can also be obtained as a method value: var f locker.Factory = s.NewLocker.
+type Factory func(ctx context.Context, name string, opts ...Option) (Locker, error)
+
 // Options holds configuration for a Locker instance.
 type Options struct {
 	// TTL bounds how long the backend will hold the lock without a renewal.

@@ -116,3 +116,60 @@ func ExamplePrefixed_predicates() {
 	// Output:
 	// succeeded: true
 }
+
+// ExamplePrefixed_locker shows that Prefixed scopes lock names too:
+// Prefixed("/ns", base).NewLocker(ctx, "/lock") asks the inner Storage for a
+// lock named "/ns/lock", so two wrappers under different namespaces cannot
+// collide on the same logical name.
+func ExamplePrefixed_locker() {
+	ctx := context.Background()
+	base := storage.NewStorage(dummy.New())
+
+	nsA, err := storage.Prefixed("/a", base)
+	if err != nil {
+		log.Fatalf("prefix /a: %v", err)
+	}
+
+	nsB, err := storage.Prefixed("/b", base)
+	if err != nil {
+		log.Fatalf("prefix /b: %v", err)
+	}
+
+	lockA, err := nsA.NewLocker(ctx, "/lock")
+	if err != nil {
+		log.Fatalf("new-locker A: %v", err)
+	}
+
+	lockB, err := nsB.NewLocker(ctx, "/lock")
+	if err != nil {
+		log.Fatalf("new-locker B: %v", err)
+	}
+
+	err = lockA.Lock(ctx)
+	if err != nil {
+		log.Fatalf("lock A: %v", err)
+	}
+
+	// Different namespaces, so B can acquire even while A is held.
+	err = lockB.Lock(ctx)
+	if err != nil {
+		log.Fatalf("lock B: %v", err)
+	}
+
+	fmt.Println("A:", lockA.Key())
+	fmt.Println("B:", lockB.Key())
+
+	err = lockB.Unlock(ctx)
+	if err != nil {
+		log.Fatalf("unlock B: %v", err)
+	}
+
+	err = lockA.Unlock(ctx)
+	if err != nil {
+		log.Fatalf("unlock A: %v", err)
+	}
+
+	// Output:
+	// A: /a/lock
+	// B: /b/lock
+}

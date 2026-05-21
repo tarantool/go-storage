@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- `driver.Driver` and `storage.Storage` interfaces gained a `NewLocker(ctx, name, opts...) (locker.Locker, error)` method backed by a new `locker` package. Minor breaking change for out-of-tree implementers of either interface. The dummy driver ships an in-memory implementation; the etcd driver wires `concurrency.Mutex` and supports `NewLocker` only when the `Client` passed to `etcd.New` is a concrete `*etcd.Client` (the `concurrency` package needs the concrete type which the `Client` interface does not expose); otherwise `NewLocker` returns `locker.ErrUnsupported`. The TCS driver layers a "smallest mod_revision wins" protocol over `config.storage.put`/`keepalive`/`get`/`delete` and requires a TCS schema with both `features.ttl` and `features.keepalive`.
+- `locker.Factory` and `Storage.LockerFactory()`: a lightweight "create a lock" surface for components that do not need the full `Storage` interface. `Prefixed` implements it so factory-issued lockers keep the prefix-rewrite path that scopes lock names under the wrapper's namespace.
+
 ### Fixed
 
 ## [v1.5.0] - 2026-05-15
