@@ -1,10 +1,8 @@
 package etcd_test
 
-// This file provides example tests for the etcd driver using LazyCluster.
-// These examples demonstrate real usage with a running etcd instance.
-//
-// Due to inability to start multiple LazyClusters - we're using one LazyCluster
-// and won't start tests in parallel here.
+// This file provides example tests for the etcd driver using an embedded etcd
+// cluster (see etcdtest). These examples demonstrate real usage with a running
+// etcd instance.
 
 import (
 	"context"
@@ -15,14 +13,13 @@ import (
 	"time"
 
 	etcdclient "go.etcd.io/etcd/client/v3"
-	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 
 	"github.com/tarantool/go-storage/driver/etcd"
 	testingUtils "github.com/tarantool/go-storage/internal/testing"
-	etcdtestingUtils "github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/locker"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
+	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
 )
 
 const (
@@ -34,11 +31,7 @@ const (
 func createEtcdDriver(tb testing.TB) (*etcd.Driver, func()) {
 	tb.Helper()
 
-	etcdfintegration.BeforeTest(etcdtestingUtils.NewSilentTB(tb), etcdfintegration.WithoutGoLeakDetection())
-
-	cluster := etcdtestingUtils.NewLazyCluster()
-
-	tb.Cleanup(func() { cluster.Terminate() })
+	cluster := etcdtest.New(tb, etcdtest.ClusterConfig{Size: 1}) //nolint:exhaustruct
 
 	endpoints := cluster.EndpointsGRPC()
 

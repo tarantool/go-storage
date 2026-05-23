@@ -20,7 +20,6 @@ import (
 	"github.com/tarantool/go-tarantool/v2/pool"
 	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
 	etcdclient "go.etcd.io/etcd/client/v3"
-	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 
 	"github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/crypto"
@@ -30,10 +29,10 @@ import (
 	tcsdriver "github.com/tarantool/go-storage/driver/tcs"
 	"github.com/tarantool/go-storage/hasher"
 	"github.com/tarantool/go-storage/integrity"
-	"github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/marshaller"
 	"github.com/tarantool/go-storage/namer"
 	"github.com/tarantool/go-storage/operation"
+	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
 	"github.com/tarantool/go-storage/watch"
 )
 
@@ -58,6 +57,14 @@ var (
 	rsaPK2048 *rsa.PrivateKey //nolint:gochecknoglobals
 	rsaPK4096 *rsa.PrivateKey //nolint:gochecknoglobals
 )
+
+// sharedEtcdCluster is a single embedded etcd reused across every etcd
+// subtest in this package. Spinning up one cluster per subtest under
+// `-race -count=N` blows past the standard 30-minute test timeout; sharing
+// reduces total cluster boots from N × #tests to one.
+//
+//nolint:gochecknoglobals
+var sharedEtcdCluster *etcdtest.LazyCluster
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -84,11 +91,15 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
+	sharedEtcdCluster = etcdtest.NewLazyCluster(etcdtest.ClusterConfig{Size: 1}) //nolint:exhaustruct
+
 	os.Exit(func() int {
 		defer func() {
 			if haveTCS {
 				tcsInstance.Stop()
 			}
+
+			sharedEtcdCluster.Terminate()
 		}()
 
 		return m.Run()
@@ -103,16 +114,12 @@ func createDummyDriver(_ context.Context, t *testing.T) (driver.Driver, func()) 
 }
 
 // createEtcdTestDriver creates an etcd driver for testing using the integration framework.
+// It reuses the package-wide sharedEtcdCluster; per-test data isolation is the
+// caller's responsibility (tests already cleanup their own keys).
 func createEtcdTestDriver(_ context.Context, t *testing.T) (driver.Driver, func()) {
 	t.Helper()
 
-	etcdfintegration.BeforeTest(etcd.NewSilentTB(t), etcdfintegration.WithoutGoLeakDetection())
-
-	cluster := etcd.NewLazyCluster()
-
-	t.Cleanup(func() { cluster.Terminate() })
-
-	endpoints := cluster.EndpointsGRPC()
+	endpoints := sharedEtcdCluster.EndpointsGRPC()
 
 	client, err := etcdclient.New(etcdclient.Config{
 		Endpoints:   endpoints,

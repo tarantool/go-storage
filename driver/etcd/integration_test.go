@@ -1,8 +1,14 @@
 // Package etcd_test provides integration tests for the etcd driver.
 // These tests require a running etcd instance and test full functionality.
 //
-// Due to inability to start multiple LazyClusters - we're using one LazyCluster
-// and won't start tests in parallel here.
+// All Test* functions share a single embedded etcd cluster started in TestMain
+// (see sharedEtcdCluster); per-test data isolation is achieved by namespacing
+// keys with t.Name(). Sharing one cluster across the whole package avoids the
+// ephemeral-port reservation race that surfaces under -race -count=N and
+// keeps total cluster boots at one per `go test` invocation.
+//
+// Example* functions still use their own per-example cluster because some of
+// them assert on etcd's global ModRevision counter in `// Output:` blocks.
 //
 //nolint:paralleltest
 package etcd_test
@@ -11,7 +17,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -20,13 +28,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tarantool/go-storage/tx"
 	etcdclient "go.etcd.io/etcd/client/v3"
-	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 
 	etcddriver "github.com/tarantool/go-storage/driver/etcd"
-	"github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/kv"
 	"github.com/tarantool/go-storage/operation"
 	"github.com/tarantool/go-storage/predicate"
+	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
 )
 
 const (
@@ -34,7 +41,30 @@ const (
 	testDialTimeout    = 5 * time.Second
 )
 
+// sharedEtcdCluster is a single embedded etcd reused across every Test* in
+// this package. Spinning up one cluster per subtest under `-race -count=N`
+// both blows past the 30-minute CI timeout and racily collides on the
+// ephemeral port snapshot in etcdtest.freeURL. Sharing reduces total cluster
+// boots from N × #tests to one.
+//
+//nolint:gochecknoglobals
+var sharedEtcdCluster *etcdtest.LazyCluster
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+
+	sharedEtcdCluster = etcdtest.NewLazyCluster(etcdtest.ClusterConfig{Size: 1}) //nolint:exhaustruct
+
+	os.Exit(func() int {
+		defer sharedEtcdCluster.Terminate()
+
+		return m.Run()
+	}())
+}
+
 // createTestDriver creates an etcd driver for testing using the integration framework.
+// It reuses the package-wide sharedEtcdCluster; per-test data isolation is
+// the caller's responsibility (tests already namespace their keys by t.Name()).
 // Returns driver and cleanup function for simple test scenarios.
 func createTestDriver(t *testing.T) (*etcddriver.Driver, func()) {
 	t.Helper()
@@ -43,13 +73,7 @@ func createTestDriver(t *testing.T) (*etcddriver.Driver, func()) {
 		t.Skip("skipping integration tests in short mode")
 	}
 
-	etcdfintegration.BeforeTest(etcd.NewSilentTB(t), etcdfintegration.WithoutGoLeakDetection())
-
-	cluster := etcd.NewLazyCluster()
-
-	t.Cleanup(func() { cluster.Terminate() })
-
-	endpoints := cluster.EndpointsGRPC()
+	endpoints := sharedEtcdCluster.EndpointsGRPC()
 
 	client, err := etcdclient.New(etcdclient.Config{
 		Endpoints:   endpoints,
@@ -397,8 +421,7 @@ func TestEtcdDriver_Watch_Prefix(t *testing.T) {
 }
 
 func TestEtcdDriver_Watch_ContextCancellation(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	driver, cleanup := createTestDriver(t)
 	defer cleanup()
@@ -410,12 +433,16 @@ func TestEtcdDriver_Watch_ContextCancellation(t *testing.T) {
 
 	defer cancelWatch()
 
-	// Wait for context cancellation and verify channel is closed.
+	// Cancel the outer context and verify the event channel observes it.
+	// The wait window is generous because the goal is to confirm the channel
+	// closes — not to assert any particular latency.
+	cancel()
+
 	select {
 	case _, ok := <-eventCh:
 		assert.False(t, ok, "Event channel should be closed after context cancellation")
-	case <-time.After(100 * time.Millisecond):
-		assert.Fail(t, "Event channel should be closed immediately after context cancellation")
+	case <-time.After(defaultWaitTimeout):
+		assert.Fail(t, "Event channel should be closed after context cancellation")
 	}
 }
 

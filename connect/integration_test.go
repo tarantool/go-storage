@@ -19,17 +19,23 @@ import (
 	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
 	"go.etcd.io/etcd/client/pkg/v3/transport" //nolint:depguard
 	etcdclient "go.etcd.io/etcd/client/v3"
-	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
-	etcdlazy "go.etcd.io/etcd/tests/v3/integration"
 
 	"github.com/tarantool/go-storage"
 	"github.com/tarantool/go-storage/connect"
-	etcdtesting "github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/operation"
+	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
 )
 
 var haveTCS bool          //nolint:gochecknoglobals
 var tcsEndpoints []string //nolint:gochecknoglobals
+
+// sharedEtcdCluster is a single embedded etcd reused across every non-TLS,
+// non-auth Test* in this package. The auth helper enables AuthEnable globally
+// and TLS tests need TLS-configured listeners, so both keep their own
+// per-test cluster (see createEtcdAuthTestConfig and createEtcdTLSCluster).
+//
+//nolint:gochecknoglobals
+var sharedEtcdCluster *etcdtest.LazyCluster
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -45,15 +51,24 @@ func TestMain(m *testing.M) {
 		tcsEndpoints = tcsInstance.Endpoints()
 	}
 
-	code := m.Run()
+	sharedEtcdCluster = etcdtest.NewLazyCluster(etcdtest.ClusterConfig{Size: 1}) //nolint:exhaustruct
 
-	if haveTCS {
-		tcsInstance.Stop()
-	}
+	os.Exit(func() int {
+		defer func() {
+			if haveTCS {
+				tcsInstance.Stop()
+			}
 
-	os.Exit(code)
+			sharedEtcdCluster.Terminate()
+		}()
+
+		return m.Run()
+	}())
 }
 
+// createEtcdTestConfig returns a connect.Config pointing at sharedEtcdCluster.
+// Per-test data isolation is the caller's responsibility (tests namespace
+// their keys with t.Name()).
 func createEtcdTestConfig(t *testing.T) connect.Config {
 	t.Helper()
 
@@ -61,21 +76,26 @@ func createEtcdTestConfig(t *testing.T) connect.Config {
 		t.Skip("skipping integration tests in short mode")
 	}
 
-	etcdfintegration.BeforeTest(etcdtesting.NewSilentTB(t), etcdfintegration.WithoutGoLeakDetection())
-
-	cluster := etcdtesting.NewLazyCluster()
-
-	t.Cleanup(func() { cluster.Terminate() })
-
 	return connect.Config{ //nolint:exhaustruct
-		Endpoints: cluster.EndpointsGRPC(),
+		Endpoints: sharedEtcdCluster.EndpointsGRPC(),
 	}
 }
 
+// createEtcdAuthTestConfig spins up a dedicated etcd cluster because it
+// enables AuthEnable globally, which would otherwise poison every other test
+// sharing the cluster.
 func createEtcdAuthTestConfig(t *testing.T) connect.Config {
 	t.Helper()
 
-	cfg := createEtcdTestConfig(t)
+	if testing.Short() {
+		t.Skip("skipping integration tests in short mode")
+	}
+
+	cluster := etcdtest.New(t, etcdtest.ClusterConfig{Size: 1}) //nolint:exhaustruct
+
+	cfg := connect.Config{ //nolint:exhaustruct
+		Endpoints: cluster.EndpointsGRPC(),
+	}
 
 	client, err := etcdclient.New(etcdclient.Config{ //nolint:exhaustruct
 		Endpoints:   cfg.Endpoints,
@@ -88,19 +108,19 @@ func createEtcdAuthTestConfig(t *testing.T) connect.Config {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err = client.Auth.UserAdd(ctx, "root", "root")
+	_, err = client.UserAdd(ctx, "root", "root")
 	require.NoError(t, err)
 
-	_, err = client.Auth.UserGrantRole(ctx, "root", "root")
+	_, err = client.UserGrantRole(ctx, "root", "root")
 	require.NoError(t, err)
 
-	_, err = client.Auth.UserAdd(ctx, "client", "secret")
+	_, err = client.UserAdd(ctx, "client", "secret")
 	require.NoError(t, err)
 
-	_, err = client.Auth.UserGrantRole(ctx, "client", "root")
+	_, err = client.UserGrantRole(ctx, "client", "root")
 	require.NoError(t, err)
 
-	_, err = client.Auth.AuthEnable(ctx)
+	_, err = client.AuthEnable(ctx)
 	require.NoError(t, err)
 
 	cfg.Username = "client"
@@ -237,14 +257,12 @@ func tlsDir(t *testing.T) string {
 	return filepath.Join(dir, "testdata", "tls")
 }
 
-func createEtcdTLSCluster(t *testing.T) etcdlazy.LazyCluster {
+func createEtcdTLSCluster(t *testing.T) *etcdtest.Cluster {
 	t.Helper()
 
 	if testing.Short() {
 		t.Skip("skipping integration tests in short mode")
 	}
-
-	etcdfintegration.BeforeTest(etcdtesting.NewSilentTB(t), etcdfintegration.WithoutGoLeakDetection())
 
 	tlsDir := tlsDir(t)
 	peerTLS := &transport.TLSInfo{ //nolint:exhaustruct
@@ -258,18 +276,11 @@ func createEtcdTLSCluster(t *testing.T) etcdlazy.LazyCluster {
 		InsecureSkipVerify: true,
 	}
 
-	cfg := etcdfintegration.ClusterConfig{ //nolint:exhaustruct
+	return etcdtest.New(t, etcdtest.ClusterConfig{
 		Size:      1,
 		PeerTLS:   peerTLS,
 		ClientTLS: clientTLS,
-		UseTCP:    true,
-	}
-
-	cluster := etcdlazy.NewLazyClusterWithConfig(cfg)
-
-	t.Cleanup(func() { cluster.Terminate() })
-
-	return cluster
+	})
 }
 
 func TestNewEtcdStorage_WithTLSCaFile(t *testing.T) {
@@ -423,6 +434,7 @@ func TestNewEtcdStorage_CanceledContext(t *testing.T) {
 
 func TestNewEtcdStorage_InvalidCredentials(t *testing.T) {
 	cfg := createEtcdAuthTestConfig(t)
+
 	cfg.Username = "invalid_user"
 	cfg.Password = "invalid_pass"
 
@@ -557,6 +569,7 @@ func TestNewTCSStorage_HTTPEndpointScheme(t *testing.T) {
 	key := []byte(prefix + "/value")
 
 	_, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit()
+
 	defer func() { _, _ = stor.Tx(ctx).Then(operation.Delete(key)).Commit() }()
 
 	_, err = stor.Tx(ctx).Then(operation.Put(key, []byte("http-scheme-test"))).Commit()
