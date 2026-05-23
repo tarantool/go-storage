@@ -4,7 +4,6 @@
 package connect_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,13 +27,13 @@ func TestNewEtcdStorage_NewLocker(t *testing.T) {
 
 	defer cancel()
 
-	lk, err := stor.NewLocker(ctx, "/"+t.Name()+"/lock")
+	lock, err := stor.NewLocker(ctx, "/"+t.Name()+"/lock")
 	require.NoError(t, err)
-	require.False(t, errors.Is(err, locker.ErrUnsupported),
+	require.NotErrorIs(t, err, locker.ErrUnsupported,
 		"NewEtcdStorage builds the driver with a concrete *etcd.Client, so NewLocker must be supported")
-	assert.NotNil(t, lk)
+	assert.NotNil(t, lock)
 
 	// Acquire and release to confirm the locker is wired correctly.
-	require.NoError(t, lk.Lock(ctx))
-	require.NoError(t, lk.Unlock(ctx))
+	require.NoError(t, lock.Lock(ctx))
+	require.NoError(t, lock.Unlock(ctx))
 }

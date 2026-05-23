@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.golang }}
+          go-version-file: go.mod
 
       - name: run tests, collect code coverage data and send to Coveralls
         env:
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.golang }}
+          go-version-file: go.mod
       - name: run benchmarks
         run:  make bench
 

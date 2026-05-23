@@ -3,6 +3,8 @@ package etcd_test
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,11 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	etcdclient "go.etcd.io/etcd/client/v3"
-	etcdfintegration "go.etcd.io/etcd/tests/v3/framework/integration"
 
 	etcddriver "github.com/tarantool/go-storage/driver/etcd"
 	"github.com/tarantool/go-storage/internal/mocks"
-	"github.com/tarantool/go-storage/internal/testing/etcd"
 	"github.com/tarantool/go-storage/locker"
 )
 
@@ -25,17 +25,27 @@ const (
 	lockerTestTimeout = 30 * time.Second
 )
 
-// testLockName derives a per-test lock name so different tests cannot
-// accidentally interfere via shared etcd keys (each test runs against its
-// own cluster, but a per-test prefix is a cheap belt-and-braces guard).
+// lockerTestSeq guarantees a fresh lock name on every invocation, even when
+// the same test function is re-run under `-count=N` against the shared etcd
+// cluster. t.Name() alone would collide across counts (no `#NN` suffix is
+// added) and leave a previous iteration's contender blocking on a key the
+// next iteration is also trying to acquire.
+//
+//nolint:gochecknoglobals
+var lockerTestSeq atomic.Uint64
+
+// testLockName derives a unique lock name so different tests — and successive
+// runs of the same test under -count=N — cannot interfere via the shared
+// etcd cluster's keyspace.
 func testLockName(t *testing.T) string {
 	t.Helper()
 
-	return "/test/locker/" + t.Name()
+	return fmt.Sprintf("/test/locker/%s/%d", t.Name(), lockerTestSeq.Add(1))
 }
 
 // createTestDriverConcrete builds a Driver from a concrete *etcd.Client
-// (the locker requires the concrete type).
+// (the locker requires the concrete type). It reuses sharedEtcdCluster from
+// integration_test.go.
 func createTestDriverConcrete(t *testing.T) (*etcddriver.Driver, *etcdclient.Client) {
 	t.Helper()
 
@@ -43,13 +53,7 @@ func createTestDriverConcrete(t *testing.T) (*etcddriver.Driver, *etcdclient.Cli
 		t.Skip("skipping integration tests in short mode")
 	}
 
-	etcdfintegration.BeforeTest(etcd.NewSilentTB(t), etcdfintegration.WithoutGoLeakDetection())
-
-	cluster := etcd.NewLazyCluster()
-
-	t.Cleanup(func() { cluster.Terminate() })
-
-	endpoints := cluster.EndpointsGRPC()
+	endpoints := sharedEtcdCluster.EndpointsGRPC()
 
 	client, err := etcdclient.New(etcdclient.Config{ //nolint:exhaustruct
 		Endpoints:   endpoints,

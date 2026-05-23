@@ -267,13 +267,10 @@ func TestDummyLocker_LifeCtxCancellation_AbortsBlockingLock(t *testing.T) {
 		waiters sync.WaitGroup
 		lockErr error
 	)
-	waiters.Add(1)
 
-	go func() {
-		defer waiters.Done()
-
+	waiters.Go(func() {
 		lockErr = lockB.Lock(context.Background())
-	}()
+	})
 
 	time.Sleep(30 * time.Millisecond)
 
