@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -64,26 +63,24 @@ func createEtcdClient(ctx context.Context, cfg Config) (*etcdclient.Client, Clea
 		return nil, nil, fmt.Errorf("%w: %w", errFailedEtcdClient, clientErr)
 	}
 
-	probeErrs := make([]error, 0, len(endpoints))
+	statusCtx, statusCancel := context.WithTimeout(ctx, cfg.dialTimeout())
 
-	for _, endpoint := range endpoints {
-		statusCtx, statusCancel := context.WithTimeout(ctx, cfg.dialTimeout())
+	// MemberList is used as a connection probe: it validates reachability and
+	// (when auth is enabled) credentials, but does not require admin permission
+	// the way Maintenance.Status or Auth.AuthStatus do. WithSerializable avoids
+	// a raft round-trip since we only need to confirm the request reached a server.
+	_, statusErr := client.MemberList(statusCtx, etcdclient.WithSerializable())
 
-		_, statusErr := client.Status(statusCtx, endpoint)
+	statusCancel()
 
-		statusCancel()
-
-		if statusErr == nil {
-			return client, func() { _ = client.Close() }, nil
-		}
-
-		probeErrs = append(probeErrs, fmt.Errorf("%s: %w", endpoint, statusErr))
+	if statusErr == nil {
+		return client, func() { _ = client.Close() }, nil
 	}
 
 	_ = client.Close()
 
 	return nil, nil, fmt.Errorf("%w: failed to connect to %v: %w",
-		errFailedEtcdClient, endpoints, errors.Join(probeErrs...))
+		errFailedEtcdClient, endpoints, statusErr)
 }
 
 func validateSSLConfig(cfg SSLConfig) error {

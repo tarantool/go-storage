@@ -117,7 +117,13 @@ func createEtcdAuthTestConfig(t *testing.T) connect.Config {
 	_, err = client.UserAdd(ctx, "client", "secret")
 	require.NoError(t, err)
 
-	_, err = client.UserGrantRole(ctx, "client", "root")
+	_, err = client.Auth.RoleAdd(ctx, "client")
+	require.NoError(t, err)
+
+	_, err = client.Auth.RoleGrantPermission(ctx, "client", "/prefix/", etcdclient.GetPrefixRangeEnd("/prefix/"), etcdclient.PermissionType(etcdclient.PermReadWrite))
+	require.NoError(t, err)
+
+	_, err = client.Auth.UserGrantRole(ctx, "client", "client")
 	require.NoError(t, err)
 
 	_, err = client.AuthEnable(ctx)
@@ -443,6 +449,15 @@ func TestNewEtcdStorage_InvalidCredentials(t *testing.T) {
 	_, _, err := connect.NewEtcdStorage(ctx, cfg)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "authentication failed, invalid user ID or password")
+}
+
+func TestNewEtcdStorage_ValidCredentials(t *testing.T) {
+	cfg := createEtcdAuthTestConfig(t)
+
+	ctx := context.Background()
+
+	_, _, err := connect.NewEtcdStorage(ctx, cfg)
+	require.NoError(t, err)
 }
 
 func TestNewTCSStorage_CanceledContext(t *testing.T) {

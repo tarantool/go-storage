@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `Get`/`Watch`. Without it, a leading slash was silently stripped by
   the namer and aliased `"/foo"` to `"foo"`, letting a predicate match
   a row no sibling call could see.
+- connect.NewEtcdStorage failed if user has no admin permission.
 
 ## [v1.5.0] - 2026-05-15
 
