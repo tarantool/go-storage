@@ -1,6 +1,8 @@
 package integrity_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"testing"
 
@@ -641,8 +643,11 @@ func TestValidatorValidate_MissingValueKey(t *testing.T) {
 	assert.Equal(t, "my-object", result.Name)
 	assert.True(t, result.Value.IsZero())
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
-	// When there's no value key, the validator still tries to compute hashes on nil data.
-	require.ErrorContains(t, result.Error, "failed to calculate hash")
+	// With a missing value key the body is nil, which now hashes to the
+	// well-defined SHA-256 of the empty input — that does not match the
+	// "some-hash" placeholder, so the validator reports a hash mismatch
+	// rather than the prior "failed to calculate hash" / "data is nil".
+	require.ErrorContains(t, result.Error, "hash mismatch for \"sha256\"")
 }
 
 func TestValidatorValidate_UnmarshalError(t *testing.T) {
@@ -789,4 +794,138 @@ func TestValidatorValidate_SignatureKeyNotFound(t *testing.T) {
 	assert.Equal(t, SimpleStruct{Name: "test", Value: 42}, val)
 	require.ErrorAs(t, result.Error, &integrity.ValidationError{})
 	require.ErrorContains(t, result.Error, "signature \"ecdsa\" not verified (missing)")
+}
+
+// sha256OfEmpty is the SHA-256 digest of the empty bit string. Storage
+// backends round-trip empty values as nil; the hasher must produce this digest
+// for both nil and []byte{} so validation of an empty stored value succeeds.
+var sha256OfEmpty = []byte{ //nolint:gochecknoglobals
+	0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+	0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+	0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+	0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
+}
+
+// TestValidatorValidate_EmptyValue_NilBody pins that the validator computes
+// the hash over a nil body without erroring. Storage backends return nil for
+// stored empty values, and prior to the hasher fix this aggregated to "failed
+// to calculate hash 'sha256': data is nil".
+func TestValidatorValidate_EmptyValue_NilBody(t *testing.T) {
+	t.Parallel()
+
+	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, nil)
+	marshallerInstance := marshaller.NewTypedBytesMarshaller()
+	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
+
+	validator := integrity.NewValidator[[]byte](
+		namerInstance,
+		marshallerInstance,
+		hashers,
+		nil,
+	)
+
+	kvs := []kv.KeyValue{
+		{
+			Key:         []byte("/test/my-object"),
+			Value:       nil, // The shape a real driver returns for an empty stored value.
+			ModRevision: 0,
+		},
+		{
+			Key:         []byte("/test/hashes/sha256/my-object"),
+			Value:       sha256OfEmpty,
+			ModRevision: 0,
+		},
+	}
+
+	results, err := validator.Validate(kvs)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	assert.Equal(t, "my-object", result.Name)
+	require.NoError(t, result.Error, "validator must not surface hash errors on empty body")
+	require.True(t, result.Value.IsSome())
+
+	val, _ := result.Value.Get()
+	assert.Empty(t, val)
+}
+
+// TestValidatorValidate_EmptyValue_EmptyBody is the []byte{} sibling of
+// TestValidatorValidate_EmptyValue_NilBody — some drivers return an empty
+// slice instead of nil, and both must validate cleanly against the same hash.
+func TestValidatorValidate_EmptyValue_EmptyBody(t *testing.T) {
+	t.Parallel()
+
+	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, nil)
+	marshallerInstance := marshaller.NewTypedBytesMarshaller()
+	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
+
+	validator := integrity.NewValidator[[]byte](
+		namerInstance,
+		marshallerInstance,
+		hashers,
+		nil,
+	)
+
+	kvs := []kv.KeyValue{
+		{
+			Key:         []byte("/test/my-object"),
+			Value:       []byte{},
+			ModRevision: 0,
+		},
+		{
+			Key:         []byte("/test/hashes/sha256/my-object"),
+			Value:       sha256OfEmpty,
+			ModRevision: 0,
+		},
+	}
+
+	results, err := validator.Validate(kvs)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	result := results[0]
+	require.NoError(t, result.Error)
+}
+
+// TestValidatorValidate_EmptyValue_WithVerifier covers the signature branch:
+// an empty stored body must verify cleanly against an RSA-PSS signature
+// computed over the same empty input. Mirrors the user-reported reproducer
+// where rsapss aggregated "failed to get hash: data is nil" alongside the
+// sha256 failure.
+func TestValidatorValidate_EmptyValue_WithVerifier(t *testing.T) {
+	t.Parallel()
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+
+	sig, err := signerVerifier.Sign(nil)
+	require.NoError(t, err)
+
+	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{"rsapss"})
+	marshallerInstance := marshaller.NewTypedBytesMarshaller()
+	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
+	verifiers := []crypto.Verifier{signerVerifier}
+
+	validator := integrity.NewValidator[[]byte](
+		namerInstance,
+		marshallerInstance,
+		hashers,
+		verifiers,
+	)
+
+	kvs := []kv.KeyValue{
+		{Key: []byte("/test/my-object"), Value: nil, ModRevision: 0},
+		{Key: []byte("/test/hashes/sha256/my-object"), Value: sha256OfEmpty, ModRevision: 0},
+		{Key: []byte("/test/sig/rsapss/my-object"), Value: sig, ModRevision: 0},
+	}
+
+	results, err := validator.Validate(kvs)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	require.NoError(t, results[0].Error,
+		"signature verification over an empty stored body must succeed")
 }
