@@ -38,15 +38,21 @@ func NewTCSStorage(ctx context.Context, cfg Config) (storage.Storage, CleanupFun
 }
 
 // NewStorage creates a new storage instance by trying to connect to etcd first, then TCS.
-func NewStorage(ctx context.Context, cfg Config) (storage.Storage, CleanupFunc, error) {
-	stor, cleanup, err := NewEtcdStorage(ctx, cfg)
+func NewStorage(_ context.Context, cfg Config) (storage.Storage, CleanupFunc, error) {
+	etcdCtx, etcdCancel := context.WithTimeout(context.Background(), cfg.dialTimeout())
+	defer etcdCancel()
+
+	stor, cleanup, err := NewEtcdStorage(etcdCtx, cfg) //nolint:contextcheck
 	if err == nil {
 		return stor, cleanup, nil
 	}
 
 	etcdErr := err
 
-	stor, cleanup, err = NewTCSStorage(ctx, cfg)
+	tcsCtx, tcsCancel := context.WithTimeout(context.Background(), cfg.dialTimeout())
+	defer tcsCancel()
+
+	stor, cleanup, err = NewTCSStorage(tcsCtx, cfg) //nolint:contextcheck
 	if err == nil {
 		return stor, cleanup, nil
 	}
