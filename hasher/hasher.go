@@ -4,16 +4,17 @@ package hasher
 import (
 	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"hash"
 )
 
-// ErrDataIsNil is returned if the passed data is nil.
-var ErrDataIsNil = errors.New("data is nil")
-
 // Hasher is the interface that storage hashers must implement.
 // It provides low-level operations for hash calculating.
+//
+// Implementations must accept nil and zero-length input and return the
+// well-defined hash of the empty bit string for both. This matters because
+// storage backends round-trip empty values as nil, so a read of a
+// legitimately-empty value must hash without error.
 type Hasher interface {
 	Name() string
 	Hash(data []byte) ([]byte, error)
@@ -37,10 +38,6 @@ func (h *sha256Hasher) Name() string {
 
 // Hash implements Hasher interface.
 func (h *sha256Hasher) Hash(data []byte) ([]byte, error) {
-	if data == nil {
-		return nil, ErrDataIsNil
-	}
-
 	h.hash.Reset()
 
 	n, err := h.hash.Write(data)
@@ -69,10 +66,6 @@ func (h *sha1Hasher) Name() string {
 
 // Hash implements Hasher interface.
 func (h *sha1Hasher) Hash(data []byte) ([]byte, error) {
-	if data == nil {
-		return nil, ErrDataIsNil
-	}
-
 	h.hash.Reset()
 
 	n, err := h.hash.Write(data)

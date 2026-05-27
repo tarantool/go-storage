@@ -15,6 +15,7 @@ import (
 	"github.com/tarantool/go-storage/driver"
 	"github.com/tarantool/go-storage/hasher"
 	"github.com/tarantool/go-storage/integrity"
+	"github.com/tarantool/go-storage/marshaller"
 )
 
 // integrationPrefix returns a per-test storage namespace so concurrent driver
@@ -580,5 +581,90 @@ func TestTxIntegration_AlreadyCommitted(t *testing.T) {
 
 		store := codec.Bind(base)
 		defer cleanupStore(t, store, "once")
+	})
+}
+
+// TestTxIntegration_EmptyValue_RoundTrip pins that an empty stored value is a
+// valid first-class value: writing []byte{} and reading it back must succeed
+// even with a hasher and signer/verifier configured, and without
+// IgnoreVerificationError.
+//
+// Storage backends round-trip empty values as nil, so prior to the hasher fix
+// validation panicked with "data is nil" when computing SHA-256 over the
+// read-back body, and the RSA-PSS verifier failed the same way.
+func TestTxIntegration_EmptyValue_RoundTrip(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		base := scopedStorage(t, driverInstance)
+
+		shaHash := hasher.NewSHA256Hasher()
+		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+
+		codec, err := integrity.NewCodecBuilder[[]byte]().
+			WithObjectLocation("objects").
+			WithMarshaller(marshaller.NewTypedBytesMarshaller()).
+			WithHasher(shaHash).
+			WithSignerVerifier(rsaSV).
+			Build()
+		require.NoError(t, err)
+
+		store := codec.Bind(base)
+		defer cleanupStore(t, store, "all1")
+
+		// Mirror of the reproducer: TxPut with []byte{}, TxGet without
+		// IgnoreVerificationError, then commit. The future must surface a
+		// successful result, not the hash/signature "data is nil" aggregate.
+		txn := integrity.NewTx(base)
+		require.NoError(t, codec.TxPut(txn.Then(), "all1", []byte{}))
+
+		fut := codec.TxGet(txn.Then(), "all1")
+
+		resp, err := txn.Commit(ctx)
+		require.NoError(t, err)
+		require.True(t, resp.Succeeded)
+
+		got, err := fut.Result()
+		require.NoError(t, err, "round-trip of empty value must succeed")
+		require.True(t, got.Value.IsSome())
+
+		val, _ := got.Value.Get()
+		assert.Empty(t, val)
+	})
+}
+
+// TestStoreIntegration_EmptyValue_GetPut covers the same empty-value
+// round-trip via the higher-level Store API (Put then Get), guarding both
+// entry points against future regressions.
+func TestStoreIntegration_EmptyValue_GetPut(t *testing.T) {
+	executeOnStorage(t, func(t *testing.T, driverInstance driver.Driver) {
+		t.Helper()
+
+		ctx := t.Context()
+		base := scopedStorage(t, driverInstance)
+
+		shaHash := hasher.NewSHA256Hasher()
+		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+
+		codec, err := integrity.NewCodecBuilder[[]byte]().
+			WithObjectLocation("objects").
+			WithMarshaller(marshaller.NewTypedBytesMarshaller()).
+			WithHasher(shaHash).
+			WithSignerVerifier(rsaSV).
+			Build()
+		require.NoError(t, err)
+
+		store := codec.Bind(base)
+		defer cleanupStore(t, store, "empty")
+
+		require.NoError(t, store.Put(ctx, "empty", []byte{}))
+
+		got, err := store.Get(ctx, "empty")
+		require.NoError(t, err)
+		require.True(t, got.Value.IsSome())
+
+		val, _ := got.Value.Get()
+		assert.Empty(t, val)
 	})
 }

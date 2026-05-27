@@ -22,6 +22,12 @@ const (
 	// lockerTestTimeout is generous to absorb -race + slow CI overhead on
 	// etcd lease/raft round-trips. It is used both as per-test outer
 	// deadline and as the internal time.After bound for cross-locker waits.
+	//
+	// The outer ctx is started AFTER createTestDriverConcrete so the budget
+	// covers only the actual locker operations, not the embedded etcd
+	// cluster bootstrap — which can take >20s on slow CI runners and would
+	// otherwise eat the whole budget, leaving Unlock to fail at
+	// session.Close→Revoke with "context deadline exceeded".
 	lockerTestTimeout = 30 * time.Second
 )
 
@@ -79,10 +85,10 @@ func createSecondClient(t *testing.T, endpoints []string) *etcdclient.Client {
 }
 
 func TestLocker_AcquireRelease(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
@@ -98,10 +104,10 @@ func TestLocker_AcquireRelease(t *testing.T) {
 }
 
 func TestLocker_ReLock_IsNoOp(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
@@ -112,10 +118,10 @@ func TestLocker_ReLock_IsNoOp(t *testing.T) {
 }
 
 func TestLocker_Unlock_NeverLocked(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
@@ -125,10 +131,10 @@ func TestLocker_Unlock_NeverLocked(t *testing.T) {
 }
 
 func TestLocker_DoubleUnlock(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
@@ -141,16 +147,16 @@ func TestLocker_DoubleUnlock(t *testing.T) {
 }
 
 func TestLocker_Contention(t *testing.T) {
+	driverA, clientA := createTestDriverConcrete(t)
+	endpoints := clientA.Endpoints()
+	clientB := createSecondClient(t, endpoints)
+	driverB := etcddriver.New(clientB)
+
 	// Outer timeout is generous (3x per-op timeout) because the test does
 	// several Lock/Unlock round-trips and an internal time.After wait of
 	// lockerTestTimeout. The point is only to prevent infinite hangs.
 	ctx, cancel := context.WithTimeout(t.Context(), 3*lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driverA, clientA := createTestDriverConcrete(t)
-	endpoints := clientA.Endpoints()
-	clientB := createSecondClient(t, endpoints)
-	driverB := etcddriver.New(clientB)
 
 	lockName := testLockName(t)
 
@@ -187,13 +193,13 @@ func TestLocker_Contention(t *testing.T) {
 }
 
 func TestLocker_TryLock_Contended(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
-	t.Cleanup(cancel)
-
 	driverA, clientA := createTestDriverConcrete(t)
 	endpoints := clientA.Endpoints()
 	clientB := createSecondClient(t, endpoints)
 	driverB := etcddriver.New(clientB)
+
+	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
+	t.Cleanup(cancel)
 
 	lockName := testLockName(t)
 
@@ -212,15 +218,15 @@ func TestLocker_TryLock_Contended(t *testing.T) {
 }
 
 func TestLocker_CtxCancellation_AbortsLock(t *testing.T) {
-	// 3x per-op timeout to cover several Lock/Unlock round-trips plus an
-	// internal time.After(lockerTestTimeout) wait for the C locker.
-	ctx, cancel := context.WithTimeout(t.Context(), 3*lockerTestTimeout)
-	t.Cleanup(cancel)
-
 	driverA, clientA := createTestDriverConcrete(t)
 	endpoints := clientA.Endpoints()
 	clientB := createSecondClient(t, endpoints)
 	driverB := etcddriver.New(clientB)
+
+	// 3x per-op timeout to cover several Lock/Unlock round-trips plus an
+	// internal time.After(lockerTestTimeout) wait for the C locker.
+	ctx, cancel := context.WithTimeout(t.Context(), 3*lockerTestTimeout)
+	t.Cleanup(cancel)
 
 	lockName := testLockName(t)
 
@@ -268,10 +274,10 @@ func TestLocker_CtxCancellation_AbortsLock(t *testing.T) {
 }
 
 func TestLocker_Done_NeverLocked_IsClosed(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
@@ -284,10 +290,10 @@ func TestLocker_Done_NeverLocked_IsClosed(t *testing.T) {
 }
 
 func TestLocker_Done_WhileHeld_IsOpen(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
@@ -303,10 +309,10 @@ func TestLocker_Done_WhileHeld_IsOpen(t *testing.T) {
 }
 
 func TestLocker_Done_ClosedAfterUnlock(t *testing.T) {
+	driver, _ := createTestDriverConcrete(t)
+
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
-
-	driver, _ := createTestDriverConcrete(t)
 
 	lock, err := driver.NewLocker(ctx, testLockName(t))
 	require.NoError(t, err)
