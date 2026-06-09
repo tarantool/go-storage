@@ -9,48 +9,115 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [v1.6.0] - 2026-06-09
+
+This release introduces a new `locker` package providing distributed locking
+across all drivers: `Driver` and `Storage` gain a `NewLocker` method (with
+etcd, TCS, and in-memory dummy implementations), plus `locker.Factory`,
+`Prefixed`, `Do`, and `Done` helpers. It also adds key-prefix support to
+`namer.LayeredNamer` and `integrity.CodecBuilder` (`WithKeyPrefix`) so
+multiple codecs can share one storage in disjoint sub-trees for atomic
+commits, along with new `ValueKey`/`FullKeys` accessors on integrity codecs
+and stores. Includes fixes for name validation, empty-value hashing, and
+etcd connections for non-admin users.
+
+### Added
+
 - namer.LayeredNamer: `WithKeyPrefix(prefix)` option prepends a fixed path
   prefix to every emitted/parsed key. Lets two codecs sit in disjoint
   sub-trees of a single `storage.Storage` so they can be committed atomically
   in one `integrity.Tx` (which cannot span multiple storage handles, the way
   `storage.Prefixed` wrappers can). Validation matches `storage.Prefixed`:
   must start with `/`, must not end with `/`; an empty prefix is a no-op.
-  Returns `namer.ErrKeyPrefixNoLeadingSlash` / `namer.ErrKeyPrefixTrailingSlash`
-  on malformed input; `ParseKey` returns `namer.ErrKeyPrefixMissing` for
-  keys that do not start with the configured prefix.
+  Returns `namer.ErrKeyPrefixNoLeadingSlash` /
+  `namer.ErrKeyPrefixTrailingSlash` on malformed input; `ParseKey` returns
+  `namer.ErrKeyPrefixMissing` for keys that do not start with the configured
+  prefix (#101).
 - integrity.CodecBuilder: `WithKeyPrefix(prefix)` threads the namer option
-  through to the underlying `namer.NewLayeredNamer`, so codecs can be
-  built directly with a prefix without writing a custom
-  `CodecNamerConstructor`.
-- `locker.Do(ctx, f, name, fn, opts...)`: helper that creates a Locker via the supplied `Factory`, acquires it, runs `fn` while the lock is held, and releases the lock on return. `fn`'s error leads any joined Unlock error so `errors.Is` against domain errors works without peeling off lock-machinery wrappers; Unlock always runs after `fn` regardless of `fn`'s result.
-- `locker.Prefixed(prefix, inner)`: Factory-level name-scoping helper that concatenates `prefix` to every caller-supplied lock name before delegating to `inner`, mirroring `storage.Prefixed`'s rewrite convention. Lets a component receive a name-scoped `locker.Factory` without seeing the full `Storage`; an empty prefix is a transparent passthrough, and a non-empty prefix must start with `/` (`ErrPrefixNoLeadingSlash`) and not end with `/` (`ErrPrefixTrailingSlash`).
+  through to the underlying `namer.NewLayeredNamer`, so codecs can be built
+  directly with a prefix without writing a custom `CodecNamerConstructor`
+  (#101).
+- `locker.Do(ctx, f, name, fn, opts...)`: helper that creates a Locker via
+  the supplied `Factory`, acquires it, runs `fn` while the lock is held, and
+  releases the lock on return. `fn`'s error leads any joined Unlock error so
+  `errors.Is` against domain errors works without peeling off lock-machinery
+  wrappers; Unlock always runs after `fn` regardless of `fn`'s result (#104).
+- `locker.Prefixed(prefix, inner)`: Factory-level name-scoping helper that
+  concatenates `prefix` to every caller-supplied lock name before delegating
+  to `inner`, mirroring `storage.Prefixed`'s rewrite convention. Lets a
+  component receive a name-scoped `locker.Factory` without seeing the full
+  `Storage`; an empty prefix is a transparent passthrough, and a non-empty
+  prefix must start with `/` (`ErrPrefixNoLeadingSlash`) and not end with `/`
+  (`ErrPrefixTrailingSlash`) (#104).
 - integrity.Codec: `ValueKey(name)` returns the namer-relative value-layer
   key; `FullKeys(name)` returns every key the codec's namer would emit
-  (value + hashes + signatures), in namer-emitted order. Both reject
-  empty, leading-slash, and trailing-slash names with `ErrInvalidName`,
-  matching the rule applied by `Put`/`Delete`/`Get`/`Watch`.
+  (value + hashes + signatures), in namer-emitted order. Both reject empty,
+  leading-slash, and trailing-slash names with `ErrInvalidName`, matching the
+  rule applied by `Put`/`Delete`/`Get`/`Watch` (#102).
 - integrity.Store: `ValueKey(name)` and `FullKeys(name)` mirror the codec
   methods but return on-disk keys — when the storage is wrapped with
-  `storage.Prefixed`, the wrapper's prefix is prepended.
-- integrity.SingletonStore: no-arg `ValueKey()` and `FullKeys()` delegate
-  to the inner `Store` with the bound name.
-- storage.Prefixer: optional interface implemented by `Prefixed` storages
-  to expose their key prefix. `storage.StoragePrefix(s)` returns the
-  prefix or `nil` for storages that are not wrapped.
+  `storage.Prefixed`, the wrapper's prefix is prepended (#102).
+- integrity.SingletonStore: no-arg `ValueKey()` and `FullKeys()` delegate to
+  the inner `Store` with the bound name (#102).
+- storage.Prefixer: optional interface implemented by `Prefixed` storages to
+  expose their key prefix. `storage.StoragePrefix(s)` returns the prefix or
+  `nil` for storages that are not wrapped (#102).
+- test_helpers/etcd: new public helper package built on
+  `go.etcd.io/etcd/server/v3/embed`, replacing the old `internal/testing/etcd`
+  helper that pulled in conflicting `genproto` and `grpc-middleware` versions
+  and broke module-mode builds. Exposes `New`, `Cluster`, `ClusterConfig`,
+  `EndpointsGRPC`, `EndpointsHTTP`, `Terminate`, and a `LazyCluster` for
+  sharing one embedded cluster across a test suite (#105).
 
 ### Changed
 
-- `driver.Driver` and `storage.Storage` interfaces gained a `NewLocker(ctx, name, opts...) (locker.Locker, error)` method backed by a new `locker` package. Minor breaking change for out-of-tree implementers of either interface. The dummy driver ships an in-memory implementation; the etcd driver wires `concurrency.Mutex` and supports `NewLocker` only when the `Client` passed to `etcd.New` is a concrete `*etcd.Client` (the `concurrency` package needs the concrete type which the `Client` interface does not expose); otherwise `NewLocker` returns `locker.ErrUnsupported`. The TCS driver layers a "smallest mod_revision wins" protocol over `config.storage.put`/`keepalive`/`get`/`delete` and requires a TCS schema with both `features.ttl` and `features.keepalive`. The `Locker` interface also gained a `Done() <-chan struct{}` method that closes when the lock is no longer held — either via `Unlock` or because the backend session was lost (TTL elapsed without renewal, connection dropped, etc.); calling `Done` before any successful acquire returns an already-closed channel. Minor breaking change for out-of-tree `Locker` implementers (same flavor as the original `NewLocker` addition).
-- `locker.Factory` and `Storage.LockerFactory()`: a lightweight "create a lock" surface for components that do not need the full `Storage` interface. `Prefixed` implements it so factory-issued lockers keep the prefix-rewrite path that scopes lock names under the wrapper's namespace. **Breaking change:** `locker.Factory` is now an interface with a `NewLocker(ctx, name, opts...) (Locker, error)` method instead of a function type. `Storage` and the `Prefixed` wrapper already satisfy it via their `NewLocker` method; adapt a bare function with the new `locker.FactoryFunc` (mirrors `http.HandlerFunc`). `locker.Prefixed` composition is now flattened at construction and is outer-first — `locker.Prefixed("/a", locker.Prefixed("/b", inner))` is equivalent to `locker.Prefixed("/a/b", inner)`, matching `storage.Prefixed`.
+- `driver.Driver` and `storage.Storage` interfaces gained a
+  `NewLocker(ctx, name, opts...) (locker.Locker, error)` method backed by a
+  new `locker` package. Minor breaking change for out-of-tree implementers of
+  either interface. The dummy driver ships an in-memory implementation; the
+  etcd driver wires `concurrency.Mutex` and supports `NewLocker` only when the
+  `Client` passed to `etcd.New` is a concrete `*etcd.Client` (the
+  `concurrency` package needs the concrete type which the `Client` interface
+  does not expose); otherwise `NewLocker` returns `locker.ErrUnsupported`. The
+  TCS driver layers a "smallest mod_revision wins" protocol over
+  `config.storage.put`/`keepalive`/`get`/`delete` and requires a TCS schema
+  with both `features.ttl` and `features.keepalive`. The `Locker` interface
+  also gained a `Done() <-chan struct{}` method that closes when the lock is
+  no longer held — either via `Unlock` or because the backend session was lost
+  (TTL elapsed without renewal, connection dropped, etc.); calling `Done`
+  before any successful acquire returns an already-closed channel. Minor
+  breaking change for out-of-tree `Locker` implementers (same flavor as the
+  original `NewLocker` addition) (#103, #98, #99, #100, #104).
+- `locker.Factory` and `Storage.LockerFactory()`: a lightweight "create a
+  lock" surface for components that do not need the full `Storage` interface.
+  `Prefixed` implements it so factory-issued lockers keep the prefix-rewrite
+  path that scopes lock names under the wrapper's namespace. **Breaking
+  change:** `locker.Factory` is now an interface with a
+  `NewLocker(ctx, name, opts...) (Locker, error)` method instead of a function
+  type. `Storage` and the `Prefixed` wrapper already satisfy it via their
+  `NewLocker` method; adapt a bare function with the new `locker.FactoryFunc`
+  (mirrors `http.HandlerFunc`). `locker.Prefixed` composition is now flattened
+  at construction and is outer-first —
+  `locker.Prefixed("/a", locker.Prefixed("/b", inner))` is equivalent to
+  `locker.Prefixed("/a/b", inner)`, matching `storage.Prefixed` (#104).
 
 ### Fixed
 
 - integrity.Codec.BindPredicate now rejects empty, leading-slash, and
   trailing-slash names with `ErrInvalidName`, matching `Put`/`Delete`/
-  `Get`/`Watch`. Without it, a leading slash was silently stripped by
-  the namer and aliased `"/foo"` to `"foo"`, letting a predicate match
-  a row no sibling call could see.
-- connect.NewEtcdStorage failed if user has no admin permission.
+  `Get`/`Watch`. Without it, a leading slash was silently stripped by the
+  namer and aliased `"/foo"` to `"foo"`, letting a predicate match a row no
+  sibling call could see (#102).
+- hasher: nil and empty input now hash to the empty-string digest instead of
+  failing with "data is nil". Storage backends round-trip empty stored values
+  as nil, so reading a legitimately-empty value previously exploded in the
+  SHA-256 hasher and the RSA-PSS verifier, forcing `IgnoreVerificationError()`
+  as the only workaround. The internal-only `ErrDataIsNil` is removed (#107).
+- connect.NewEtcdStorage failed if user has no admin permission (#106).
 
 ## [v1.5.0] - 2026-05-15
 
@@ -304,10 +371,3 @@ The release introduces the initial version of the library.
   operations with Get, Put, Delete, Range, and Watch methods.
 
 ### Fixed
-
-[v1.3.0]: https://github.com/tarantool/go-storage/releases/tag/v1.3.0
-[v1.2.0]: https://github.com/tarantool/go-storage/releases/tag/v1.2.0
-[v1.1.2]: https://github.com/tarantool/go-storage/releases/tag/v1.1.2
-[v1.1.1]: https://github.com/tarantool/go-storage/releases/tag/v1.1.1
-[v1.1.0]: https://github.com/tarantool/go-storage/releases/tag/v1.1.0
-[v1.0.0]: https://github.com/tarantool/go-storage/releases/tag/v1.0.0
