@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/driver/tcs"
-	"github.com/tarantool/go-storage/locker"
+	"github.com/tarantool/go-storage/v2/driver/tcs"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 const lockerTestTTL = 3 * time.Second

@@ -5,7 +5,7 @@ import (
 
 	"github.com/vmihailenco/msgpack/v5"
 
-	goOperation "github.com/tarantool/go-storage/operation"
+	goOperation "github.com/tarantool/go-storage/v2/operation"
 )
 
 // Error definitions for err113 compliance.

@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tarantool/go-tarantool/v2"
 
-	"github.com/tarantool/go-storage/locker"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 var (

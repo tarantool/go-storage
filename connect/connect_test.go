@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/connect"
+	"github.com/tarantool/go-storage/v2/connect"
 )
 
 func TestNewStorage_NoEndpoints(t *testing.T) {

@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/integrity"
-	"github.com/tarantool/go-storage/internal/mocks"
-	"github.com/tarantool/go-storage/namer"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	storagetx "github.com/tarantool/go-storage/tx"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/integrity"
+	"github.com/tarantool/go-storage/v2/internal/mocks"
+	"github.com/tarantool/go-storage/v2/namer"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	storagetx "github.com/tarantool/go-storage/v2/tx"
 )
 
 type txTestValue struct {

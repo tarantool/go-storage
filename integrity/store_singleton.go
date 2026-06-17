@@ -3,9 +3,9 @@ package integrity
 import (
 	"context"
 
-	"github.com/tarantool/go-storage/internal/options"
-	"github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/watch"
+	"github.com/tarantool/go-storage/v2/internal/options"
+	"github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/watch"
 )
 
 // SingletonStore[T] is a Store[T] bound to one fixed name. It is intended for

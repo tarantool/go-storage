@@ -9,7 +9,7 @@ import (
 	"github.com/tarantool/go-tarantool/v2"
 	"github.com/tarantool/go-tarantool/v2/pool"
 
-	tcsdriver "github.com/tarantool/go-storage/driver/tcs"
+	tcsdriver "github.com/tarantool/go-storage/v2/driver/tcs"
 )
 
 func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher, CleanupFunc, error) {

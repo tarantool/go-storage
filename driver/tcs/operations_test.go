@@ -12,7 +12,7 @@ import (
 	"github.com/tarantool/go-iproto"
 	"github.com/vmihailenco/msgpack/v5"
 
-	goOperation "github.com/tarantool/go-storage/operation"
+	goOperation "github.com/tarantool/go-storage/v2/operation"
 )
 
 func logMsgpackAsJSONConvert(t *testing.T, data []byte) {

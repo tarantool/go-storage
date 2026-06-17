@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/driver/tcs"
+	"github.com/tarantool/go-storage/v2/driver/tcs"
 )
 
 func TestEncodingError_Error(t *testing.T) {

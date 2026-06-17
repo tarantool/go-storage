@@ -5,8 +5,8 @@ package tx
 import (
 	"context"
 
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
 )
 
 // Tx represents a transactional interface for atomic operations.

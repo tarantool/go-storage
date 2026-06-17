@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarantool/go-storage/predicate"
+	"github.com/tarantool/go-storage/v2/predicate"
 )
 
 func TestValueNotEqual(t *testing.T) {

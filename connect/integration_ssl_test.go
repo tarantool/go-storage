@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/connect"
+	"github.com/tarantool/go-storage/v2/connect"
 )
 
 func TestNewTCSStorage_SSLEnabled(t *testing.T) {

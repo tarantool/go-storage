@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/v2/namer"
 )
 
 // ExampleNewLayeredNamer demonstrates the default layered key layout:

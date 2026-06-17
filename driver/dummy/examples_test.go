@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/locker"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/locker"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
 )
 
 // ExampleDriver_Execute_simple demonstrates basic Execute operations with the dummy driver.

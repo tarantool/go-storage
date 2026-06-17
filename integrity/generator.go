@@ -1,11 +1,11 @@
 package integrity
 
 import (
-	"github.com/tarantool/go-storage/crypto"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/marshaller"
-	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/v2/crypto"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/kv"
+	"github.com/tarantool/go-storage/v2/marshaller"
+	"github.com/tarantool/go-storage/v2/namer"
 )
 
 // Generator creates integrity-protected key-value pairs for storage.

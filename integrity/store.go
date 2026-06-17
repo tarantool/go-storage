@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/internal/options"
-	"github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/watch"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/internal/options"
+	"github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/watch"
 )
 
 // Store[T] is a Codec[T] bound to a concrete storage.Storage. Each method is

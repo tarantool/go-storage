@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/connect"
-	"github.com/tarantool/go-storage/locker"
+	"github.com/tarantool/go-storage/v2/connect"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 // TestNewEtcdStorage_NewLocker verifies that the Storage returned by

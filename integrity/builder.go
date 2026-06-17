@@ -4,11 +4,11 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/crypto"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/marshaller"
-	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/crypto"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/marshaller"
+	"github.com/tarantool/go-storage/v2/namer"
 )
 
 type NamerConstructor func(prefix string, hashNames []string, sigNames []string) namer.Namer
