@@ -12,9 +12,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tarantool/go-tarantool/v2"
-	"github.com/tarantool/go-tarantool/v2/pool"
-	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
+	"github.com/tarantool/go-tarantool/v3"
+	"github.com/tarantool/go-tarantool/v3/pool"
+	tcshelper "github.com/tarantool/go-tarantool/v3/test_helpers/tcs"
 
 	"github.com/tarantool/go-storage/v2/driver/tcs"
 	"github.com/tarantool/go-storage/v2/operation"
@@ -66,15 +66,16 @@ func createTestDriver(ctx context.Context, t *testing.T) (*tcs.Driver, func()) {
 				Notify:        nil,
 				Handle:        nil,
 				Logger:        nil,
+				Allocator:     nil,
 			},
 		})
 	}
 
-	conn, err := pool.Connect(ctx, instances)
+	conn, err := pool.New(ctx, instances)
 	require.NoError(t, err, "Failed to connect to Tarantool pool")
 
 	// Wrap the pool connection to implement DoerWatcher.
-	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
+	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	return tcs.New(wrapper), func() { _ = wrapper.Close() }
 }
@@ -801,13 +802,20 @@ func TestTCSDriver_GetNonExistentKey(t *testing.T) {
 func TestTCSDriver_ErrConnect(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
+	// Bound pool.New so a misbehaving dial can never hang the whole suite.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	instances := []pool.Instance{
 		{
 			Name: "a",
 			Dialer: &tarantool.NetDialer{
-				Address:  "10.0.0.1:65534",
+				// A loopback port nothing listens on is refused immediately by
+				// the kernel. A non-routable address (e.g. 10.0.0.1) would
+				// instead black-hole the SYN: go-tarantool/v3 dials using the
+				// context rather than Opts.Timeout, so pool.New would block on
+				// the dial until the test timeout instead of failing fast.
+				Address:  "127.0.0.1:1",
 				User:     "client",
 				Password: "secret",
 				RequiredProtocolInfo: tarantool.ProtocolInfo{
@@ -817,9 +825,11 @@ func TestTCSDriver_ErrConnect(t *testing.T) {
 				},
 			},
 			Opts: tarantool.Opts{
-				Timeout:       10 * time.Millisecond,
-				Reconnect:     1,
-				MaxReconnects: 1,
+				Timeout: 10 * time.Millisecond,
+				// Reconnect/MaxReconnects must stay unset: go-tarantool/v3
+				// pool.New rejects instances that set them.
+				Reconnect:     0,
+				MaxReconnects: 0,
 				RateLimit:     0,
 				RLimitAction:  0,
 				Concurrency:   0,
@@ -827,14 +837,15 @@ func TestTCSDriver_ErrConnect(t *testing.T) {
 				Notify:        nil,
 				Handle:        nil,
 				Logger:        nil,
+				Allocator:     nil,
 			},
 		},
 	}
 
-	conn, err := pool.Connect(ctx, instances)
+	conn, err := pool.New(ctx, instances)
 	require.NoError(t, err, "failed to connect to Tarantool pool")
 
-	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
+	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	defer func() { _ = wrapper.Close() }()
 
