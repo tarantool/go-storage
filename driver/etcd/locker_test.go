@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	etcdclient "go.etcd.io/etcd/client/v3"
 
-	etcddriver "github.com/tarantool/go-storage/driver/etcd"
-	"github.com/tarantool/go-storage/internal/mocks"
-	"github.com/tarantool/go-storage/locker"
+	etcddriver "github.com/tarantool/go-storage/v2/driver/etcd"
+	"github.com/tarantool/go-storage/v2/internal/mocks"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 const (

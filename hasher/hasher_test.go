@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/hasher"
+	"github.com/tarantool/go-storage/v2/hasher"
 )
 
 // sha1EmptyHex is the hex-encoded SHA-1 of the empty bit string.

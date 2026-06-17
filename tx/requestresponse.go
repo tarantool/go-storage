@@ -1,6 +1,6 @@
 package tx
 
-import "github.com/tarantool/go-storage/kv"
+import "github.com/tarantool/go-storage/v2/kv"
 
 // RequestResponse represents the response for an individual transaction operation.
 type RequestResponse struct {

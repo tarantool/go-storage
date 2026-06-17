@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/internal/mocks"
-	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/locker"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/tx"
-	"github.com/tarantool/go-storage/watch"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/internal/mocks"
+	"github.com/tarantool/go-storage/v2/kv"
+	"github.com/tarantool/go-storage/v2/locker"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/tx"
+	"github.com/tarantool/go-storage/v2/watch"
 )
 
 func TestStorage_Tx(t *testing.T) {

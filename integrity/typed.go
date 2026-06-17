@@ -10,14 +10,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/internal/options"
-	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/namer"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/tx"
-	"github.com/tarantool/go-storage/watch"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/internal/options"
+	"github.com/tarantool/go-storage/v2/kv"
+	"github.com/tarantool/go-storage/v2/namer"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/tx"
+	"github.com/tarantool/go-storage/v2/watch"
 )
 
 // Typed provides integrity-protected storage operations for typed values.

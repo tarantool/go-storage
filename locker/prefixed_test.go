@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/locker"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 func TestPrefixed_RejectsTrailingSlash(t *testing.T) {

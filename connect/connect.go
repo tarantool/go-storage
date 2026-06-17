@@ -5,9 +5,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tarantool/go-storage"
-	etcddriver "github.com/tarantool/go-storage/driver/etcd"
-	tcsdriver "github.com/tarantool/go-storage/driver/tcs"
+	"github.com/tarantool/go-storage/v2"
+	etcddriver "github.com/tarantool/go-storage/v2/driver/etcd"
+	tcsdriver "github.com/tarantool/go-storage/v2/driver/tcs"
 )
 
 // CleanupFunc is a function type for cleaning up resources.

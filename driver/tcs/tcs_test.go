@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tarantool/go-tarantool/v2"
 
-	"github.com/tarantool/go-storage/driver/tcs"
-	"github.com/tarantool/go-storage/internal/mocks"
-	gsTesting "github.com/tarantool/go-storage/internal/testing"
-	goOperation "github.com/tarantool/go-storage/operation"
-	goPredicate "github.com/tarantool/go-storage/predicate"
+	"github.com/tarantool/go-storage/v2/driver/tcs"
+	"github.com/tarantool/go-storage/v2/internal/mocks"
+	gsTesting "github.com/tarantool/go-storage/v2/internal/testing"
+	goOperation "github.com/tarantool/go-storage/v2/operation"
+	goPredicate "github.com/tarantool/go-storage/v2/predicate"
 )
 
 const (

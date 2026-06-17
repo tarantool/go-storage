@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/v2/namer"
 )
 
 func newPrefixedLayeredNamer(t *testing.T, prefix string, opts ...namer.LayeredOption) namer.Namer {

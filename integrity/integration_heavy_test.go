@@ -12,11 +12,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/crypto"
-	"github.com/tarantool/go-storage/driver"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/integrity"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/crypto"
+	"github.com/tarantool/go-storage/v2/driver"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/integrity"
 )
 
 const (

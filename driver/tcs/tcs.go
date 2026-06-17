@@ -11,11 +11,11 @@ import (
 
 	"github.com/tarantool/go-tarantool/v2"
 
-	"github.com/tarantool/go-storage/driver"
-	goOperation "github.com/tarantool/go-storage/operation"
-	goPredicate "github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/tx"
-	"github.com/tarantool/go-storage/watch"
+	"github.com/tarantool/go-storage/v2/driver"
+	goOperation "github.com/tarantool/go-storage/v2/operation"
+	goPredicate "github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/tx"
+	"github.com/tarantool/go-storage/v2/watch"
 )
 
 const watchEventChannelSize = 16

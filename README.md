@@ -44,7 +44,7 @@ safety are critical.
 ### Installation
 
 ```bash
-go get github.com/tarantool/go-storage
+go get github.com/tarantool/go-storage/v2
 ```
 
 ### Quick Start
@@ -59,8 +59,8 @@ import (
     "log"
 
     "go.etcd.io/etcd/client/v3"
-    "github.com/tarantool/go-storage/driver/etcd"
-    "github.com/tarantool/go-storage/operation"
+    "github.com/tarantool/go-storage/v2/driver/etcd"
+    "github.com/tarantool/go-storage/v2/operation"
 )
 
 func main() {
@@ -97,8 +97,8 @@ import (
     "log"
 
     "github.com/tarantool/go-tarantool/v2"
-    "github.com/tarantool/go-storage/driver/tcs"
-    "github.com/tarantool/go-storage/operation"
+    "github.com/tarantool/go-storage/v2/driver/tcs"
+    "github.com/tarantool/go-storage/v2/operation"
 )
 
 func main() {
@@ -155,7 +155,7 @@ import (
     "context"
     "log"
 
-    "github.com/tarantool/go-storage/connect"
+    "github.com/tarantool/go-storage/v2/connect"
 )
 
 func main() {
@@ -285,7 +285,7 @@ if err != nil {
 ```
 
 #### Data Integrity with Typed Storage
-The [`integrity`](https://pkg.go.dev/github.com/tarantool/go-storage/integrity)
+The [`integrity`](https://pkg.go.dev/github.com/tarantool/go-storage/v2/integrity)
  package provides a high‑level `Typed` interface for storing and retrieving
   values with built‑in integrity protection. It automatically computes hashes
    and signatures (using configurable algorithms) and verifies them on
@@ -303,11 +303,11 @@ import (
     "log"
 
     clientv3 "go.etcd.io/etcd/client/v3"
-    "github.com/tarantool/go-storage"
-    "github.com/tarantool/go-storage/driver/etcd"
-    "github.com/tarantool/go-storage/hasher"
-    "github.com/tarantool/go-storage/crypto"
-    "github.com/tarantool/go-storage/integrity"
+    "github.com/tarantool/go-storage/v2"
+    "github.com/tarantool/go-storage/v2/driver/etcd"
+    "github.com/tarantool/go-storage/v2/hasher"
+    "github.com/tarantool/go-storage/v2/crypto"
+    "github.com/tarantool/go-storage/v2/integrity"
 )
 
 func main() {
@@ -576,8 +576,8 @@ file for guidelines (if present) or open an issue to discuss your ideas.
 
 This project is licensed under the BSD 2‑Clause License – see the [LICENSE](LICENSE) file for details.
 
-[godoc-badge]: https://pkg.go.dev/badge/github.com/tarantool/go-storage.svg
-[godoc-url]: https://pkg.go.dev/github.com/tarantool/go-storage
+[godoc-badge]: https://pkg.go.dev/badge/github.com/tarantool/go-storage/v2.svg
+[godoc-url]: https://pkg.go.dev/github.com/tarantool/go-storage/v2
 [coverage-badge]: https://coveralls.io/repos/github/tarantool/go-storage/badge.svg?branch=master
 [coverage-url]: https://coveralls.io/github/tarantool/go-storage?branch=master
 [telegram-badge]: https://img.shields.io/badge/Telegram-join%20chat-blue.svg
