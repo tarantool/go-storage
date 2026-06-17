@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"sync"
 
-	"github.com/tarantool/go-tarantool/v2"
+	"github.com/tarantool/go-tarantool/v3"
 )
 
 type doerResponse struct {
@@ -58,14 +58,13 @@ func NewMockDoer(t T, responses ...any) *MockDoer {
 
 // Do returns a future with the current response or an error.
 // It saves the current request into MockDoer.Requests.
-func (d *MockDoer) Do(req tarantool.Request) *tarantool.Future {
+func (d *MockDoer) Do(req tarantool.Request) tarantool.Future {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	d.Requests = append(d.Requests, req)
 
 	mockReq := NewMockRequest()
-	fut := tarantool.NewFuture(mockReq)
 
 	if len(d.responses) == 0 {
 		d.t.Fatalf("list of responses is empty")
@@ -73,13 +72,17 @@ func (d *MockDoer) Do(req tarantool.Request) *tarantool.Future {
 
 	response := d.responses[0]
 
+	d.responses = d.responses[1:]
+
 	if response.err != nil {
-		fut.SetError(response.err)
-	} else {
-		_ = fut.SetResponse(response.resp.header, bytes.NewBuffer(response.resp.data))
+		return tarantool.NewFutureWithErr(mockReq, response.err)
 	}
 
-	d.responses = d.responses[1:]
+	fut, err := tarantool.NewFutureWithResponse(mockReq,
+		response.resp.header, bytes.NewBuffer(response.resp.data))
+	if err != nil {
+		d.t.Fatalf("failed to create future from response: %s", err)
+	}
 
 	return fut
 }

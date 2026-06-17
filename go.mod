@@ -7,8 +7,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tarantool/go-iproto v1.1.0
-	github.com/tarantool/go-option v1.0.0
-	github.com/tarantool/go-tarantool/v2 v2.4.1
+	github.com/tarantool/go-option v1.1.0
+	github.com/tarantool/go-tarantool/v3 v3.0.0
 	github.com/tarantool/go-tlsdialer v1.0.2
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	go.etcd.io/etcd/api/v3 v3.6.11
@@ -54,6 +54,7 @@ require (
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/tarantool/go-openssl v1.2.2 // indirect
+	github.com/tarantool/go-tarantool/v2 v2.4.1 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect

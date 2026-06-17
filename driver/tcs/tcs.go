@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tarantool/go-tarantool/v2"
+	"github.com/tarantool/go-tarantool/v3"
 
 	"github.com/tarantool/go-storage/v2/driver"
 	goOperation "github.com/tarantool/go-storage/v2/operation"
@@ -23,7 +23,7 @@ const watchEventChannelSize = 16
 // DoerWatcher is an interface that combines tarantool.Doer and NewWatcher method.
 // tarantool.Connection and pool.ConnectionAdapter implement this interface.
 type DoerWatcher interface {
-	Do(req tarantool.Request) (fut *tarantool.Future)
+	Do(req tarantool.Request) (fut tarantool.Future)
 	NewWatcher(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error)
 }
 

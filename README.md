@@ -96,14 +96,18 @@ import (
     "context"
     "log"
 
-    "github.com/tarantool/go-tarantool/v2"
+    "github.com/tarantool/go-tarantool/v3"
     "github.com/tarantool/go-storage/v2/driver/tcs"
     "github.com/tarantool/go-storage/v2/operation"
 )
 
 func main() {
+    ctx := context.Background()
+
     // Connect to Tarantool.
-    conn, err := tarantool.Connect("localhost:3301", tarantool.Opts{})
+    conn, err := tarantool.Connect(ctx, tarantool.NetDialer{
+        Address: "localhost:3301",
+    }, tarantool.Opts{})
     if err != nil {
         log.Fatal(err)
     }
@@ -113,7 +117,6 @@ func main() {
     driver := tcs.New(conn)
 
     // Execute a transaction.
-    ctx := context.Background()
     resp, err := driver.Execute(ctx, nil, []operation.Operation{
         operation.Put([]byte("/config/app/name"), []byte("MyApp")),
     }, nil)
