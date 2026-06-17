@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/tarantool/go-storage/hasher"
+	"github.com/tarantool/go-storage/v2/hasher"
 )
 
 var (

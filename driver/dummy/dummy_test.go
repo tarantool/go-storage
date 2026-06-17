@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/tx"
 )
 
 const (

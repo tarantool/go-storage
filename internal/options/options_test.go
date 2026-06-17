@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarantool/go-storage/internal/options"
+	"github.com/tarantool/go-storage/v2/internal/options"
 )
 
 func zero[T any]() (out T) { return } //nolint:nonamedreturns

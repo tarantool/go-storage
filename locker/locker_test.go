@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/locker"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 func TestApplyOptions_DefaultTTL(t *testing.T) {

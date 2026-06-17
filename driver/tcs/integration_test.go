@@ -16,10 +16,10 @@ import (
 	"github.com/tarantool/go-tarantool/v2/pool"
 	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
 
-	"github.com/tarantool/go-storage/driver/tcs"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/v2/driver/tcs"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/tx"
 )
 
 var (

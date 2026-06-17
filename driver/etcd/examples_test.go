@@ -14,12 +14,12 @@ import (
 
 	etcdclient "go.etcd.io/etcd/client/v3"
 
-	"github.com/tarantool/go-storage/driver/etcd"
-	testingUtils "github.com/tarantool/go-storage/internal/testing"
-	"github.com/tarantool/go-storage/locker"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
+	"github.com/tarantool/go-storage/v2/driver/etcd"
+	testingUtils "github.com/tarantool/go-storage/v2/internal/testing"
+	"github.com/tarantool/go-storage/v2/locker"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	etcdtest "github.com/tarantool/go-storage/v2/test_helpers/etcd"
 )
 
 const (

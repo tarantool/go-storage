@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/integrity"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/integrity"
 )
 
 type authConfig struct {

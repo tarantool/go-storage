@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tarantool/go-option"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/crypto"
-	"github.com/tarantool/go-storage/driver"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/integrity"
-	"github.com/tarantool/go-storage/marshaller"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/crypto"
+	"github.com/tarantool/go-storage/v2/driver"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/integrity"
+	"github.com/tarantool/go-storage/v2/marshaller"
 )
 
 // integrationPrefix returns a per-test storage namespace so concurrent driver

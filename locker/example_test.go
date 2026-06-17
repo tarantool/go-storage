@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/locker"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 // Example shows the basic Lock/Unlock cycle of a locker obtained through

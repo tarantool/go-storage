@@ -3,10 +3,10 @@ package tcs
 import (
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/tarantool/go-storage/kv"
-	goOperation "github.com/tarantool/go-storage/operation"
-	goPredicate "github.com/tarantool/go-storage/predicate"
-	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/v2/kv"
+	goOperation "github.com/tarantool/go-storage/v2/operation"
+	goPredicate "github.com/tarantool/go-storage/v2/predicate"
+	"github.com/tarantool/go-storage/v2/tx"
 )
 
 type txnOpResponse struct {

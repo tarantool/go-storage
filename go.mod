@@ -1,4 +1,4 @@
-module github.com/tarantool/go-storage
+module github.com/tarantool/go-storage/v2
 
 go 1.25.0
 

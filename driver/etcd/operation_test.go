@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/v2/operation"
 )
 
 func TestOperationsToEtcdOps(t *testing.T) {

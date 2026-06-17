@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/driver/dummy"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/driver/dummy"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
 )
 
 // ExamplePrefixed shows how Prefixed scopes every Tx operation under a

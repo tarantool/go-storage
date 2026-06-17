@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+## [v2.0.0]
+
+This is the first `v2` release. It bumps the Go module path to carry the
+required `/v2` major-version suffix and contains **no source-level API
+changes**: every package, type, function, and method keeps the same name and
+signature as in `v1.6.0`. Upgrading is a mechanical rewrite of import paths.
+See [MIGRATION.md](MIGRATION.md) for the step-by-step guide.
+
+### Changed
+
+- **BREAKING:** the module path is now
+  `github.com/tarantool/go-storage/v2` (was
+  `github.com/tarantool/go-storage`), per the Go module major-version rules.
+  Update every `go-storage` import to add the `/v2` suffix and run
+  `go get github.com/tarantool/go-storage/v2@latest`. No other code changes are
+  required. The minimum Go version is unchanged (`1.25`).
+
 ## [v1.6.0] - 2026-06-09
 
 This release introduces a new `locker` package providing distributed locking

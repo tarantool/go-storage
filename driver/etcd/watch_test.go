@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/internal/mocks"
+	"github.com/tarantool/go-storage/v2/internal/mocks"
 )
 
 func TestDriver_Watch_CancelClosesEventChannel(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 
 	etcd "go.etcd.io/etcd/client/v3"
 
-	"github.com/tarantool/go-storage/predicate"
+	"github.com/tarantool/go-storage/v2/predicate"
 )
 
 // predicatesToCmps converts a predicate list to an etcd comparison list.

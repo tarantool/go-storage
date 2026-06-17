@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarantool/go-storage/namer"
+	"github.com/tarantool/go-storage/v2/namer"
 )
 
 func TestInvalidNameError_Error(t *testing.T) {

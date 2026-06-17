@@ -5,7 +5,7 @@ import (
 
 	etcd "go.etcd.io/etcd/client/v3"
 
-	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/v2/operation"
 )
 
 // operationsToEtcdOps converts operations to etcd operations.

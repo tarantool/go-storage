@@ -20,10 +20,10 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/transport" //nolint:depguard
 	etcdclient "go.etcd.io/etcd/client/v3"
 
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/connect"
-	"github.com/tarantool/go-storage/operation"
-	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/connect"
+	"github.com/tarantool/go-storage/v2/operation"
+	etcdtest "github.com/tarantool/go-storage/v2/test_helpers/etcd"
 )
 
 var haveTCS bool          //nolint:gochecknoglobals

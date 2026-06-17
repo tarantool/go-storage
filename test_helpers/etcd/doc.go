@@ -4,7 +4,7 @@
 // Importers are expected to alias the package to etcdtest to disambiguate it
 // from sibling packages named etcd (notably driver/etcd):
 //
-//	import etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
+//	import etcdtest "github.com/tarantool/go-storage/v2/test_helpers/etcd"
 //
 // The helper is backed by go.etcd.io/etcd/server/v3/embed (the etcd server
 // library) rather than go.etcd.io/etcd/tests/v3. The test framework drags in a

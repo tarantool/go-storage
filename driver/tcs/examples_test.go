@@ -9,11 +9,11 @@ import (
 
 	"github.com/tarantool/go-tarantool/v2"
 
-	"github.com/tarantool/go-storage/driver/tcs"
-	gsTesting "github.com/tarantool/go-storage/internal/testing"
-	"github.com/tarantool/go-storage/locker"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
+	"github.com/tarantool/go-storage/v2/driver/tcs"
+	gsTesting "github.com/tarantool/go-storage/v2/internal/testing"
+	"github.com/tarantool/go-storage/v2/locker"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
 )
 
 func newResponse(success bool, data [][]any) *gsTesting.MockResponse {
