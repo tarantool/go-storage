@@ -16,7 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
+	tcshelper "github.com/tarantool/go-tarantool/v3/test_helpers/tcs"
 	"go.etcd.io/etcd/client/pkg/v3/transport" //nolint:depguard
 	etcdclient "go.etcd.io/etcd/client/v3"
 

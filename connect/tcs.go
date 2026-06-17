@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tarantool/go-tarantool/v2"
-	"github.com/tarantool/go-tarantool/v2/pool"
+	"github.com/tarantool/go-tarantool/v3"
+	"github.com/tarantool/go-tarantool/v3/pool"
 
 	tcsdriver "github.com/tarantool/go-storage/v2/driver/tcs"
 )
@@ -43,19 +43,19 @@ func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher
 	// Probe the connections to ensure that we have at least one working connection.
 	//
 	// Go-tarantool pool doesn't return connection failures, just logs it.
-	// Check go-tarantool/v2@v2.4.1/pool/connection_pool.go:200,
+	// Check go-tarantool/v3@v3.0.0/pool/pool.go,
 	// So we need to check it ourselves.
 	err = probeTCSEndpoints(ctx, cfg, instances)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	conn, connErr := pool.Connect(ctx, instances)
+	conn, connErr := pool.New(ctx, instances)
 	if connErr != nil {
 		return nil, nil, fmt.Errorf("%w: %w", errFailedTarantool, connErr)
 	}
 
-	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
+	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	return wrapper, func() { _ = wrapper.Close() }, nil
 }

@@ -98,10 +98,12 @@ github.com/tarantool/go-iproto v1.1.0 h1:HULVOIHsiehI+FnHfM7wMDntuzUddO09DKqu2Wn
 github.com/tarantool/go-iproto v1.1.0/go.mod h1:LNCtdyZxojUed8SbOiYHoc3v9NvaZTB7p96hUySMlIo=
 github.com/tarantool/go-openssl v1.2.2 h1:GaGMNsa68ZqoNgrMF7Ke4s9+tXGfc5ulfCUm3/Jb7/k=
 github.com/tarantool/go-openssl v1.2.2/go.mod h1:EwX1pKIGypLxkY49vKIIR4LTT+94DhKiunCqU2gEzLQ=
-github.com/tarantool/go-option v1.0.0 h1:+Etw0i3TjsXvADTo5rfZNCfsXe3BfHOs+iVfIrl0Nlo=
-github.com/tarantool/go-option v1.0.0/go.mod h1:lXzzeZtL+rPUtLOCDP6ny3FemFBjruG9aHKzNN2bS08=
+github.com/tarantool/go-option v1.1.0 h1:ShoOhNsdL41sRpm4hXCRDjV8H0WzPkd4UnKhLKbW//w=
+github.com/tarantool/go-option v1.1.0/go.mod h1:hMr9z2JXOWlgdCBpCPSL2nwp8718GKYvNBJ+ZuzJbCo=
 github.com/tarantool/go-tarantool/v2 v2.4.1 h1:Bk9mh+gMPVmHTSefHvVBpEkf6P2UZA/8xa5kqgyQtyo=
 github.com/tarantool/go-tarantool/v2 v2.4.1/go.mod h1:MTbhdjFc3Jl63Lgi/UJr5D+QbT+QegqOzsNJGmaw7VM=
+github.com/tarantool/go-tarantool/v3 v3.0.0 h1:zsIXS4nvSSXqZWtN/f1Bfuq973j6J85O5U/8RYQCRcE=
+github.com/tarantool/go-tarantool/v3 v3.0.0/go.mod h1:TXxLWhUCgdxXFfelnTSkq+goKRTRj660zxq4/WXPe8k=
 github.com/tarantool/go-tlsdialer v1.0.2 h1:TiOkihvC2ufLbOqJcJLuQ9I7W5bsZtmnT7KHF/t8n4s=
 github.com/tarantool/go-tlsdialer v1.0.2/go.mod h1:ztE9J5oh4YzNQkSqlpjA0OkY89zHy/BiJJbbSFm+IiQ=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 h1:uruHq4dN7GR16kFc5fp3d1RIYzJW5onx8Ybykw2YQFA=

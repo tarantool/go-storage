@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/tarantool/go-iproto"
-	"github.com/tarantool/go-tarantool/v2"
+	"github.com/tarantool/go-tarantool/v3"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -31,13 +31,6 @@ func (req *MockRequest) Async() bool {
 // Body fills an msgpack.Encoder with the watch request body.
 func (req *MockRequest) Body(_ tarantool.SchemaResolver, _ *msgpack.Encoder) error {
 	return nil
-}
-
-// Conn returns the Connection object the request belongs to.
-func (req *MockRequest) Conn() *tarantool.Connection {
-	return &tarantool.Connection{
-		Greeting: nil,
-	}
 }
 
 // Ctx returns a context of the MockRequest.

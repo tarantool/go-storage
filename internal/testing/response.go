@@ -6,7 +6,7 @@ import (
 
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/tarantool/go-tarantool/v2"
+	"github.com/tarantool/go-tarantool/v3"
 )
 
 // MockResponse is a mock response used for testing purposes.
@@ -57,6 +57,10 @@ func CreateMockResponse(header tarantool.Header, body io.Reader) (*MockResponse,
 func (resp *MockResponse) Header() tarantool.Header {
 	return resp.header
 }
+
+// Release is a no-op for the MockResponse; it satisfies the tarantool.Response
+// interface, which uses Release to return pooled buffers in real responses.
+func (resp *MockResponse) Release() {}
 
 // Decode returns the result of decoding the response data as slice.
 func (resp *MockResponse) Decode() ([]any, error) {
