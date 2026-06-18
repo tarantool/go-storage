@@ -11,24 +11,24 @@ import (
 
 func newUnnamedNamer(
 	t *testing.T,
-	hashLocs []namer.LayeredHashLocation,
-	sigLocs []namer.LayeredSigLocation,
-	opts ...namer.LayeredOption,
+	hashLocs []namer.HashLocation,
+	sigLocs []namer.SigLocation,
+	opts ...namer.Option,
 ) namer.Namer {
 	t.Helper()
 
-	n, err := namer.NewLayeredNamer(namer.ObjectLocationMissing, hashLocs, sigLocs, opts...)
+	n, err := namer.New(namer.ObjectLocationMissing, hashLocs, sigLocs, opts...)
 	require.NoError(t, err)
 
 	return n
 }
 
-func TestUnnamedLayeredNamer_GenerateNames(t *testing.T) {
+func TestUnnamedNamer_GenerateNames(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	keys, err := nmr.GenerateNames("alice")
@@ -48,12 +48,12 @@ func TestUnnamedLayeredNamer_GenerateNames(t *testing.T) {
 	assert.Equal(t, "ed25519", keys[2].Property())
 }
 
-func TestUnnamedLayeredNamer_GenerateNames_RejectsReservedFirstSegment(t *testing.T) {
+func TestUnnamedNamer_GenerateNames_RejectsReservedFirstSegment(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	cases := []string{"hashes", "sig", "hashes/foo", "sig/bar/baz"}
@@ -72,7 +72,7 @@ func TestUnnamedLayeredNamer_GenerateNames_RejectsReservedFirstSegment(t *testin
 	}
 }
 
-func TestUnnamedLayeredNamer_GenerateNames_AcceptsNonReservedNames(t *testing.T) {
+func TestUnnamedNamer_GenerateNames_AcceptsNonReservedNames(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t, nil, nil)
@@ -84,7 +84,7 @@ func TestUnnamedLayeredNamer_GenerateNames_AcceptsNonReservedNames(t *testing.T)
 	}
 }
 
-func TestUnnamedLayeredNamer_ParseKey_Value(t *testing.T) {
+func TestUnnamedNamer_ParseKey_Value(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t, nil, nil)
@@ -100,12 +100,12 @@ func TestUnnamedLayeredNamer_ParseKey_Value(t *testing.T) {
 	assert.Equal(t, namer.KeyTypeValue, parsed.Type())
 }
 
-func TestUnnamedLayeredNamer_ParseKey_HashAndSig(t *testing.T) {
+func TestUnnamedNamer_ParseKey_HashAndSig(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	parsed, err := nmr.ParseKey("/hashes/sha256/alice")
@@ -121,12 +121,12 @@ func TestUnnamedLayeredNamer_ParseKey_HashAndSig(t *testing.T) {
 	assert.Equal(t, "ed25519", parsed.Property())
 }
 
-func TestUnnamedLayeredNamer_ParseKey_Errors(t *testing.T) {
+func TestUnnamedNamer_ParseKey_Errors(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	cases := []string{
@@ -150,12 +150,12 @@ func TestUnnamedLayeredNamer_ParseKey_Errors(t *testing.T) {
 	}
 }
 
-func TestUnnamedLayeredNamer_RoundTrip(t *testing.T) {
+func TestUnnamedNamer_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	for _, name := range []string{"alice", "users/bob", "deeply/nested/name"} {
@@ -172,7 +172,7 @@ func TestUnnamedLayeredNamer_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestUnnamedLayeredNamer_Prefix(t *testing.T) {
+func TestUnnamedNamer_Prefix(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t, nil, nil)
@@ -184,12 +184,12 @@ func TestUnnamedLayeredNamer_Prefix(t *testing.T) {
 	assert.Equal(t, "/alice", nmr.Prefix("/alice/", false))
 }
 
-func TestUnnamedLayeredNamer_Compact(t *testing.T) {
+func TestUnnamedNamer_Compact(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.CompactSingleHash(),
 		namer.CompactSingleSig(),
 	)
@@ -210,12 +210,12 @@ func TestUnnamedLayeredNamer_Compact(t *testing.T) {
 	}
 }
 
-func TestUnnamedLayeredNamer_Compact_ParseErrors(t *testing.T) {
+func TestUnnamedNamer_Compact_ParseErrors(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.CompactSingleHash(),
 		namer.CompactSingleSig(),
 	)
@@ -233,12 +233,12 @@ func TestUnnamedLayeredNamer_Compact_ParseErrors(t *testing.T) {
 	}
 }
 
-func TestUnnamedLayeredNamer_Prefixes(t *testing.T) {
+func TestUnnamedNamer_Prefixes(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	// Unnamed-mode roots: value at "/", hash at "/hashes/<loc>/", sig at "/sig/<loc>/".
@@ -252,12 +252,12 @@ func TestUnnamedLayeredNamer_Prefixes(t *testing.T) {
 	assert.Equal(t, []string{"/alice/", "/hashes/sha256/alice/", "/sig/ed25519/alice/"}, prefixes)
 }
 
-func TestUnnamedLayeredNamer_Compact_Prefixes(t *testing.T) {
+func TestUnnamedNamer_Compact_Prefixes(t *testing.T) {
 	t.Parallel()
 
 	nmr := newUnnamedNamer(t,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.CompactSingleHash(),
 		namer.CompactSingleSig(),
 	)

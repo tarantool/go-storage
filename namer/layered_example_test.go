@@ -7,16 +7,16 @@ import (
 	"github.com/tarantool/go-storage/v2/namer"
 )
 
-// ExampleNewLayeredNamer demonstrates the default layered key layout:
+// ExampleNew demonstrates the default layered key layout:
 //
 //	/<obj>/<name>                       (value)
 //	/hashes/<hashLoc>/<obj>/<name>        (one per hasher)
 //	/sig/<sigLoc>/<obj>/<name>          (one per signer)
-func ExampleNewLayeredNamer() {
-	layered, err := namer.NewLayeredNamer(
+func ExampleNew() {
+	layered, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "rsa", Location: "rsa"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "rsa", Location: "rsa"}},
 	)
 	if err != nil {
 		log.Fatalf("new namer: %v", err)
@@ -40,9 +40,9 @@ func ExampleNewLayeredNamer() {
 // ExampleCompactSingleHash shows the compact hash layout, which drops the
 // per-hasher segment when exactly one hasher is configured.
 func ExampleCompactSingleHash() {
-	layered, err := namer.NewLayeredNamer(
+	layered, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 		namer.CompactSingleHash(),
 	)
@@ -67,10 +67,10 @@ func ExampleCompactSingleHash() {
 // ExampleCompactSingleSig shows the compact sig layout, which drops the
 // per-signer segment when exactly one signer is configured.
 func ExampleCompactSingleSig() {
-	layered, err := namer.NewLayeredNamer(
+	layered, err := namer.New(
 		"objects",
 		nil,
-		[]namer.LayeredSigLocation{{SignerName: "rsapss", Location: "rsapss"}},
+		[]namer.SigLocation{{SignerName: "rsapss", Location: "rsapss"}},
 		namer.CompactSingleSig(),
 	)
 	if err != nil {
@@ -94,10 +94,10 @@ func ExampleCompactSingleSig() {
 // ExampleLegacyHashSigLayout shows the legacy product layout: hash and sig
 // keys drop the objectLocation segment while value keys keep it.
 func ExampleLegacyHashSigLayout() {
-	layered, err := namer.NewLayeredNamer(
+	layered, err := namer.New(
 		"config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.LegacyHashSigLayout(),
 	)
 	if err != nil {
@@ -119,12 +119,12 @@ func ExampleLegacyHashSigLayout() {
 	// KeyTypeSignature -> /sig/ed25519/all
 }
 
-// ExampleNewLayeredNamer_parse shows how ParseKey resolves a raw key path
+// ExampleNew_parse shows how ParseKey resolves a raw key path
 // back into its category and object name.
-func ExampleNewLayeredNamer_parse() {
-	layered, err := namer.NewLayeredNamer(
+func ExampleNew_parse() {
+	layered, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 	)
 	if err != nil {
@@ -148,10 +148,10 @@ func ExampleNewLayeredNamer_parse() {
 	// KeyTypeHash name=alice property="sha256"
 }
 
-// ExampleNewLayeredNamer_prefix shows the prefix used to walk all values
+// ExampleNew_prefix shows the prefix used to walk all values
 // under the value layer (hashes/sigs are separate sub-trees).
-func ExampleNewLayeredNamer_prefix() {
-	layered, err := namer.NewLayeredNamer("objects", nil, nil)
+func ExampleNew_prefix() {
+	layered, err := namer.New("objects", nil, nil)
 	if err != nil {
 		log.Fatalf("new namer: %v", err)
 	}
