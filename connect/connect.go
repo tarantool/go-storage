@@ -37,8 +37,10 @@ func NewTCSStorage(ctx context.Context, cfg Config) (storage.Storage, CleanupFun
 	return storage.NewStorage(drv), cleanup, nil
 }
 
-// NewStorage creates a new storage instance by trying to connect to etcd first, then TCS.
-func NewStorage(ctx context.Context, cfg Config) (storage.Storage, CleanupFunc, error) {
+// Connect creates a storage instance by probing backends: it tries etcd first,
+// then falls back to TCS. For a specific backend use NewEtcdStorage or
+// NewTCSStorage directly.
+func Connect(ctx context.Context, cfg Config) (storage.Storage, CleanupFunc, error) {
 	stor, cleanup, err := NewEtcdStorage(ctx, cfg)
 	if err == nil {
 		return stor, cleanup, nil
