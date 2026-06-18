@@ -9,15 +9,15 @@ import (
 	"github.com/tarantool/go-storage/v2/namer"
 )
 
-func newPrefixedLayeredNamer(t *testing.T, prefix string, opts ...namer.LayeredOption) namer.Namer {
+func newPrefixedNamer(t *testing.T, prefix string, opts ...namer.Option) namer.Namer {
 	t.Helper()
 
-	allOpts := append([]namer.LayeredOption{namer.WithKeyPrefix(prefix)}, opts...)
+	allOpts := append([]namer.Option{namer.WithKeyPrefix(prefix)}, opts...)
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		allOpts...,
 	)
 	require.NoError(t, err)
@@ -25,7 +25,7 @@ func newPrefixedLayeredNamer(t *testing.T, prefix string, opts ...namer.LayeredO
 	return layeredN
 }
 
-func TestLayeredNamer_WithKeyPrefix_Validation(t *testing.T) {
+func TestNamer_WithKeyPrefix_Validation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -45,7 +45,7 @@ func TestLayeredNamer_WithKeyPrefix_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := namer.NewLayeredNamer(
+			_, err := namer.New(
 				"objects",
 				nil,
 				nil,
@@ -62,10 +62,10 @@ func TestLayeredNamer_WithKeyPrefix_Validation(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_GenerateNames(t *testing.T) {
+func TestNamer_WithKeyPrefix_GenerateNames(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)
@@ -82,10 +82,10 @@ func TestLayeredNamer_WithKeyPrefix_GenerateNames(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_MultiSegment(t *testing.T) {
+func TestNamer_WithKeyPrefix_MultiSegment(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/tenant/acme")
+	layeredN := newPrefixedNamer(t, "/tenant/acme")
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)
@@ -95,10 +95,10 @@ func TestLayeredNamer_WithKeyPrefix_MultiSegment(t *testing.T) {
 	assert.Equal(t, "/tenant/acme/sig/ed25519/objects/alice", keys[2].Build())
 }
 
-func TestLayeredNamer_WithKeyPrefix_ParseRoundTrip(t *testing.T) {
+func TestNamer_WithKeyPrefix_ParseRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)
@@ -113,19 +113,19 @@ func TestLayeredNamer_WithKeyPrefix_ParseRoundTrip(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_ParseKey_MissingPrefix(t *testing.T) {
+func TestNamer_WithKeyPrefix_ParseKey_MissingPrefix(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	_, err := layeredN.ParseKey("/objects/alice")
 	require.ErrorIs(t, err, namer.ErrKeyPrefixMissing)
 }
 
-func TestLayeredNamer_WithKeyPrefix_Prefixes(t *testing.T) {
+func TestNamer_WithKeyPrefix_Prefixes(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	got := layeredN.Prefixes("", false)
 	expected := []string{
@@ -144,22 +144,22 @@ func TestLayeredNamer_WithKeyPrefix_Prefixes(t *testing.T) {
 	assert.Equal(t, expectedWithVal, gotWithVal)
 }
 
-func TestLayeredNamer_WithKeyPrefix_Prefix(t *testing.T) {
+func TestNamer_WithKeyPrefix_Prefix(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	assert.Equal(t, "/p/objects/", layeredN.Prefix("", false))
 	assert.Equal(t, "/p/objects/alice", layeredN.Prefix("alice", false))
 	assert.Equal(t, "/p/objects/alice/", layeredN.Prefix("alice", true))
 }
 
-func TestLayeredNamer_WithKeyPrefix_UnnamedMode(t *testing.T) {
+func TestNamer_WithKeyPrefix_UnnamedMode(t *testing.T) {
 	t.Parallel()
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		namer.ObjectLocationMissing,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 		namer.WithKeyPrefix("/p"),
 	)
@@ -178,10 +178,10 @@ func TestLayeredNamer_WithKeyPrefix_UnnamedMode(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_Legacy(t *testing.T) {
+func TestNamer_WithKeyPrefix_Legacy(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p", namer.LegacyHashSigLayout())
+	layeredN := newPrefixedNamer(t, "/p", namer.LegacyHashSigLayout())
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)
@@ -191,13 +191,13 @@ func TestLayeredNamer_WithKeyPrefix_Legacy(t *testing.T) {
 	assert.Equal(t, "/p/sig/ed25519/alice", keys[2].Build())
 }
 
-func TestLayeredNamer_WithKeyPrefix_Compact(t *testing.T) {
+func TestNamer_WithKeyPrefix_Compact(t *testing.T) {
 	t.Parallel()
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.WithKeyPrefix("/p"),
 		namer.CompactSingleHash(),
 		namer.CompactSingleSig(),
@@ -219,20 +219,20 @@ func TestLayeredNamer_WithKeyPrefix_Compact(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_EmptyIsNoop(t *testing.T) {
+func TestNamer_WithKeyPrefix_EmptyIsNoop(t *testing.T) {
 	t.Parallel()
 
-	withEmpty, err := namer.NewLayeredNamer(
+	withEmpty, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 		namer.WithKeyPrefix(""),
 	)
 	require.NoError(t, err)
 
-	without, err := namer.NewLayeredNamer(
+	without, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 	)
 	require.NoError(t, err)
@@ -250,15 +250,15 @@ func TestLayeredNamer_WithKeyPrefix_EmptyIsNoop(t *testing.T) {
 	}
 }
 
-// TestLayeredNamer_WithKeyPrefix_ParseKey_SiblingPrefixRejected guards against
+// TestNamer_WithKeyPrefix_ParseKey_SiblingPrefixRejected guards against
 // a subtle confused-prefix bug: prefix "/p" must not falsely match keys under
 // a sibling prefix such as "/pp/..." just because "/p" is a string prefix of
 // "/pp". The check must require the configured prefix to be followed by '/'
 // (or the end of the key).
-func TestLayeredNamer_WithKeyPrefix_ParseKey_SiblingPrefixRejected(t *testing.T) {
+func TestNamer_WithKeyPrefix_ParseKey_SiblingPrefixRejected(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	cases := []string{
 		"/pp/objects/alice",
@@ -272,12 +272,12 @@ func TestLayeredNamer_WithKeyPrefix_ParseKey_SiblingPrefixRejected(t *testing.T)
 	}
 }
 
-// TestLayeredNamer_WithKeyPrefix_OverlapsObjectLocation checks that a keyPrefix
+// TestNamer_WithKeyPrefix_OverlapsObjectLocation checks that a keyPrefix
 // textually overlapping the objectLocation does not corrupt the residual
 // ParseKey validates: the prefix is stripped up to a '/' boundary, so the
 // following objectLocation segment is matched independently and the round-trip
 // stays exact.
-func TestLayeredNamer_WithKeyPrefix_OverlapsObjectLocation(t *testing.T) {
+func TestNamer_WithKeyPrefix_OverlapsObjectLocation(t *testing.T) {
 	t.Parallel()
 
 	prefixes := []string{
@@ -290,7 +290,7 @@ func TestLayeredNamer_WithKeyPrefix_OverlapsObjectLocation(t *testing.T) {
 		t.Run(prefix, func(t *testing.T) {
 			t.Parallel()
 
-			layeredN := newPrefixedLayeredNamer(t, prefix)
+			layeredN := newPrefixedNamer(t, prefix)
 
 			keys, err := layeredN.GenerateNames("alice")
 			require.NoError(t, err)
@@ -310,16 +310,16 @@ func TestLayeredNamer_WithKeyPrefix_OverlapsObjectLocation(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_MultipleHashersAndSigners(t *testing.T) {
+func TestNamer_WithKeyPrefix_MultipleHashersAndSigners(t *testing.T) {
 	t.Parallel()
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{
+		[]namer.HashLocation{
 			{HasherName: "sha256", Location: "sha256"},
 			{HasherName: "blake3", Location: "blake3"},
 		},
-		[]namer.LayeredSigLocation{
+		[]namer.SigLocation{
 			{SignerName: "ed25519", Location: "ed25519"},
 			{SignerName: "rsa", Location: "rsa"},
 		},
@@ -351,10 +351,10 @@ func TestLayeredNamer_WithKeyPrefix_MultipleHashersAndSigners(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_WithKeyPrefix_ParseKeys_GroupsByName(t *testing.T) {
+func TestNamer_WithKeyPrefix_ParseKeys_GroupsByName(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newPrefixedLayeredNamer(t, "/p")
+	layeredN := newPrefixedNamer(t, "/p")
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)

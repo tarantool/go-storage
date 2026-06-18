@@ -12,15 +12,15 @@ import (
 func newLegacyNamer(
 	t *testing.T,
 	objectLocation string,
-	hashLocs []namer.LayeredHashLocation,
-	sigLocs []namer.LayeredSigLocation,
-	extra ...namer.LayeredOption,
+	hashLocs []namer.HashLocation,
+	sigLocs []namer.SigLocation,
+	extra ...namer.Option,
 ) namer.Namer {
 	t.Helper()
 
-	opts := append([]namer.LayeredOption{namer.LegacyHashSigLayout()}, extra...)
+	opts := append([]namer.Option{namer.LegacyHashSigLayout()}, extra...)
 
-	n, err := namer.NewLayeredNamer(objectLocation, hashLocs, sigLocs, opts...)
+	n, err := namer.New(objectLocation, hashLocs, sigLocs, opts...)
 	require.NoError(t, err)
 
 	return n
@@ -30,8 +30,8 @@ func TestLegacyLayout_GenerateNames(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	keys, err := nmr.GenerateNames("all")
@@ -55,7 +55,7 @@ func TestLegacyLayout_MultiSegmentObjectLocation(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "settings/ldap",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 	)
 
@@ -71,7 +71,7 @@ func TestLegacyLayout_CompactSingleHash(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 		namer.CompactSingleHash(),
 	)
@@ -88,7 +88,7 @@ func TestLegacyLayout_CompactSingleSig(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config", nil,
-		[]namer.LayeredSigLocation{{SignerName: "rsa", Location: "rsa"}},
+		[]namer.SigLocation{{SignerName: "rsa", Location: "rsa"}},
 		namer.CompactSingleSig(),
 	)
 
@@ -104,8 +104,8 @@ func TestLegacyLayout_ParseKey(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	cases := []struct {
@@ -136,7 +136,7 @@ func TestLegacyLayout_ParseKey_NamesMayContainSlashes(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil,
 	)
 
@@ -153,8 +153,8 @@ func TestLegacyLayout_RoundTrip(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	keys, err := nmr.GenerateNames("alice")
@@ -173,8 +173,8 @@ func TestLegacyLayout_Prefixes(t *testing.T) {
 	t.Parallel()
 
 	nmr := newLegacyNamer(t, "config",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
 	got := nmr.Prefixes("", false)
@@ -198,13 +198,13 @@ func TestLegacyLayout_UnnamedIsNoop(t *testing.T) {
 	// In unnamed mode the layout already omits objectLocation; the legacy
 	// option has no effect.
 	legacy := newLegacyNamer(t, namer.ObjectLocationMissing,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 
-	plain, err := namer.NewLayeredNamer(namer.ObjectLocationMissing,
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+	plain, err := namer.New(namer.ObjectLocationMissing,
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 	require.NoError(t, err)
 
