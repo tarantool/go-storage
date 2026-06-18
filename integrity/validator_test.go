@@ -14,7 +14,6 @@ import (
 	"github.com/tarantool/go-storage/v2/integrity"
 	"github.com/tarantool/go-storage/v2/kv"
 	"github.com/tarantool/go-storage/v2/marshaller"
-	"github.com/tarantool/go-storage/v2/namer"
 )
 
 type mockVerifier struct {
@@ -44,8 +43,8 @@ func (m *mockTypedMarshaller[T]) Unmarshal(_ []byte) (T, error) {
 func TestValidatorValidate_Success(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{"rsa"})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{"rsa"})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 	verifiers := []crypto.Verifier{&mockVerifier{name: "rsa", verifyErr: nil}}
@@ -67,7 +66,7 @@ func TestValidatorValidate_Success(t *testing.T) {
 			ModRevision: expectedModRevision,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/my-object"),
+			Key: []byte("/hashes/sha256/test/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -75,7 +74,7 @@ func TestValidatorValidate_Success(t *testing.T) {
 			ModRevision: expectedModRevision,
 		},
 		{
-			Key:         []byte("/test/sig/rsa/my-object"),
+			Key:         []byte("/sig/rsa/test/my-object"),
 			Value:       []byte("mock-signature-rsa"),
 			ModRevision: expectedModRevision,
 		},
@@ -98,8 +97,8 @@ func TestValidatorValidate_Success(t *testing.T) {
 func TestValidatorValidate_MissingHash(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -116,7 +115,7 @@ func TestValidatorValidate_MissingHash(t *testing.T) {
 			Value:       []byte("name: test\nvalue: 42\n"),
 			ModRevision: 0,
 		},
-		// Missing hash key: /test/hashes/sha256/my-object.
+		// Missing hash key: /hashes/sha256/test/my-object.
 	}
 
 	// Should fail because sha256 hash is expected but missing.
@@ -138,8 +137,8 @@ func TestValidatorValidate_MissingHash(t *testing.T) {
 func TestValidatorValidate_HashMismatch(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -157,7 +156,7 @@ func TestValidatorValidate_HashMismatch(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hashes/sha256/my-object"),
+			Key:         []byte("/hashes/sha256/test/my-object"),
 			Value:       []byte("corrupted-hash"), // Wrong hash.
 			ModRevision: 0,
 		},
@@ -181,8 +180,8 @@ func TestValidatorValidate_HashMismatch(t *testing.T) {
 func TestValidatorValidate_MultipleObjects(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -201,7 +200,7 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/object1"),
+			Key: []byte("/hashes/sha256/test/object1"),
 			Value: []byte{
 				0xf3, 0x88, 0x82, 0x49, 0x59, 0x8f, 0xbf, 0x4e, 0xcd, 0x8a, 0x47, 0x7a, 0x6b, 0xc3, 0x83, 0xe9, 0xa8,
 				0x8f, 0x6c, 0x13, 0xd7, 0x2a, 0x44, 0x86, 0xba, 0x6d, 0xe4, 0xf0, 0xbe, 0x7d, 0x18, 0xa9,
@@ -215,7 +214,7 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/object2"),
+			Key: []byte("/hashes/sha256/test/object2"),
 			Value: []byte{
 				0x1c, 0x47, 0x13, 0x01, 0xf9, 0x1b, 0x97, 0x9e, 0xa2, 0x92, 0x3e, 0xd2, 0x95, 0x67, 0x46, 0x6c, 0xad,
 				0x09, 0x7d, 0xc6, 0x33, 0xb4, 0x10, 0xac, 0x9d, 0x88, 0xdb, 0xc8, 0xf2, 0xb2, 0x3f, 0x7b,
@@ -260,8 +259,8 @@ func TestValidatorValidate_MultipleObjects(t *testing.T) {
 func TestValidatorValidate_PartialSuccess(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -280,7 +279,7 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/object1"),
+			Key: []byte("/hashes/sha256/test/object1"),
 			Value: []byte{
 				0xf3, 0x88, 0x82, 0x49, 0x59, 0x8f, 0xbf, 0x4e, 0xcd, 0x8a, 0x47, 0x7a, 0x6b, 0xc3, 0x83, 0xe9, 0xa8,
 				0x8f, 0x6c, 0x13, 0xd7, 0x2a, 0x44, 0x86, 0xba, 0x6d, 0xe4, 0xf0, 0xbe, 0x7d, 0x18, 0xa9,
@@ -294,7 +293,7 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hashes/sha256/object2"),
+			Key:         []byte("/hashes/sha256/test/object2"),
 			Value:       []byte("corrupted-hash"), // Wrong hash.
 			ModRevision: 0,
 		},
@@ -339,8 +338,8 @@ func TestValidatorValidate_PartialSuccess(t *testing.T) {
 func TestValidatorValidate_MissingSignature(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{}, []string{"rsa"})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{}, []string{"rsa"})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	verifiers := []crypto.Verifier{&mockVerifier{name: "rsa", verifyErr: nil}}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -357,7 +356,7 @@ func TestValidatorValidate_MissingSignature(t *testing.T) {
 			Value:       []byte("name: test\nvalue: 42\n"),
 			ModRevision: 0,
 		},
-		// Missing signature key: /test/sig/rsa/my-object .
+		// Missing signature key: /sig/rsa/test/my-object .
 	}
 
 	// Should fail because rsa signature is expected but missing.
@@ -379,8 +378,8 @@ func TestValidatorValidate_MissingSignature(t *testing.T) {
 func TestValidatorValidate_SignatureVerificationError(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{}, []string{"rsa"})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{}, []string{"rsa"})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 
 	// Create verifier that returns error.
 	verifiers := []crypto.Verifier{&mockVerifier{name: "rsa", verifyErr: assert.AnError}}
@@ -399,7 +398,7 @@ func TestValidatorValidate_SignatureVerificationError(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/sig/rsa/my-object"),
+			Key:         []byte("/sig/rsa/test/my-object"),
 			Value:       []byte("mock-signature-rsa"),
 			ModRevision: 0,
 		},
@@ -424,8 +423,8 @@ func TestValidatorValidate_SignatureVerificationError(t *testing.T) {
 func TestValidatorValidate_HashComputationError(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 
 	// Validate with failing hasher.
 	failingHashers := []hasher.Hasher{newMockHasherWithError("sha256", "hash computation failed")}
@@ -444,7 +443,7 @@ func TestValidatorValidate_HashComputationError(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/my-object"),
+			Key: []byte("/hashes/sha256/test/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -472,8 +471,8 @@ func TestValidatorValidate_HashComputationError(t *testing.T) {
 func TestValidatorValidate_EmptyKVs(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -492,8 +491,8 @@ func TestValidatorValidate_EmptyKVs(t *testing.T) {
 func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256", "sha1"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256", "sha1"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 
 	// Validator only has sha256 hasher, not sha1.
 	validatorHashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
@@ -512,7 +511,7 @@ func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/my-object"),
+			Key: []byte("/hashes/sha256/test/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -520,7 +519,7 @@ func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hashes/sha1/my-object"),
+			Key:         []byte("/hashes/sha1/test/my-object"),
 			Value:       []byte("mock-sha1-hash"),
 			ModRevision: 0,
 		},
@@ -544,8 +543,8 @@ func TestValidatorValidate_HasherNotAvailable(t *testing.T) {
 func TestValidatorValidate_VerifierNotAvailable(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{}, []string{"rsa", "ecdsa"})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{}, []string{"rsa", "ecdsa"})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 
 	// Validator only has rsa verifier, not ecdsa.
 	verifiers := []crypto.Verifier{&mockVerifier{name: "rsa", verifyErr: nil}}
@@ -564,12 +563,12 @@ func TestValidatorValidate_VerifierNotAvailable(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/sig/rsa/my-object"),
+			Key:         []byte("/sig/rsa/test/my-object"),
 			Value:       []byte("mock-signature-rsa"),
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/sig/ecdsa/my-object"),
+			Key:         []byte("/sig/ecdsa/test/my-object"),
 			Value:       []byte("mock-signature-ecdsa"),
 			ModRevision: 0,
 		},
@@ -593,8 +592,8 @@ func TestValidatorValidate_VerifierNotAvailable(t *testing.T) {
 func TestValidatorValidate_InvalidKeyParsing(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -618,8 +617,8 @@ func TestValidatorValidate_InvalidKeyParsing(t *testing.T) {
 func TestValidatorValidate_MissingValueKey(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -631,7 +630,7 @@ func TestValidatorValidate_MissingValueKey(t *testing.T) {
 
 	// Create KVs with only hash key, no value key.
 	missingValueKVs := []kv.KeyValue{
-		{Key: []byte("/test/hashes/sha256/my-object"), Value: []byte("some-hash"), ModRevision: 0},
+		{Key: []byte("/hashes/sha256/test/my-object"), Value: []byte("some-hash"), ModRevision: 0},
 	}
 
 	// Should fail because value key is missing.
@@ -653,7 +652,7 @@ func TestValidatorValidate_MissingValueKey(t *testing.T) {
 func TestValidatorValidate_UnmarshalError(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{})
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{})
 
 	// Create a mock marshaller that returns error.
 	mockMarshaller := &mockTypedMarshaller[SimpleStruct]{
@@ -678,7 +677,7 @@ func TestValidatorValidate_UnmarshalError(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/my-object"),
+			Key: []byte("/hashes/sha256/test/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
@@ -702,8 +701,8 @@ func TestValidatorValidate_UnmarshalError(t *testing.T) {
 func TestValidatorValidate_HashKeyNotFound(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256", "sha1"}, []string{})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{"sha256", "sha1"}, []string{})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher(), hasher.NewSHA1Hasher()}
 
 	validator := integrity.NewValidator[SimpleStruct](
@@ -721,14 +720,14 @@ func TestValidatorValidate_HashKeyNotFound(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key: []byte("/test/hashes/sha256/my-object"),
+			Key: []byte("/hashes/sha256/test/my-object"),
 			Value: []byte{
 				0x86, 0x1c, 0xdf, 0xcd, 0x76, 0x2f, 0x0a, 0x8c, 0xc0, 0xc7, 0xfc, 0x44, 0xcb, 0xfa, 0x5d, 0x29, 0xde,
 				0xed, 0x36, 0xa2, 0x5c, 0x73, 0xf7, 0xa4, 0xc6, 0x7a, 0xd6, 0x37, 0xf7, 0x1b, 0xab, 0x39,
 			},
 			ModRevision: 0,
 		},
-		// Missing sha1 hash key: /test/hashes/sha1/my-object .
+		// Missing sha1 hash key: /hashes/sha1/test/my-object .
 	}
 
 	// Should fail because sha1 hash key is missing.
@@ -750,8 +749,8 @@ func TestValidatorValidate_HashKeyNotFound(t *testing.T) {
 func TestValidatorValidate_SignatureKeyNotFound(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{}, []string{"rsa", "ecdsa"})
-	marshallerInstance := marshaller.NewTypedYamlMarshaller[SimpleStruct]()
+	namerInstance := mustNamer(t, "test", []string{}, []string{"rsa", "ecdsa"})
+	marshallerInstance := marshaller.NewYamlMarshaller[SimpleStruct]()
 
 	// Validator has both verifiers.
 	verifiers := []crypto.Verifier{
@@ -773,11 +772,11 @@ func TestValidatorValidate_SignatureKeyNotFound(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/sig/rsa/my-object"),
+			Key:         []byte("/sig/rsa/test/my-object"),
 			Value:       []byte("mock-signature-rsa"),
 			ModRevision: 0,
 		},
-		// Missing ecdsa signature key: /test/sig/ecdsa/my-object .
+		// Missing ecdsa signature key: /sig/ecdsa/test/my-object .
 	}
 
 	// Should fail because ecdsa signature key is missing.
@@ -813,8 +812,8 @@ var sha256OfEmpty = []byte{ //nolint:gochecknoglobals
 func TestValidatorValidate_EmptyValue_NilBody(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, nil)
-	marshallerInstance := marshaller.NewTypedBytesMarshaller()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, nil)
+	marshallerInstance := marshaller.NewBytesMarshaller()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[[]byte](
@@ -831,7 +830,7 @@ func TestValidatorValidate_EmptyValue_NilBody(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hashes/sha256/my-object"),
+			Key:         []byte("/hashes/sha256/test/my-object"),
 			Value:       sha256OfEmpty,
 			ModRevision: 0,
 		},
@@ -856,8 +855,8 @@ func TestValidatorValidate_EmptyValue_NilBody(t *testing.T) {
 func TestValidatorValidate_EmptyValue_EmptyBody(t *testing.T) {
 	t.Parallel()
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, nil)
-	marshallerInstance := marshaller.NewTypedBytesMarshaller()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, nil)
+	marshallerInstance := marshaller.NewBytesMarshaller()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 
 	validator := integrity.NewValidator[[]byte](
@@ -874,7 +873,7 @@ func TestValidatorValidate_EmptyValue_EmptyBody(t *testing.T) {
 			ModRevision: 0,
 		},
 		{
-			Key:         []byte("/test/hashes/sha256/my-object"),
+			Key:         []byte("/hashes/sha256/test/my-object"),
 			Value:       sha256OfEmpty,
 			ModRevision: 0,
 		},
@@ -904,8 +903,8 @@ func TestValidatorValidate_EmptyValue_WithVerifier(t *testing.T) {
 	sig, err := signerVerifier.Sign(nil)
 	require.NoError(t, err)
 
-	namerInstance := namer.NewDefaultNamer("test", []string{"sha256"}, []string{"rsapss"})
-	marshallerInstance := marshaller.NewTypedBytesMarshaller()
+	namerInstance := mustNamer(t, "test", []string{"sha256"}, []string{"rsapss"})
+	marshallerInstance := marshaller.NewBytesMarshaller()
 	hashers := []hasher.Hasher{hasher.NewSHA256Hasher()}
 	verifiers := []crypto.Verifier{signerVerifier}
 
@@ -918,8 +917,8 @@ func TestValidatorValidate_EmptyValue_WithVerifier(t *testing.T) {
 
 	kvs := []kv.KeyValue{
 		{Key: []byte("/test/my-object"), Value: nil, ModRevision: 0},
-		{Key: []byte("/test/hashes/sha256/my-object"), Value: sha256OfEmpty, ModRevision: 0},
-		{Key: []byte("/test/sig/rsapss/my-object"), Value: sig, ModRevision: 0},
+		{Key: []byte("/hashes/sha256/test/my-object"), Value: sha256OfEmpty, ModRevision: 0},
+		{Key: []byte("/sig/rsapss/test/my-object"), Value: sig, ModRevision: 0},
 	}
 
 	results, err := validator.Validate(kvs)

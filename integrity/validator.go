@@ -18,7 +18,7 @@ const ModRevisionEmpty = 0
 // Validator verifies integrity-protected key-value pairs.
 type Validator[T any] struct {
 	namer      namer.Namer
-	marshaller marshaller.TypedMarshaller[T]
+	marshaller marshaller.Marshaller[T]
 	hashers    map[string]hasher.Hasher
 	verifiers  map[string]crypto.Verifier
 }
@@ -26,7 +26,7 @@ type Validator[T any] struct {
 // NewValidator creates a new Validator instance.
 func NewValidator[T any](
 	namer namer.Namer,
-	marshaller marshaller.TypedMarshaller[T],
+	marshaller marshaller.Marshaller[T],
 	hashers []hasher.Hasher,
 	verifiers []crypto.Verifier,
 ) Validator[T] {

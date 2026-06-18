@@ -33,13 +33,13 @@ var ErrSingleSigCompactCardinality = errors.New(
 	"codec: WithSingleSigCompact requires exactly one unique signer/verifier")
 
 // CodecNamerConstructor builds a namer for a Codec given the resolved
-// object/hash/sig location bindings and any LayeredOptions threaded through
+// object/hash/sig location bindings and any namer.Options threaded through
 // from the builder (e.g. compact-mode flags).
 type CodecNamerConstructor func(
 	objectLocation string,
-	hashLocations []namer.LayeredHashLocation,
-	sigLocations []namer.LayeredSigLocation,
-	opts ...namer.LayeredOption,
+	hashLocations []namer.HashLocation,
+	sigLocations []namer.SigLocation,
+	opts ...namer.Option,
 ) (namer.Namer, error)
 
 // Codec holds the integrity schema for type T: marshaller, hashers,
@@ -50,7 +50,7 @@ type Codec[T any] struct {
 	gen        Generator[T]
 	val        Validator[T]
 	namer      namer.Namer
-	marshaller marshaller.TypedMarshaller[T]
+	marshaller marshaller.Marshaller[T]
 }
 
 // ValueEqual creates a predicate that checks if a key's value equals the specified value.
@@ -105,7 +105,7 @@ func (c *Codec[T]) versionPredicate(
 // Each setter returns a copy of the builder (copy-on-write), so the original
 // builder is not mutated.
 type CodecBuilder[T any] struct {
-	marshaller     marshaller.TypedMarshaller[T]
+	marshaller     marshaller.Marshaller[T]
 	hashers        []hasher.Hasher
 	signers        []crypto.Signer
 	verifiers      []crypto.Verifier
@@ -119,14 +119,14 @@ type CodecBuilder[T any] struct {
 }
 
 // NewCodecBuilder returns a new CodecBuilder with sensible defaults.
-// Default marshaller: TypedYamlMarshaller[T].
+// Default marshaller: YamlMarshaller[T].
 // Default objectLocation: namer.ObjectLocationMissing (unnamed codec —
 // keys are emitted without the per-codec location segment). Call
 // WithObjectLocation to opt into a named layout like /<location>/<name>.
-// Default namerFunc: wraps namer.NewLayeredNamer.
+// Default namerFunc: wraps namer.New.
 func NewCodecBuilder[T any]() CodecBuilder[T] {
 	return CodecBuilder[T]{
-		marshaller:     marshaller.NewTypedYamlMarshaller[T](),
+		marshaller:     marshaller.NewYamlMarshaller[T](),
 		hashers:        []hasher.Hasher{},
 		signers:        []crypto.Signer{},
 		verifiers:      []crypto.Verifier{},
@@ -160,7 +160,7 @@ func (b CodecBuilder[T]) copy() CodecBuilder[T] {
 }
 
 // WithMarshaller sets a custom marshaller.
-func (b CodecBuilder[T]) WithMarshaller(m marshaller.TypedMarshaller[T]) CodecBuilder[T] {
+func (b CodecBuilder[T]) WithMarshaller(m marshaller.Marshaller[T]) CodecBuilder[T] {
 	out := b.copy()
 
 	out.marshaller = m
@@ -282,8 +282,8 @@ func (b CodecBuilder[T]) WithSingleSigCompact() CodecBuilder[T] {
 // malformed input.
 //
 // Custom namers passed through WithNamer receive the prefix as an extra
-// namer.LayeredOption. Namers that ignore LayeredOptions silently drop the
-// prefix; the default namer.NewLayeredNamer honours it.
+// namer.Option. Namers that ignore namer.Options silently drop the
+// prefix; the default namer.New honours it.
 func (b CodecBuilder[T]) WithKeyPrefix(prefix string) CodecBuilder[T] {
 	out := b.copy()
 
@@ -301,7 +301,7 @@ func (b CodecBuilder[T]) WithKeyPrefix(prefix string) CodecBuilder[T] {
 func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 	namerFn := b.namerFunc
 	if namerFn == nil {
-		namerFn = namer.NewLayeredNamer
+		namerFn = namer.New
 	}
 
 	// objLoc == namer.ObjectLocationMissing ("") puts the codec in
@@ -338,14 +338,14 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 		}
 	}
 
-	genHashLocs := make([]namer.LayeredHashLocation, 0, len(b.hashers))
+	genHashLocs := make([]namer.HashLocation, 0, len(b.hashers))
 	for _, hasher := range b.hashers {
 		loc := hasher.Name()
 		if override, ok := b.hashLocations[hasher.Name()]; ok {
 			loc = override
 		}
 
-		genHashLocs = append(genHashLocs, namer.LayeredHashLocation{
+		genHashLocs = append(genHashLocs, namer.HashLocation{
 			HasherName: hasher.Name(),
 			Location:   loc,
 		})
@@ -353,27 +353,27 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 
 	// SignerName always carries the real signer/verifier name (not the
 	// location override) because downstream lookups index by Property().
-	genSigLocs := make([]namer.LayeredSigLocation, 0, len(b.signers))
+	genSigLocs := make([]namer.SigLocation, 0, len(b.signers))
 	for _, signer := range b.signers {
 		loc := signer.Name()
 		if override, ok := b.sigLocations[signer.Name()]; ok {
 			loc = override
 		}
 
-		genSigLocs = append(genSigLocs, namer.LayeredSigLocation{
+		genSigLocs = append(genSigLocs, namer.SigLocation{
 			SignerName: signer.Name(),
 			Location:   loc,
 		})
 	}
 
-	valSigLocs := make([]namer.LayeredSigLocation, 0, len(b.verifiers))
+	valSigLocs := make([]namer.SigLocation, 0, len(b.verifiers))
 	for _, verifier := range b.verifiers {
 		loc := verifier.Name()
 		if override, ok := b.sigLocations[verifier.Name()]; ok {
 			loc = override
 		}
 
-		valSigLocs = append(valSigLocs, namer.LayeredSigLocation{
+		valSigLocs = append(valSigLocs, namer.SigLocation{
 			SignerName: verifier.Name(),
 			Location:   loc,
 		})
@@ -382,7 +382,7 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 	// Top-level namer must accept keys produced by either side (signer or
 	// verifier), so its sig list is the union deduplicated by name.
 	seenSigNames := make(map[string]struct{})
-	topSigLocs := make([]namer.LayeredSigLocation, 0, len(b.signers)+len(b.verifiers))
+	topSigLocs := make([]namer.SigLocation, 0, len(b.signers)+len(b.verifiers))
 
 	for _, sl := range genSigLocs {
 		if _, ok := seenSigNames[sl.SignerName]; !ok {
@@ -401,7 +401,7 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 	// Compact flags must be uniform across gen/val/top — otherwise their
 	// emitted/parsed key shapes diverge and round-trips break. Check
 	// cardinality against every list that will become a namer's sig/hash list.
-	var opts []namer.LayeredOption
+	var opts []namer.Option
 
 	if b.compactHash {
 		if len(genHashLocs) != 1 {

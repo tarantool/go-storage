@@ -73,14 +73,14 @@ func TestValidationError_Unpack(t *testing.T) {
 		text:   "validation failed",
 		parent: parentErr,
 	}
-	assert.Equal(t, parentErr, validationErr.Unpack())
+	assert.Equal(t, parentErr, validationErr.Unwrap())
 
 	// Test with nil parent.
 	validationErr = ValidationError{
 		text:   "validation failed",
 		parent: nil,
 	}
-	require.NoError(t, validationErr.Unpack())
+	require.NoError(t, validationErr.Unwrap())
 }
 
 func TestFailedToGenerateKeysError_Error(t *testing.T) {
@@ -439,13 +439,6 @@ func TestFailedToValidateAggregatedError_Finalize(t *testing.T) {
 		finalizedErr := aggErr.Finalize()
 		assert.Equal(t, "aggregated error: error1, error2", finalizedErr.Error())
 	})
-}
-
-func TestInvalidNameError_Error(t *testing.T) {
-	t.Parallel()
-
-	err := InvalidNameError{name: "name"}
-	require.Equal(t, "invalid name: name", err.Error())
 }
 
 func TestErrorWrapping(t *testing.T) {

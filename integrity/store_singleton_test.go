@@ -254,7 +254,7 @@ func TestSingletonStore_Watch(t *testing.T) {
 	select {
 	case ev, ok := <-events:
 		require.True(t, ok, "watch channel closed before delivering an event")
-		assert.NotEmpty(t, ev.Prefix)
+		assert.NotEmpty(t, ev.Key)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for watch event")
 	}

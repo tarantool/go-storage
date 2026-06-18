@@ -2,6 +2,7 @@ package integrity
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -48,7 +49,9 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s: %s", e.text, e.parent)
 }
 
-func (e ValidationError) Unpack() error {
+// Unwrap returns the underlying cause so ValidationError participates in
+// errors.Is / errors.As chains.
+func (e ValidationError) Unwrap() error {
 	return e.parent
 }
 
@@ -248,15 +251,6 @@ func (e *FailedToValidateAggregatedError) Finalize() error {
 	}
 }
 
-// InvalidNameError represents an error when a name is invalid.
-type InvalidNameError struct {
-	name string
-}
-
-// Error returns a string representation of the invalid name error.
-func (e InvalidNameError) Error() string {
-	return "invalid name: " + e.name
-}
-
-// ErrInvalidName is a sentinel error for invalid names.
-var ErrInvalidName = InvalidNameError{name: ""}
+// ErrInvalidName is returned for empty, leading-slash, or trailing-slash names.
+// Match it with errors.Is.
+var ErrInvalidName = errors.New("invalid name")
