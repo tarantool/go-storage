@@ -12,7 +12,6 @@ import (
 	"github.com/tarantool/go-storage/v2/integrity"
 	"github.com/tarantool/go-storage/v2/kv"
 	"github.com/tarantool/go-storage/v2/marshaller"
-	"github.com/tarantool/go-storage/v2/namer"
 )
 
 // Test structures.
@@ -124,8 +123,8 @@ func TestGeneratorGenerate_SuccessSimpleValue(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{}, []string{}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{}, []string{}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -145,8 +144,8 @@ func TestGeneratorGenerate_SuccessWithHashes(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{"sha256", "md5"}, []string{}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{"sha256", "md5"}, []string{}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{
 			newMockHasher("sha256"),
 			newMockHasher("md5"),
@@ -178,13 +177,13 @@ func TestGeneratorGenerate_SuccessWithHashes(t *testing.T) {
 	hashPairs := 0
 
 	for _, pair := range pairs {
-		if string(pair.Key) == "/test/hashes/sha256/my-object" {
+		if string(pair.Key) == "/hashes/sha256/test/my-object" {
 			hashPairs++
 
 			assert.Equal(t, "mock-hash-sha256", string(pair.Value))
 		}
 
-		if string(pair.Key) == "/test/hashes/md5/my-object" {
+		if string(pair.Key) == "/hashes/md5/test/my-object" {
 			hashPairs++
 
 			assert.Equal(t, "mock-hash-md5", string(pair.Value))
@@ -198,8 +197,8 @@ func TestGeneratorGenerate_SuccessWithSignatures(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{}, []string{"rsa", "ecdsa"}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{}, []string{"rsa", "ecdsa"}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		[]crypto.Signer{
 			newMockSigner("rsa"),
@@ -229,13 +228,13 @@ func TestGeneratorGenerate_SuccessWithSignatures(t *testing.T) {
 	sigPairs := 0
 
 	for _, pair := range pairs {
-		if string(pair.Key) == "/test/sig/rsa/my-object" {
+		if string(pair.Key) == "/sig/rsa/test/my-object" {
 			sigPairs++
 
 			assert.Equal(t, "mock-signature-rsa", string(pair.Value))
 		}
 
-		if string(pair.Key) == "/test/sig/ecdsa/my-object" {
+		if string(pair.Key) == "/sig/ecdsa/test/my-object" {
 			sigPairs++
 
 			assert.Equal(t, "mock-signature-ecdsa", string(pair.Value))
@@ -249,8 +248,8 @@ func TestGeneratorGenerate_SuccessWithHashesAndSignatures(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{"sha256"}, []string{"rsa"}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{"sha256"}, []string{"rsa"}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{
 			newMockHasher("sha256"),
 		},
@@ -271,16 +270,16 @@ func TestGeneratorGenerate_SuccessWithHashesAndSignatures(t *testing.T) {
 	}
 
 	assert.True(t, keys["/test/my-object"])
-	assert.True(t, keys["/test/hashes/sha256/my-object"])
-	assert.True(t, keys["/test/sig/rsa/my-object"])
+	assert.True(t, keys["/hashes/sha256/test/my-object"])
+	assert.True(t, keys["/sig/rsa/test/my-object"])
 }
 
 func TestGeneratorGenerate_ErrorHasherNotFound(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{"sha256", "md5"}, []string{}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{"sha256", "md5"}, []string{}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{
 			newMockHasher("sha256"),
 		},
@@ -297,8 +296,8 @@ func TestGeneratorGenerate_ErrorSignerNotFound(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{}, []string{"rsa", "ecdsa"}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{}, []string{"rsa", "ecdsa"}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		[]crypto.Signer{
 			newMockSigner("rsa"),
@@ -315,8 +314,8 @@ func TestGeneratorGenerate_ErrorHasherReturnsError(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{"sha256"}, []string{}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{"sha256"}, []string{}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{
 			newMockHasherWithError("sha256", "hash error"),
 		},
@@ -333,8 +332,8 @@ func TestGeneratorGenerate_ErrorSignerReturnsError(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{}, []string{"rsa"}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{}, []string{"rsa"}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		[]crypto.Signer{
 			newMockSignerWithError("rsa", "sign error"),
@@ -351,7 +350,7 @@ func TestGeneratorGenerate_ErrorMarshallerReturnsError(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{}, []string{}),
+		mustNamer(t, "test", []string{}, []string{}),
 		&mockFailingTypedMarshaller[SimpleStruct]{
 			marshalErr:   errors.New("marshal error"),
 			unmarshalErr: nil,
@@ -370,8 +369,8 @@ func TestGeneratorGenerate_ErrorInvalidName(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("test", []string{}, []string{}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "test", []string{}, []string{}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -386,8 +385,8 @@ func TestGeneratorGenerate_OutputStructure(t *testing.T) {
 	t.Parallel()
 
 	generator := integrity.NewGenerator[SimpleStruct](
-		namer.NewDefaultNamer("storage", []string{"sha256"}, []string{"rsa"}),
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		mustNamer(t, "storage", []string{"sha256"}, []string{"rsa"}),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{
 			newMockHasher("sha256"),
 		},
@@ -405,8 +404,8 @@ func TestGeneratorGenerate_OutputStructure(t *testing.T) {
 	// Verify key patterns.
 	expectedKeys := map[string]bool{
 		"/storage/config/app":               true,
-		"/storage/hashes/sha256/config/app": true,
-		"/storage/sig/rsa/config/app":       true,
+		"/hashes/sha256/storage/config/app": true,
+		"/sig/rsa/storage/config/app":       true,
 	}
 
 	for _, pair := range pairs {

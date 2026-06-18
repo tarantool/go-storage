@@ -138,7 +138,7 @@ func (s *Store[T]) Range(
 //
 // Under the signal-only Event.Prefix contract every event carries the watched
 // prefix verbatim (driver-stripped of its trailing "/"), so filtering on
-// event.Prefix is a no-op — callers must Range/Get to learn what changed.
+// event.Key is a no-op — callers must Range/Get to learn what changed.
 func (s *Store[T]) Watch(ctx context.Context, name string) (<-chan watch.Event, error) {
 	if !checkRangeName(name) {
 		return storeClosedChan, ErrInvalidName

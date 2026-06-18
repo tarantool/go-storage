@@ -145,7 +145,7 @@ func ExampleStore_Watch() {
 
 	cancel()
 
-	fmt.Println("event:", string(ev.Prefix))
+	fmt.Println("event:", string(ev.Key))
 
 	// Output:
 	// event: /objects/alice

@@ -332,7 +332,7 @@ func TestStoreIntegration_Watch(t *testing.T) {
 
 		select {
 		case ev := <-eventCh:
-			require.Equal(t, []byte("/objects/object1"), ev.Prefix)
+			require.Equal(t, []byte("/objects/object1"), ev.Key)
 		case <-time.After(2 * time.Second):
 			t.Fatal("timed out waiting for watch event")
 		}
@@ -362,7 +362,7 @@ func TestStoreIntegration_Watch_EmptyName(t *testing.T) {
 
 		select {
 		case ev := <-eventCh:
-			assert.Equal(t, []byte("/objects"), ev.Prefix)
+			assert.Equal(t, []byte("/objects"), ev.Key)
 		case <-time.After(defaultWaitTimeout):
 			t.Fatal("regression: empty-name Watch delivered no events")
 		}
@@ -604,7 +604,7 @@ func TestTxIntegration_EmptyValue_RoundTrip(t *testing.T) {
 
 		codec, err := integrity.NewCodecBuilder[[]byte]().
 			WithObjectLocation("objects").
-			WithMarshaller(marshaller.NewTypedBytesMarshaller()).
+			WithMarshaller(marshaller.NewBytesMarshaller()).
 			WithHasher(shaHash).
 			WithSignerVerifier(rsaSV).
 			Build()
@@ -649,7 +649,7 @@ func TestStoreIntegration_EmptyValue_GetPut(t *testing.T) {
 
 		codec, err := integrity.NewCodecBuilder[[]byte]().
 			WithObjectLocation("objects").
-			WithMarshaller(marshaller.NewTypedBytesMarshaller()).
+			WithMarshaller(marshaller.NewBytesMarshaller()).
 			WithHasher(shaHash).
 			WithSignerVerifier(rsaSV).
 			Build()

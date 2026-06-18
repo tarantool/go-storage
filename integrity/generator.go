@@ -11,7 +11,7 @@ import (
 // Generator creates integrity-protected key-value pairs for storage.
 type Generator[T any] struct {
 	namer      namer.Namer
-	marshaller marshaller.TypedMarshaller[T]
+	marshaller marshaller.Marshaller[T]
 	hashers    map[string]hasher.Hasher
 	signers    map[string]crypto.Signer
 }
@@ -19,7 +19,7 @@ type Generator[T any] struct {
 // NewGenerator creates a new Generator instance.
 func NewGenerator[T any](
 	namer namer.Namer,
-	marshaller marshaller.TypedMarshaller[T],
+	marshaller marshaller.Marshaller[T],
 	hashers []hasher.Hasher,
 	signers []crypto.Signer,
 ) Generator[T] {
