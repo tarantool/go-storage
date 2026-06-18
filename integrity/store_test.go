@@ -5,7 +5,7 @@ package integrity_test
 //   codec := integrity.NewCodecBuilder[T]().WithObjectLocation("objects").WithHasher(...).Build()
 //   store := codec.Bind(storage.Prefixed("/test", storage.NewStorage(driverMock)))
 //
-// LayeredNamer key layout (objectLocation = "objects"):
+// namer key layout (objectLocation = "objects"):
 //   /objects/<name>          value
 //   /<hasherName>/<name>     hash       (e.g. /sha256/<name>)
 //   /<signerName>/<name>     signature  (e.g. /rsa/<name>)
@@ -99,22 +99,22 @@ func newMockedStore(
 	return codec.Bind(prefixed)
 }
 
-// newLayeredNamer reproduces the codec's internal namer so tests can compute
+// newNamer reproduces the codec's internal namer so tests can compute
 // the absolute keys the driver mock will see (location = hasher/signer name).
-func newLayeredNamer(t *testing.T, hashNames, sigNames []string) namer.Namer {
+func newNamer(t *testing.T, hashNames, sigNames []string) namer.Namer {
 	t.Helper()
 
-	hashLocs := make([]namer.LayeredHashLocation, 0, len(hashNames))
+	hashLocs := make([]namer.HashLocation, 0, len(hashNames))
 	for _, n := range hashNames {
-		hashLocs = append(hashLocs, namer.LayeredHashLocation{HasherName: n, Location: n})
+		hashLocs = append(hashLocs, namer.HashLocation{HasherName: n, Location: n})
 	}
 
-	sigLocs := make([]namer.LayeredSigLocation, 0, len(sigNames))
+	sigLocs := make([]namer.SigLocation, 0, len(sigNames))
 	for _, n := range sigNames {
-		sigLocs = append(sigLocs, namer.LayeredSigLocation{SignerName: n, Location: n})
+		sigLocs = append(sigLocs, namer.SigLocation{SignerName: n, Location: n})
 	}
 
-	testNamer, err := namer.NewLayeredNamer("objects", hashLocs, sigLocs)
+	testNamer, err := namer.New("objects", hashLocs, sigLocs)
 	require.NoError(t, err)
 
 	return testNamer
@@ -260,14 +260,14 @@ func TestStore_Get_Success(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -318,7 +318,7 @@ func TestStore_Get_ExecutionError(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -346,7 +346,7 @@ func TestStore_Get_NotFound(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -382,14 +382,14 @@ func TestStore_Get_VerificationError(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, []string{"sha256"}, nil)
+	testNamer := newNamer(t, []string{"sha256"}, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{mockH},
 		nil,
 	)
@@ -436,14 +436,14 @@ func TestStore_Get_WithIgnoreVerificationError(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, []string{"sha256"}, nil)
+	testNamer := newNamer(t, []string{"sha256"}, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{mockH},
 		nil,
 	)
@@ -490,14 +490,14 @@ func TestStore_Get_WithIgnoreMoreThanOneResult(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -540,14 +540,14 @@ func TestStore_Get_WithHasher(t *testing.T) {
 	codec := newStoreCodecWithHasher(t, mockH)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, []string{"sha256"}, nil)
+	testNamer := newNamer(t, []string{"sha256"}, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{mockH},
 		nil,
 	)
@@ -603,7 +603,7 @@ func TestStore_Get_WithVerifier(t *testing.T) {
 	codec := newStoreCodecWithVerifier(t, mockV)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, []string{"rsa"})
+	testNamer := newNamer(t, nil, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
@@ -611,7 +611,7 @@ func TestStore_Get_WithVerifier(t *testing.T) {
 	mockS := newMockSigner("rsa")
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		[]crypto.Signer{mockS},
 	)
@@ -668,9 +668,9 @@ func TestStore_Get_NamerGenerateNamesError(t *testing.T) {
 	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithNamer(func(
 			_ string,
-			_ []namer.LayeredHashLocation,
-			_ []namer.LayeredSigLocation,
-			_ ...namer.LayeredOption,
+			_ []namer.HashLocation,
+			_ []namer.SigLocation,
+			_ ...namer.Option,
 		) (namer.Namer, error) {
 			return &mockNamer{generateNamesErr: generateErr, prefixVal: ""}, nil
 		}).
@@ -700,13 +700,13 @@ func TestStore_Get_PassingModRevision(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -745,10 +745,10 @@ func TestStore_Put_Success(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -784,10 +784,10 @@ func TestStore_Put_WithPutPredicates(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -831,10 +831,10 @@ func TestStore_Put_WithPredicates_Failed(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -893,10 +893,10 @@ func TestStore_Put_TransactionExecutionError(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -948,14 +948,14 @@ func TestStore_Put_WithSigner(t *testing.T) {
 	codec := newStoreCodecWithSigner(t, mockS)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, []string{"rsa"})
+	testNamer := newNamer(t, nil, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		[]crypto.Signer{mockS},
 	)
@@ -989,14 +989,14 @@ func TestStore_Put_WithSignerVerifier(t *testing.T) {
 	codec := newStoreCodecWithSignerVerifier(t, mockSV)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, []string{"rsa"})
+	testNamer := newNamer(t, nil, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 2)
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		[]crypto.Signer{mockSV},
 	)
@@ -1027,16 +1027,16 @@ func TestStore_Put_WithMarshaller(t *testing.T) {
 	driverMock := mocks.NewDriverMock(t)
 
 	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
-		WithMarshaller(marshaller.NewTypedYamlMarshaller[SimpleStruct]()).
+		WithMarshaller(marshaller.NewYamlMarshaller[SimpleStruct]()).
 		Build()
 	require.NoError(t, err)
 
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -1071,7 +1071,7 @@ func TestStore_Predicates_ValueOps(t *testing.T) {
 	// The key for the predicate is whatever the caller passes in.
 	key := []byte("/objects/my-object")
 	value := SimpleStruct{Name: "test", Value: 42}
-	expectedValue, err := marshaller.NewTypedYamlMarshaller[SimpleStruct]().Marshal(value)
+	expectedValue, err := marshaller.NewYamlMarshaller[SimpleStruct]().Marshal(value)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -1178,7 +1178,7 @@ func TestStore_Delete_Success(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -1207,7 +1207,7 @@ func TestStore_Delete_WithDeletePredicates(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -1238,7 +1238,7 @@ func TestStore_Delete_WithDeletePredicates_Failed(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -1268,7 +1268,7 @@ func TestStore_Delete_TransactionExecutionError(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -1298,9 +1298,9 @@ func TestStore_Delete_NamerGenerateNamesError(t *testing.T) {
 	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithNamer(func(
 			_ string,
-			_ []namer.LayeredHashLocation,
-			_ []namer.LayeredSigLocation,
-			_ ...namer.LayeredOption,
+			_ []namer.HashLocation,
+			_ []namer.SigLocation,
+			_ ...namer.Option,
 		) (namer.Namer, error) {
 			return &mockNamer{generateNamesErr: generateErr, prefixVal: ""}, nil
 		}).
@@ -1328,7 +1328,7 @@ func TestStore_Delete_Prefix(t *testing.T) {
 	codec := newStoreCodec(t)
 	store := newMockedStore(t, codec, driverMock)
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	keys, err := testNamer.GenerateNames("test/")
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
@@ -1395,10 +1395,10 @@ func TestStore_Range_Success(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		nil,
 		nil,
 	)
@@ -1472,10 +1472,10 @@ func TestStore_Range_WithValidationError(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, []string{"sha256"}, nil)
+	testNamer := newNamer(t, []string{"sha256"}, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{mockH},
 		nil,
 	)
@@ -1526,10 +1526,10 @@ func TestStore_Range_WithIgnoreVerificationError(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, []string{"sha256"}, nil)
+	testNamer := newNamer(t, []string{"sha256"}, nil)
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{mockH},
 		nil,
 	)
@@ -1582,7 +1582,7 @@ func TestStore_Range_ExecutionError(t *testing.T) {
 
 	ctx := context.Background()
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	expectedPrefix := testNamer.Prefix("", true)
 	expectedOps := []operation.Operation{makeAbsoluteGetOp(expectedPrefix)}
 
@@ -1614,7 +1614,7 @@ func TestStore_Range_WithIgnoreVerificationErrorButFailedToDecode(t *testing.T) 
 		ModRevision: 0,
 	}
 
-	testNamer := newLayeredNamer(t, nil, nil)
+	testNamer := newNamer(t, nil, nil)
 	expectedPrefix := testNamer.Prefix("", true) // "/objects/".
 	expectedOps := []operation.Operation{makeAbsoluteGetOp(expectedPrefix)}
 
@@ -1642,25 +1642,25 @@ func TestStore_WithNamer(t *testing.T) {
 
 	var capturedObjectLoc string
 
-	var capturedHashLocs []namer.LayeredHashLocation
+	var capturedHashLocs []namer.HashLocation
 
-	var capturedSigLocs []namer.LayeredSigLocation
+	var capturedSigLocs []namer.SigLocation
 
 	codec, err := integrity.NewCodecBuilder[SimpleStruct]().WithObjectLocation("objects").
 		WithHasher(newMockHasher("sha256")).
 		WithSigner(newMockSigner("rsa")).
 		WithNamer(func(
 			objectLocation string,
-			hashLocations []namer.LayeredHashLocation,
-			sigLocations []namer.LayeredSigLocation,
-			opts ...namer.LayeredOption,
+			hashLocations []namer.HashLocation,
+			sigLocations []namer.SigLocation,
+			opts ...namer.Option,
 		) (namer.Namer, error) {
 			constructorCalled = true
 			capturedObjectLoc = objectLocation
 			capturedHashLocs = hashLocations
 			capturedSigLocs = sigLocations
 
-			return namer.NewLayeredNamer(objectLocation, hashLocations, sigLocations, opts...)
+			return namer.New(objectLocation, hashLocations, sigLocations, opts...)
 		}).
 		Build()
 	require.NoError(t, err)
@@ -1677,14 +1677,14 @@ func TestStore_WithNamer(t *testing.T) {
 	require.Len(t, capturedSigLocs, 1)
 	assert.Equal(t, "rsa", capturedSigLocs[0].SignerName)
 
-	testNamer := newLayeredNamer(t, []string{"sha256"}, []string{"rsa"})
+	testNamer := newNamer(t, []string{"sha256"}, []string{"rsa"})
 	keys, err := testNamer.GenerateNames("my-object")
 	require.NoError(t, err)
 	require.Len(t, keys, 3) // value + hash + signature.
 
 	generator := integrity.NewGenerator[SimpleStruct](
 		testNamer,
-		marshaller.NewTypedYamlMarshaller[SimpleStruct](),
+		marshaller.NewYamlMarshaller[SimpleStruct](),
 		[]hasher.Hasher{newMockHasher("sha256")},
 		[]crypto.Signer{newMockSigner("rsa")},
 	)
@@ -1720,7 +1720,7 @@ func TestStore_Watch(t *testing.T) {
 		codec := newStoreCodec(t)
 		store := newMockedStore(t, codec, driverMock)
 
-		// Codec namer (LayeredNamer): Prefix("my-object", false) = "/objects/my-object"
+		// Codec namer: Prefix("my-object", false) = "/objects/my-object"
 		// Prefixed wrapper adds "/test" → driver Watch called with "/test/objects/my-object".
 		absWatchKey := absKeyStr("/objects/my-object")
 		rawCh := make(chan watch.Event, 10)
@@ -1734,11 +1734,11 @@ func TestStore_Watch(t *testing.T) {
 		// Under the signal-only contract every event reaching the integrity
 		// layer carries the watched prefix verbatim — Store.Watch must forward
 		// it as-is (the Prefixed wrapper has already stripped its own prefix).
-		rawCh <- watch.Event{Prefix: absKeyStr("/objects/my-object")}
+		rawCh <- watch.Event{Key: absKeyStr("/objects/my-object")}
 
 		select {
 		case e := <-eventCh:
-			assert.Equal(t, []byte("/objects/my-object"), e.Prefix)
+			assert.Equal(t, []byte("/objects/my-object"), e.Key)
 		case <-time.After(100 * time.Millisecond):
 			t.Fatal("expected event to be forwarded")
 		}

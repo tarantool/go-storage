@@ -40,12 +40,12 @@ func TestCodecBuilder_Defaults(t *testing.T) {
 }
 
 // The codec keeps its namer private, so the default-object-location guarantee
-// is verified by constructing an equivalent LayeredNamer and asserting its
+// is verified by constructing an equivalent namer and asserting its
 // output matches the documented unnamed shape (no objectLocation segment).
 func TestCodecBuilder_DefaultIsUnnamed(t *testing.T) {
 	t.Parallel()
 
-	defaultNamer, err := namer.NewLayeredNamer(namer.ObjectLocationMissing, nil, nil)
+	defaultNamer, err := namer.New(namer.ObjectLocationMissing, nil, nil)
 	require.NoError(t, err)
 
 	keys, err := defaultNamer.GenerateNames("foo")
@@ -107,8 +107,8 @@ func TestCodecBuilder_WithHasher(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, codec)
 
-	n, err := namer.NewLayeredNamer("objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+	n, err := namer.New("objects",
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 		nil)
 	require.NoError(t, err)
 
@@ -137,8 +137,8 @@ func TestCodecBuilder_WithHashLocation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, codec)
 
-	n, err := namer.NewLayeredNamer("objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "checksums"}},
+	n, err := namer.New("objects",
+		[]namer.HashLocation{{HasherName: "sha256", Location: "checksums"}},
 		nil)
 	require.NoError(t, err)
 
@@ -204,8 +204,8 @@ func TestCodecBuilder_WithSignatureLocation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, codec)
 
-	n, err := namer.NewLayeredNamer("objects", nil,
-		[]namer.LayeredSigLocation{{SignerName: signerVerifier.Name(), Location: "sigs"}})
+	n, err := namer.New("objects", nil,
+		[]namer.SigLocation{{SignerName: signerVerifier.Name(), Location: "sigs"}})
 	require.NoError(t, err)
 
 	keys, err := n.GenerateNames("bar")
@@ -279,7 +279,7 @@ func TestCodecBuilder_MultiSegmentObjectLocation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, codec)
 
-	n, err := namer.NewLayeredNamer("settings/ldap", nil, nil)
+	n, err := namer.New("settings/ldap", nil, nil)
 	require.NoError(t, err)
 
 	keys, err := n.GenerateNames("entry-1")
@@ -336,14 +336,14 @@ type sentinelNamer struct {
 
 func (n *sentinelNamer) GenerateNames(name string) ([]namer.Key, error) {
 	return []namer.Key{
-		namer.NewDefaultKey(name, namer.KeyTypeValue, "", "/sentinel/"+name),
+		namer.NewKey(name, namer.KeyTypeValue, "", "/sentinel/"+name),
 	}, nil
 }
 
-func (n *sentinelNamer) ParseKey(raw string) (namer.DefaultKey, error) {
+func (n *sentinelNamer) ParseKey(raw string) (namer.Key, error) {
 	name := strings.TrimPrefix(raw, "/sentinel/")
 
-	return namer.NewDefaultKey(name, namer.KeyTypeValue, "", raw), nil
+	return namer.NewKey(name, namer.KeyTypeValue, "", raw), nil
 }
 
 func (n *sentinelNamer) ParseKeys(names []string, ignoreError bool) (namer.Results, error) {
@@ -380,9 +380,9 @@ func TestCodecBuilder_WithNamer(t *testing.T) {
 
 	customConstructor := integrity.CodecNamerConstructor(func(
 		_ string,
-		_ []namer.LayeredHashLocation,
-		_ []namer.LayeredSigLocation,
-		_ ...namer.LayeredOption,
+		_ []namer.HashLocation,
+		_ []namer.SigLocation,
+		_ ...namer.Option,
 	) (namer.Namer, error) {
 		constructorCalled = true
 
@@ -416,7 +416,7 @@ func TestCodec_ValueEqual(t *testing.T) {
 	require.NotNil(t, concretePred)
 	assert.Equal(t, key, concretePred.Key())
 
-	marsh := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
+	marsh := marshaller.NewYamlMarshaller[codecTestStruct]()
 	expected, err := marsh.Marshal(val)
 	require.NoError(t, err)
 	assert.Equal(t, expected, concretePred.Value())
@@ -497,8 +497,8 @@ func TestCodecBuilder_Immutability(t *testing.T) {
 
 	base := integrity.NewCodecBuilder[codecTestStruct]().WithObjectLocation("objects")
 
-	marsh1 := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
-	marsh2 := marshaller.NewTypedYamlMarshaller[codecTestStruct]()
+	marsh1 := marshaller.NewYamlMarshaller[codecTestStruct]()
+	marsh2 := marshaller.NewYamlMarshaller[codecTestStruct]()
 
 	builder1 := base.WithMarshaller(marsh1)
 	builder2 := builder1.WithMarshaller(marsh2)
@@ -664,7 +664,7 @@ func TestCodec_ValueKey_RoundTripsThroughNamer(t *testing.T) {
 	key, err := codec.ValueKey("alpha-beta")
 	require.NoError(t, err)
 
-	reproNamer, err := namer.NewLayeredNamer("objects", nil, nil)
+	reproNamer, err := namer.New("objects", nil, nil)
 	require.NoError(t, err)
 
 	parsed, err := reproNamer.ParseKey(key)
@@ -680,7 +680,7 @@ type fullKeyNoValueNamer struct{ sentinelNamer }
 
 func (n *fullKeyNoValueNamer) GenerateNames(name string) ([]namer.Key, error) {
 	return []namer.Key{
-		namer.NewDefaultKey(name, namer.KeyTypeHash, "sha256", "/hash/sha256/"+name),
+		namer.NewKey(name, namer.KeyTypeHash, "sha256", "/hash/sha256/"+name),
 	}, nil
 }
 
@@ -689,9 +689,9 @@ func TestCodec_ValueKey_NoValueKey(t *testing.T) {
 
 	customConstructor := integrity.CodecNamerConstructor(func(
 		_ string,
-		_ []namer.LayeredHashLocation,
-		_ []namer.LayeredSigLocation,
-		_ ...namer.LayeredOption,
+		_ []namer.HashLocation,
+		_ []namer.SigLocation,
+		_ ...namer.Option,
 	) (namer.Namer, error) {
 		return &fullKeyNoValueNamer{sentinelNamer: sentinelNamer{called: false}}, nil
 	})
@@ -723,9 +723,9 @@ func TestCodec_ValueKey_NamerError(t *testing.T) {
 
 	customConstructor := integrity.CodecNamerConstructor(func(
 		_ string,
-		_ []namer.LayeredHashLocation,
-		_ []namer.LayeredSigLocation,
-		_ ...namer.LayeredOption,
+		_ []namer.HashLocation,
+		_ []namer.SigLocation,
+		_ ...namer.Option,
 	) (namer.Namer, error) {
 		return &fullKeyErrNamer{sentinelNamer: sentinelNamer{called: false}}, nil
 	})
@@ -809,9 +809,9 @@ func TestCodec_FullKeys_NamerError(t *testing.T) {
 
 	customConstructor := integrity.CodecNamerConstructor(func(
 		_ string,
-		_ []namer.LayeredHashLocation,
-		_ []namer.LayeredSigLocation,
-		_ ...namer.LayeredOption,
+		_ []namer.HashLocation,
+		_ []namer.SigLocation,
+		_ ...namer.Option,
 	) (namer.Namer, error) {
 		return &fullKeyErrNamer{sentinelNamer: sentinelNamer{called: false}}, nil
 	})

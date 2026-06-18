@@ -570,9 +570,9 @@ func TestBindPredicate_NoValueKey(t *testing.T) {
 	codec, err := integrity.NewCodecBuilder[txTestValue]().WithObjectLocation("objects").
 		WithNamer(func(
 			_ string,
-			_ []namer.LayeredHashLocation,
-			_ []namer.LayeredSigLocation,
-			_ ...namer.LayeredOption,
+			_ []namer.HashLocation,
+			_ []namer.SigLocation,
+			_ ...namer.Option,
 		) (namer.Namer, error) {
 			return noValueNamer, nil
 		}).
@@ -616,12 +616,12 @@ type hashOnlyNamer struct{}
 
 func (n *hashOnlyNamer) GenerateNames(name string) ([]namer.Key, error) {
 	return []namer.Key{
-		namer.NewDefaultKey(name, namer.KeyTypeHash, "sha256", "/sha256/"+name),
+		namer.NewKey(name, namer.KeyTypeHash, "sha256", "/sha256/"+name),
 	}, nil
 }
 
-func (n *hashOnlyNamer) ParseKey(raw string) (namer.DefaultKey, error) {
-	return namer.DefaultKey{}, errors.New("not implemented")
+func (n *hashOnlyNamer) ParseKey(raw string) (namer.Key, error) {
+	return namer.Key{}, errors.New("not implemented")
 }
 
 func (n *hashOnlyNamer) ParseKeys(_ []string, _ bool) (namer.Results, error) {
