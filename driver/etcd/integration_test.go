@@ -359,7 +359,7 @@ func TestEtcdDriver_Watch_SingleKey(t *testing.T) {
 	// Wait for the watch event.
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix, "Event should contain the watched key")
+		assert.Equal(t, key, event.Key, "Event should contain the watched key")
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "Expected watch event but timed out")
 	}
@@ -369,7 +369,7 @@ func TestEtcdDriver_Watch_SingleKey(t *testing.T) {
 	// Wait for the delete event.
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix, "Event should contain the watched key")
+		assert.Equal(t, key, event.Key, "Event should contain the watched key")
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "Expected watch event for delete but timed out")
 	}
@@ -403,7 +403,7 @@ func TestEtcdDriver_Watch_Prefix(t *testing.T) {
 	for i := range 2 {
 		select {
 		case event := <-eventCh:
-			assert.Equal(t, expected, event.Prefix, "Event should signal the watched prefix")
+			assert.Equal(t, expected, event.Key, "Event should signal the watched prefix")
 		case <-time.After(defaultWaitTimeout):
 			t.Fatalf("Expected 2 watch events but only received %d", i)
 		}
@@ -414,7 +414,7 @@ func TestEtcdDriver_Watch_Prefix(t *testing.T) {
 	// Wait for the delete event.
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, expected, event.Prefix, "Event should signal the watched prefix")
+		assert.Equal(t, expected, event.Key, "Event should signal the watched prefix")
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "Expected watch event for delete but timed out")
 	}
@@ -505,7 +505,7 @@ func TestEtcdDriver_Watch_CancelDoesNotAffectOtherWatchers(t *testing.T) {
 
 	select {
 	case event := <-eventCh2:
-		assert.Equal(t, key2, event.Prefix, "second watcher should still receive events")
+		assert.Equal(t, key2, event.Key, "second watcher should still receive events")
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "second watcher should still receive events after first watcher is cancelled")
 	}

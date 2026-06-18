@@ -72,15 +72,15 @@ func (d Driver) Execute(
 }
 
 // Watch monitors changes to a specific key and returns a stream of events.
-// event.Prefix is the watched key with any trailing "/" stripped.
-func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
+// event.Key is the watched key with any trailing "/" stripped.
+func (d Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
 	rvChan := make(chan watch.Event, watchEventChannelSize)
 
 	emitted := bytes.TrimSuffix(key, []byte("/"))
 
 	watcher, err := d.conn.NewWatcher("config.storage:"+string(key), func(_ tarantool.WatchEvent) {
 		select {
-		case rvChan <- watch.Event{Prefix: emitted}:
+		case rvChan <- watch.Event{Key: emitted}:
 		case <-ctx.Done():
 		}
 	})

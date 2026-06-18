@@ -4,6 +4,6 @@ package watch
 
 // Event represents a change notification from the watch stream.
 type Event struct {
-	// Prefix indicates key/prefix of what was changed.
-	Prefix []byte
+	// Key is the key (or key prefix) that changed.
+	Key []byte
 }
