@@ -9,10 +9,10 @@ import (
 	"github.com/tarantool/go-storage/v2/namer"
 )
 
-// Compile-time check that NewLayeredNamer returns a Namer; the concrete type
+// Compile-time check that New returns a Namer; the concrete type
 // is unexported, so the assertion has to go through the constructor.
 var _ namer.Namer = func() namer.Namer {
-	layeredN, err := namer.NewLayeredNamer("objects", nil, nil)
+	layeredN, err := namer.New("objects", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -20,14 +20,14 @@ var _ namer.Namer = func() namer.Namer {
 	return layeredN
 }()
 
-func TestLayeredNamer_Constructor_Validation(t *testing.T) {
+func TestNamer_Constructor_Validation(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
 		objectLocation string
-		hashLocations  []namer.LayeredHashLocation
-		sigLocations   []namer.LayeredSigLocation
-		opts           []namer.LayeredOption
+		hashLocations  []namer.HashLocation
+		sigLocations   []namer.SigLocation
+		opts           []namer.Option
 	}
 
 	tests := []struct {
@@ -96,7 +96,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "hash Location with leading slash",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "/hashes"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "/hashes"}},
 				sigLocations:   nil,
 				opts:           nil,
 			},
@@ -106,7 +106,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "hash Location with trailing slash",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "hashes/"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "hashes/"}},
 				sigLocations:   nil,
 				opts:           nil,
 			},
@@ -116,7 +116,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "hash Location with inner slash",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "hash/sha256"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "hash/sha256"}},
 				sigLocations:   nil,
 				opts:           nil,
 			},
@@ -126,7 +126,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "hash Location empty",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: ""}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: ""}},
 				sigLocations:   nil,
 				opts:           nil,
 			},
@@ -136,7 +136,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "hash HasherName empty",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "", Location: "sha256"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "", Location: "sha256"}},
 				sigLocations:   nil,
 				opts:           nil,
 			},
@@ -147,7 +147,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: "/sigs"}},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: "/sigs"}},
 				opts:           nil,
 			},
 			wantErr: true,
@@ -157,7 +157,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: "sigs/"}},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: "sigs/"}},
 				opts:           nil,
 			},
 			wantErr: true,
@@ -167,7 +167,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: "sig/ed25519"}},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: "sig/ed25519"}},
 				opts:           nil,
 			},
 			wantErr: true,
@@ -177,7 +177,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: ""}},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: ""}},
 				opts:           nil,
 			},
 			wantErr: true,
@@ -187,7 +187,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "", Location: "ed25519"}},
+				sigLocations:   []namer.SigLocation{{SignerName: "", Location: "ed25519"}},
 				opts:           nil,
 			},
 			wantErr: true,
@@ -196,7 +196,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "duplicate hash entries share location",
 			args: args{
 				objectLocation: "objects",
-				hashLocations: []namer.LayeredHashLocation{
+				hashLocations: []namer.HashLocation{
 					{HasherName: "sha256", Location: "shared"},
 					{HasherName: "sha512", Location: "shared"},
 				},
@@ -210,7 +210,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations: []namer.LayeredSigLocation{
+				sigLocations: []namer.SigLocation{
 					{SignerName: "ed25519", Location: "shared"},
 					{SignerName: "rsa", Location: "shared"},
 				},
@@ -222,7 +222,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "valid: object and hash share location (different namespaces)",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "objects"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "objects"}},
 				sigLocations:   nil,
 				opts:           nil,
 			},
@@ -232,8 +232,8 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "valid: hash and sig share location (different markers)",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "common"}},
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: "common"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "common"}},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: "common"}},
 				opts:           nil,
 			},
 			wantErr: false,
@@ -247,8 +247,8 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "valid: with hash and sig",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 				opts:           nil,
 			},
 			wantErr: false,
@@ -259,7 +259,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 				objectLocation: "objects",
 				hashLocations:  nil,
 				sigLocations:   nil,
-				opts:           []namer.LayeredOption{namer.CompactSingleHash()},
+				opts:           []namer.Option{namer.CompactSingleHash()},
 			},
 			wantErr: true,
 		},
@@ -267,12 +267,12 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "compact hash: two entries fails",
 			args: args{
 				objectLocation: "objects",
-				hashLocations: []namer.LayeredHashLocation{
+				hashLocations: []namer.HashLocation{
 					{HasherName: "sha256", Location: "sha256"},
 					{HasherName: "sha512", Location: "sha512"},
 				},
 				sigLocations: nil,
-				opts:         []namer.LayeredOption{namer.CompactSingleHash()},
+				opts:         []namer.Option{namer.CompactSingleHash()},
 			},
 			wantErr: true,
 		},
@@ -280,9 +280,9 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			name: "compact hash: one entry succeeds",
 			args: args{
 				objectLocation: "objects",
-				hashLocations:  []namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+				hashLocations:  []namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 				sigLocations:   nil,
-				opts:           []namer.LayeredOption{namer.CompactSingleHash()},
+				opts:           []namer.Option{namer.CompactSingleHash()},
 			},
 			wantErr: false,
 		},
@@ -292,7 +292,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 				objectLocation: "objects",
 				hashLocations:  nil,
 				sigLocations:   nil,
-				opts:           []namer.LayeredOption{namer.CompactSingleSig()},
+				opts:           []namer.Option{namer.CompactSingleSig()},
 			},
 			wantErr: true,
 		},
@@ -301,11 +301,11 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations: []namer.LayeredSigLocation{
+				sigLocations: []namer.SigLocation{
 					{SignerName: "ed25519", Location: "ed25519"},
 					{SignerName: "rsa", Location: "rsa"},
 				},
-				opts: []namer.LayeredOption{namer.CompactSingleSig()},
+				opts: []namer.Option{namer.CompactSingleSig()},
 			},
 			wantErr: true,
 		},
@@ -314,8 +314,8 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 			args: args{
 				objectLocation: "objects",
 				hashLocations:  nil,
-				sigLocations:   []namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
-				opts:           []namer.LayeredOption{namer.CompactSingleSig()},
+				sigLocations:   []namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+				opts:           []namer.Option{namer.CompactSingleSig()},
 			},
 			wantErr: false,
 		},
@@ -325,7 +325,7 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := namer.NewLayeredNamer(
+			_, err := namer.New(
 				tt.args.objectLocation,
 				tt.args.hashLocations,
 				tt.args.sigLocations,
@@ -340,13 +340,13 @@ func TestLayeredNamer_Constructor_Validation(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_Constructor_CompactErrors_Sentinels(t *testing.T) {
+func TestNamer_Constructor_CompactErrors_Sentinels(t *testing.T) {
 	t.Parallel()
 
 	t.Run("compact hash cardinality error is sentinel", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := namer.NewLayeredNamer("objects", nil, nil, namer.CompactSingleHash())
+		_, err := namer.New("objects", nil, nil, namer.CompactSingleHash())
 		require.Error(t, err)
 		assert.ErrorIs(t, err, namer.ErrCompactSingleHashCardinality)
 	})
@@ -354,7 +354,7 @@ func TestLayeredNamer_Constructor_CompactErrors_Sentinels(t *testing.T) {
 	t.Run("compact sig cardinality error is sentinel", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := namer.NewLayeredNamer("objects", nil, nil, namer.CompactSingleSig())
+		_, err := namer.New("objects", nil, nil, namer.CompactSingleSig())
 		require.Error(t, err)
 		assert.ErrorIs(t, err, namer.ErrCompactSingleSigCardinality)
 	})
@@ -362,29 +362,29 @@ func TestLayeredNamer_Constructor_CompactErrors_Sentinels(t *testing.T) {
 	t.Run("reserved objectLocation error is sentinel", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := namer.NewLayeredNamer("hashes", nil, nil)
+		_, err := namer.New("hashes", nil, nil)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, namer.ErrObjectLocationReserved)
 	})
 }
 
-func newTestLayeredNamer(t *testing.T) namer.Namer {
+func newTestNamer(t *testing.T) namer.Namer {
 	t.Helper()
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 	)
 	require.NoError(t, err)
 
 	return layeredN
 }
 
-func TestLayeredNamer_GenerateNames_Success(t *testing.T) {
+func TestNamer_GenerateNames_Success(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)
@@ -409,10 +409,10 @@ func TestLayeredNamer_GenerateNames_Success(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_GenerateNames_EmptyName(t *testing.T) {
+func TestNamer_GenerateNames_EmptyName(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	_, err := layeredN.GenerateNames("")
 	require.Error(t, err)
@@ -421,10 +421,10 @@ func TestLayeredNamer_GenerateNames_EmptyName(t *testing.T) {
 	require.ErrorAs(t, err, &nameErr)
 }
 
-func TestLayeredNamer_GenerateNames_LeadingSlash(t *testing.T) {
+func TestNamer_GenerateNames_LeadingSlash(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	keys, err := layeredN.GenerateNames("/alice")
 	require.NoError(t, err)
@@ -434,15 +434,15 @@ func TestLayeredNamer_GenerateNames_LeadingSlash(t *testing.T) {
 	assert.Equal(t, "alice", keys[0].Name())
 }
 
-func TestLayeredNamer_GenerateNames_Compact(t *testing.T) {
+func TestNamer_GenerateNames_Compact(t *testing.T) {
 	t.Parallel()
 
 	t.Run("compact hash drops hashLocation segment", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(
+		layeredN, err := namer.New(
 			"objects",
-			[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
+			[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
 			nil,
 			namer.CompactSingleHash(),
 		)
@@ -461,10 +461,10 @@ func TestLayeredNamer_GenerateNames_Compact(t *testing.T) {
 	t.Run("compact sig drops sigLocation segment", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(
+		layeredN, err := namer.New(
 			"objects",
 			nil,
-			[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+			[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 			namer.CompactSingleSig(),
 		)
 		require.NoError(t, err)
@@ -482,10 +482,10 @@ func TestLayeredNamer_GenerateNames_Compact(t *testing.T) {
 	t.Run("both compact flags", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(
+		layeredN, err := namer.New(
 			"objects",
-			[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-			[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+			[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+			[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 			namer.CompactSingleHash(),
 			namer.CompactSingleSig(),
 		)
@@ -501,10 +501,10 @@ func TestLayeredNamer_GenerateNames_Compact(t *testing.T) {
 	})
 }
 
-func TestLayeredNamer_ParseKey_RoundTrip(t *testing.T) {
+func TestNamer_ParseKey_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	keys, err := layeredN.GenerateNames("alice")
 	require.NoError(t, err)
@@ -524,13 +524,13 @@ func TestLayeredNamer_ParseKey_RoundTrip(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_ParseKey_RoundTrip_Compact(t *testing.T) {
+func TestNamer_ParseKey_RoundTrip_Compact(t *testing.T) {
 	t.Parallel()
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.CompactSingleHash(),
 		namer.CompactSingleSig(),
 	)
@@ -554,10 +554,10 @@ func TestLayeredNamer_ParseKey_RoundTrip_Compact(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_ParseKey_Errors(t *testing.T) {
+func TestNamer_ParseKey_Errors(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	tests := []struct {
 		name string
@@ -627,10 +627,10 @@ func TestLayeredNamer_ParseKey_Errors(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_ParseKeys_Grouping(t *testing.T) {
+func TestNamer_ParseKeys_Grouping(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	t.Run("multiple names grouped correctly", func(t *testing.T) {
 		t.Parallel()
@@ -703,10 +703,10 @@ func TestLayeredNamer_ParseKeys_Grouping(t *testing.T) {
 	})
 }
 
-func TestLayeredNamer_Prefix(t *testing.T) {
+func TestNamer_Prefix(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	tests := []struct {
 		name     string
@@ -756,10 +756,10 @@ func TestLayeredNamer_Prefix(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_Prefixes(t *testing.T) {
+func TestNamer_Prefixes(t *testing.T) {
 	t.Parallel()
 
-	layeredN := newTestLayeredNamer(t)
+	layeredN := newTestNamer(t)
 
 	tests := []struct {
 		name     string
@@ -808,13 +808,13 @@ func TestLayeredNamer_Prefixes(t *testing.T) {
 	}
 }
 
-func TestLayeredNamer_Prefixes_Compact(t *testing.T) {
+func TestNamer_Prefixes_Compact(t *testing.T) {
 	t.Parallel()
 
-	layeredN, err := namer.NewLayeredNamer(
+	layeredN, err := namer.New(
 		"objects",
-		[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-		[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+		[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+		[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		namer.CompactSingleHash(),
 		namer.CompactSingleSig(),
 	)
@@ -828,10 +828,10 @@ func TestLayeredNamer_Prefixes_Compact(t *testing.T) {
 	assert.Equal(t, expected, layeredN.Prefixes("", true))
 }
 
-// TestLayeredNamer_MultiSegmentObjectLocation covers the round-trip of value,
+// TestNamer_MultiSegmentObjectLocation covers the round-trip of value,
 // hash, and sig keys when objectLocation is itself a multi-segment path
 // (e.g. "settings/ldap"). The full and compact layouts are both exercised.
-func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
+func TestNamer_MultiSegmentObjectLocation(t *testing.T) {
 	t.Parallel()
 
 	const objLoc = "settings/ldap"
@@ -839,7 +839,7 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 	t.Run("value key generate and parse", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(objLoc, nil, nil)
+		layeredN, err := namer.New(objLoc, nil, nil)
 		require.NoError(t, err)
 
 		keys, err := layeredN.GenerateNames("entry-1")
@@ -856,10 +856,10 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 	t.Run("full hash and sig", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(
+		layeredN, err := namer.New(
 			objLoc,
-			[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-			[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+			[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+			[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 		)
 		require.NoError(t, err)
 
@@ -883,10 +883,10 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 	t.Run("compact hash and sig", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(
+		layeredN, err := namer.New(
 			objLoc,
-			[]namer.LayeredHashLocation{{HasherName: "sha256", Location: "sha256"}},
-			[]namer.LayeredSigLocation{{SignerName: "ed25519", Location: "ed25519"}},
+			[]namer.HashLocation{{HasherName: "sha256", Location: "sha256"}},
+			[]namer.SigLocation{{SignerName: "ed25519", Location: "ed25519"}},
 			namer.CompactSingleHash(),
 			namer.CompactSingleSig(),
 		)
@@ -910,7 +910,7 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 	t.Run("parse rejects mismatching prefix", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(objLoc, nil, nil)
+		layeredN, err := namer.New(objLoc, nil, nil)
 		require.NoError(t, err)
 
 		// Right first segment, wrong second segment — must not be misread as
@@ -926,7 +926,7 @@ func TestLayeredNamer_MultiSegmentObjectLocation(t *testing.T) {
 	t.Run("Prefix produces correct walk root", func(t *testing.T) {
 		t.Parallel()
 
-		layeredN, err := namer.NewLayeredNamer(objLoc, nil, nil)
+		layeredN, err := namer.New(objLoc, nil, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, "/settings/ldap/", layeredN.Prefix("", false))

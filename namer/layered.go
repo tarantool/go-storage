@@ -8,15 +8,14 @@ import (
 
 // Fixed marker segments distinguishing key categories. Hash and signature keys
 // always live under these literals; the per-hasher / per-signer location
-// segment sits between the marker and the objectLocation. Mirrors the
-// hashName / signatureName constants used by DefaultNamer.
+// segment sits between the marker and the objectLocation.
 const (
-	layeredHashMarker = "hashes"
-	layeredSigMarker  = "sig"
+	hashMarker = "hashes"
+	sigMarker  = "sig"
 )
 
 // ObjectLocationMissing is the sentinel value passed as the objectLocation
-// argument to NewLayeredNamer to omit the per-codec objectLocation segment
+// argument to New to omit the per-codec objectLocation segment
 // from every generated key. The resulting layout is:
 //
 //	/<name>                            (value)
@@ -28,7 +27,7 @@ const (
 // the category markers.
 const ObjectLocationMissing = ""
 
-// Sentinel errors for NewLayeredNamer validation.
+// Sentinel errors for New validation.
 var (
 	// ErrEmptyHasherName is returned when a hash entry has an empty HasherName.
 	ErrEmptyHasherName = errors.New("namer: hash entry has empty HasherName")
@@ -67,22 +66,22 @@ var (
 	ErrKeyPrefixMissing = errors.New("namer: key does not start with configured WithKeyPrefix")
 )
 
-// LayeredHashLocation associates a hasher name with its key location segment.
-type LayeredHashLocation struct {
+// HashLocation associates a hasher name with its key location segment.
+type HashLocation struct {
 	HasherName string // matches hasher.Hasher.Name().
 	Location   string // the location segment (e.g. "sha256").
 }
 
-// LayeredSigLocation associates a signer name with its key location segment.
-type LayeredSigLocation struct {
+// SigLocation associates a signer name with its key location segment.
+type SigLocation struct {
 	SignerName string // matches crypto.Signer.Name() / Verifier.Name().
 	Location   string // the location segment (e.g. "ed25519").
 }
 
-// LayeredOption configures NewLayeredNamer.
-type LayeredOption func(*layeredOpts)
+// Option configures New.
+type Option func(*namerOpts)
 
-type layeredOpts struct {
+type namerOpts struct {
 	compactHash bool
 	compactSig  bool
 	legacy      bool
@@ -91,18 +90,18 @@ type layeredOpts struct {
 
 // CompactSingleHash drops the per-hasher location segment in generated and
 // parsed hash keys. Layout becomes /hashes/<objectLocation>/<name>.
-// NewLayeredNamer returns ErrCompactSingleHashCardinality if the hash list
+// New returns ErrCompactSingleHashCardinality if the hash list
 // does not have exactly one entry.
-func CompactSingleHash() LayeredOption {
-	return func(o *layeredOpts) { o.compactHash = true }
+func CompactSingleHash() Option {
+	return func(o *namerOpts) { o.compactHash = true }
 }
 
 // CompactSingleSig drops the per-signer location segment in generated and
 // parsed sig keys. Layout becomes /sig/<objectLocation>/<name>.
-// NewLayeredNamer returns ErrCompactSingleSigCardinality if the sig list
+// New returns ErrCompactSingleSigCardinality if the sig list
 // does not have exactly one entry.
-func CompactSingleSig() LayeredOption {
-	return func(o *layeredOpts) { o.compactSig = true }
+func CompactSingleSig() Option {
+	return func(o *namerOpts) { o.compactSig = true }
 }
 
 // LegacyHashSigLayout drops the per-codec objectLocation segment from hash
@@ -118,8 +117,8 @@ func CompactSingleSig() LayeredOption {
 // this option. Has no effect in unnamed mode (objectLocation ==
 // ObjectLocationMissing) since the unnamed layout already omits the
 // objectLocation segment.
-func LegacyHashSigLayout() LayeredOption {
-	return func(o *layeredOpts) { o.legacy = true }
+func LegacyHashSigLayout() Option {
+	return func(o *namerOpts) { o.legacy = true }
 }
 
 // WithKeyPrefix prepends a fixed path prefix to every key the namer emits
@@ -140,16 +139,16 @@ func LegacyHashSigLayout() LayeredOption {
 // top of storage.Prefixed for the same logical prefix — the two would double
 // it.
 //
-// NewLayeredNamer returns ErrKeyPrefixNoLeadingSlash or
+// New returns ErrKeyPrefixNoLeadingSlash or
 // ErrKeyPrefixTrailingSlash if the prefix is malformed.
-func WithKeyPrefix(prefix string) LayeredOption {
-	return func(o *layeredOpts) { o.keyPrefix = prefix }
+func WithKeyPrefix(prefix string) Option {
+	return func(o *namerOpts) { o.keyPrefix = prefix }
 }
 
-type layeredNamer struct {
+type namerImpl struct {
 	objectLocation string
-	hashLocations  []LayeredHashLocation
-	sigLocations   []LayeredSigLocation
+	hashLocations  []HashLocation
+	sigLocations   []SigLocation
 	compactHash    bool
 	compactSig     bool
 	// unnamed is set when objectLocation == ObjectLocationMissing. In this
@@ -169,7 +168,7 @@ type layeredNamer struct {
 	sigIndex  map[string]string // sigLocation  -> signerName.
 }
 
-// NewLayeredNamer constructs a Namer that emits keys with per-category
+// New constructs a Namer that emits keys with per-category
 // location segments. All segment strings are validated at construction time.
 //
 // Layout (default):
@@ -204,13 +203,13 @@ type layeredNamer struct {
 //     mode and skips these checks.
 //   - hashLocations must be unique within hashes; sigLocations must be unique within sigs.
 //   - Compact flags require exactly one entry in their respective category.
-func NewLayeredNamer(
+func New(
 	objectLocation string,
-	hashLocations []LayeredHashLocation,
-	sigLocations []LayeredSigLocation,
-	opts ...LayeredOption,
+	hashLocations []HashLocation,
+	sigLocations []SigLocation,
+	opts ...Option,
 ) (Namer, error) {
-	var resolved layeredOpts
+	var resolved namerOpts
 
 	for _, opt := range opts {
 		opt(&resolved)
@@ -225,7 +224,7 @@ func NewLayeredNamer(
 		}
 
 		firstSeg, _, _ := strings.Cut(objectLocation, "/")
-		if firstSeg == layeredHashMarker || firstSeg == layeredSigMarker {
+		if firstSeg == hashMarker || firstSeg == sigMarker {
 			return nil, fmt.Errorf("%w: got %q", ErrObjectLocationReserved, objectLocation)
 		}
 	}
@@ -286,7 +285,7 @@ func NewLayeredNamer(
 		sigIndex[sigLoc.Location] = sigLoc.SignerName
 	}
 
-	return &layeredNamer{
+	return &namerImpl{
 		objectLocation: objectLocation,
 		hashLocations:  hashLocations,
 		sigLocations:   sigLocations,
@@ -309,7 +308,7 @@ func isReservedFirstSegment(name string) bool {
 		first = name
 	}
 
-	return first == layeredHashMarker || first == layeredSigMarker
+	return first == hashMarker || first == sigMarker
 }
 
 func validateSegment(field, seg string) error {
@@ -361,7 +360,7 @@ func validateObjectLocation(seg string) error {
 // In unnamed mode (objectLocation == ObjectLocationMissing) the first
 // slash-separated segment of name must not equal "hashes" or "sig" — those
 // would collide with the category markers used to dispatch ParseKey.
-func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
+func (n *namerImpl) GenerateNames(name string) ([]Key, error) {
 	if name == "" {
 		return nil, errInvalidName(name, "should not be empty")
 	}
@@ -375,7 +374,7 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 
 	out := make([]Key, 0, 1+len(n.hashLocations)+len(n.sigLocations))
 
-	out = append(out, NewDefaultKey(
+	out = append(out, NewKey(
 		name,
 		KeyTypeValue,
 		"",
@@ -383,7 +382,7 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 	))
 
 	for _, hl := range n.hashLocations {
-		out = append(out, NewDefaultKey(
+		out = append(out, NewKey(
 			name,
 			KeyTypeHash,
 			hl.HasherName,
@@ -392,7 +391,7 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 	}
 
 	for _, sl := range n.sigLocations {
-		out = append(out, NewDefaultKey(
+		out = append(out, NewKey(
 			name,
 			KeyTypeSignature,
 			sl.SignerName,
@@ -403,7 +402,7 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 	return out, nil
 }
 
-// ParseKey parses a raw key path back to a DefaultKey.
+// ParseKey parses a raw key path back to a Key.
 //
 // Recognized shapes (must match the namer's configured layout):
 //
@@ -417,31 +416,31 @@ func (n *layeredNamer) GenerateNames(name string) ([]Key, error) {
 // In unnamed mode (objectLocation == ObjectLocationMissing) the
 // <objectLocation> segment is dropped from every shape; the value-key
 // branch treats the entire stripped path as <name>.
-func (n *layeredNamer) ParseKey(raw string) (DefaultKey, error) {
+func (n *namerImpl) ParseKey(raw string) (Key, error) {
 	keyless, err := n.stripKeyPrefix(raw)
 	if err != nil {
-		return DefaultKey{}, err
+		return Key{}, err
 	}
 
 	stripped := strings.TrimPrefix(keyless, "/")
 
 	first, _, found := strings.Cut(stripped, "/")
 	if first == "" {
-		return DefaultKey{}, errInvalidKey(raw, "key must have at least one non-empty path segment")
+		return Key{}, errInvalidKey(raw, "key must have at least one non-empty path segment")
 	}
 
 	if !found && !n.unnamed {
-		return DefaultKey{}, errInvalidKey(raw, "key must have at least two path segments")
+		return Key{}, errInvalidKey(raw, "key must have at least two path segments")
 	}
 
 	switch first {
-	case layeredHashMarker:
+	case hashMarker:
 		// stripped starts with "hashes/"; hand the hash parser the
 		// remainder after the marker.
 		_, rest, _ := strings.Cut(stripped, "/")
 
 		return n.parseHashKey(raw, rest)
-	case layeredSigMarker:
+	case sigMarker:
 		_, rest, _ := strings.Cut(stripped, "/")
 
 		return n.parseSigKey(raw, rest)
@@ -450,8 +449,8 @@ func (n *layeredNamer) ParseKey(raw string) (DefaultKey, error) {
 	}
 }
 
-// ParseKeys groups raw key paths by object name. It mirrors DefaultNamer.ParseKeys.
-func (n *layeredNamer) ParseKeys(names []string, ignoreError bool) (Results, error) {
+// ParseKeys groups raw key paths by object name.
+func (n *namerImpl) ParseKeys(names []string, ignoreError bool) (Results, error) {
 	out := map[string][]Key{}
 
 	for _, name := range names {
@@ -484,7 +483,7 @@ func (n *layeredNamer) ParseKeys(names []string, ignoreError bool) (Results, err
 //	Prefix("", true)        → "/"
 //	Prefix("alice", false)  → "/alice"
 //	Prefix("alice", true)   → "/alice/"
-func (n *layeredNamer) Prefix(val string, isPrefix bool) string {
+func (n *namerImpl) Prefix(val string, isPrefix bool) string {
 	suffix := strings.Trim(val, "/")
 
 	var builder strings.Builder
@@ -518,7 +517,7 @@ func (n *layeredNamer) Prefix(val string, isPrefix bool) string {
 // and "/sig/<sigLocation>/" (the <objectLocation>/ segment is dropped). The
 // value root "/" covers the entire storage including hash/sig keys, but the
 // integrity Validator filters them by category via ParseKey.
-func (n *layeredNamer) Prefixes(val string, isPrefix bool) []string {
+func (n *namerImpl) Prefixes(val string, isPrefix bool) []string {
 	suffix := strings.Trim(val, "/")
 	out := make([]string, 0, 1+len(n.hashLocations)+len(n.sigLocations))
 
@@ -540,11 +539,11 @@ func (n *layeredNamer) Prefixes(val string, isPrefix bool) []string {
 // case in unnamed mode (objectLocation == ObjectLocationMissing) — there
 // is no objectLocation to insert — and also when LegacyHashSigLayout() is
 // set, which deliberately drops the segment.
-func (n *layeredNamer) omitObjLocFromHashSig() bool {
+func (n *namerImpl) omitObjLocFromHashSig() bool {
 	return n.unnamed || n.legacy
 }
 
-func (n *layeredNamer) valueRoot() string {
+func (n *namerImpl) valueRoot() string {
 	if n.unnamed {
 		return n.keyPrefix + "/"
 	}
@@ -552,8 +551,8 @@ func (n *layeredNamer) valueRoot() string {
 	return n.keyPrefix + "/" + n.objectLocation + "/"
 }
 
-func (n *layeredNamer) hashRoot(hashLocation string) string {
-	root := n.keyPrefix + "/" + layeredHashMarker + "/"
+func (n *namerImpl) hashRoot(hashLocation string) string {
+	root := n.keyPrefix + "/" + hashMarker + "/"
 	if !n.compactHash {
 		root += hashLocation + "/"
 	}
@@ -565,8 +564,8 @@ func (n *layeredNamer) hashRoot(hashLocation string) string {
 	return root
 }
 
-func (n *layeredNamer) sigRoot(sigLocation string) string {
-	root := n.keyPrefix + "/" + layeredSigMarker + "/"
+func (n *namerImpl) sigRoot(sigLocation string) string {
+	root := n.keyPrefix + "/" + sigMarker + "/"
 	if !n.compactSig {
 		root += sigLocation + "/"
 	}
@@ -581,7 +580,7 @@ func (n *layeredNamer) sigRoot(sigLocation string) string {
 // layerPrefix appends suffix to a category root, optionally tacking on a
 // trailing slash. Empty suffix returns the root unchanged — the root already
 // ends in "/", so a range scan on it covers the whole category.
-func (n *layeredNamer) layerPrefix(root, suffix string, isPrefix bool) string {
+func (n *namerImpl) layerPrefix(root, suffix string, isPrefix bool) string {
 	if suffix == "" {
 		return root
 	}
@@ -594,7 +593,7 @@ func (n *layeredNamer) layerPrefix(root, suffix string, isPrefix bool) string {
 	return out
 }
 
-func (n *layeredNamer) buildValueKey(name string) string {
+func (n *namerImpl) buildValueKey(name string) string {
 	if n.unnamed {
 		return n.keyPrefix + "/" + name
 	}
@@ -602,70 +601,70 @@ func (n *layeredNamer) buildValueKey(name string) string {
 	return n.keyPrefix + "/" + n.objectLocation + "/" + name
 }
 
-func (n *layeredNamer) buildHashKey(hashLocation, name string) string {
+func (n *namerImpl) buildHashKey(hashLocation, name string) string {
 	omitObj := n.omitObjLocFromHashSig()
 
 	switch {
 	case n.compactHash && omitObj:
-		return n.keyPrefix + "/" + layeredHashMarker + "/" + name
+		return n.keyPrefix + "/" + hashMarker + "/" + name
 	case n.compactHash:
-		return n.keyPrefix + "/" + layeredHashMarker + "/" + n.objectLocation + "/" + name
+		return n.keyPrefix + "/" + hashMarker + "/" + n.objectLocation + "/" + name
 	case omitObj:
-		return n.keyPrefix + "/" + layeredHashMarker + "/" + hashLocation + "/" + name
+		return n.keyPrefix + "/" + hashMarker + "/" + hashLocation + "/" + name
 	}
 
-	return n.keyPrefix + "/" + layeredHashMarker + "/" + hashLocation + "/" + n.objectLocation + "/" + name
+	return n.keyPrefix + "/" + hashMarker + "/" + hashLocation + "/" + n.objectLocation + "/" + name
 }
 
-func (n *layeredNamer) buildSigKey(sigLocation, name string) string {
+func (n *namerImpl) buildSigKey(sigLocation, name string) string {
 	omitObj := n.omitObjLocFromHashSig()
 
 	switch {
 	case n.compactSig && omitObj:
-		return n.keyPrefix + "/" + layeredSigMarker + "/" + name
+		return n.keyPrefix + "/" + sigMarker + "/" + name
 	case n.compactSig:
-		return n.keyPrefix + "/" + layeredSigMarker + "/" + n.objectLocation + "/" + name
+		return n.keyPrefix + "/" + sigMarker + "/" + n.objectLocation + "/" + name
 	case omitObj:
-		return n.keyPrefix + "/" + layeredSigMarker + "/" + sigLocation + "/" + name
+		return n.keyPrefix + "/" + sigMarker + "/" + sigLocation + "/" + name
 	}
 
-	return n.keyPrefix + "/" + layeredSigMarker + "/" + sigLocation + "/" + n.objectLocation + "/" + name
+	return n.keyPrefix + "/" + sigMarker + "/" + sigLocation + "/" + n.objectLocation + "/" + name
 }
 
-func (n *layeredNamer) parseValueKey(raw, stripped string) (DefaultKey, error) {
+func (n *namerImpl) parseValueKey(raw, stripped string) (Key, error) {
 	if n.unnamed {
 		// In unnamed mode the entire stripped path is the name; the
 		// dispatcher already excluded "hashes" / "sig" first segments.
 		if strings.HasSuffix(raw, "/") {
-			return DefaultKey{}, errInvalidKey(raw, "key name should not be prefix")
+			return Key{}, errInvalidKey(raw, "key name should not be prefix")
 		}
 
 		if stripped == "" {
-			return DefaultKey{}, errInvalidKey(raw, "name part must not be empty")
+			return Key{}, errInvalidKey(raw, "name part must not be empty")
 		}
 
-		return NewDefaultKey(stripped, KeyTypeValue, "", raw), nil
+		return NewKey(stripped, KeyTypeValue, "", raw), nil
 	}
 
 	name, ok := strings.CutPrefix(stripped, n.objectLocation+"/")
 	if !ok {
 		first, _, _ := strings.Cut(stripped, "/")
 
-		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown location segment %q", first))
+		return Key{}, errInvalidKey(raw, fmt.Sprintf("unknown location segment %q", first))
 	}
 
 	if name == "" {
-		return DefaultKey{}, errInvalidKey(raw, "name part must not be empty")
+		return Key{}, errInvalidKey(raw, "name part must not be empty")
 	}
 
 	if strings.HasSuffix(name, "/") {
-		return DefaultKey{}, errInvalidKey(raw, "key name should not be prefix")
+		return Key{}, errInvalidKey(raw, "key name should not be prefix")
 	}
 
-	return NewDefaultKey(name, KeyTypeValue, "", raw), nil
+	return NewKey(name, KeyTypeValue, "", raw), nil
 }
 
-func (n *layeredNamer) parseHashKey(raw, rest string) (DefaultKey, error) {
+func (n *namerImpl) parseHashKey(raw, rest string) (Key, error) {
 	if n.compactHash {
 		return n.parseCompactHashKey(raw, rest)
 	}
@@ -673,65 +672,65 @@ func (n *layeredNamer) parseHashKey(raw, rest string) (DefaultKey, error) {
 	return n.parseFullHashKey(raw, rest)
 }
 
-func (n *layeredNamer) parseCompactHashKey(raw, rest string) (DefaultKey, error) {
+func (n *namerImpl) parseCompactHashKey(raw, rest string) (Key, error) {
 	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, rest, "hash")
 		if err != nil {
-			return DefaultKey{}, err
+			return Key{}, err
 		}
 
-		return NewDefaultKey(rest, KeyTypeHash, n.hashLocations[0].HasherName, raw), nil
+		return NewKey(rest, KeyTypeHash, n.hashLocations[0].HasherName, raw), nil
 	}
 
 	after, ok := strings.CutPrefix(rest, n.objectLocation+"/")
 	if !ok {
-		return DefaultKey{}, errInvalidKey(raw,
+		return Key{}, errInvalidKey(raw,
 			fmt.Sprintf("hash key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "hash")
 	if err != nil {
-		return DefaultKey{}, err
+		return Key{}, err
 	}
 
-	return NewDefaultKey(after, KeyTypeHash, n.hashLocations[0].HasherName, raw), nil
+	return NewKey(after, KeyTypeHash, n.hashLocations[0].HasherName, raw), nil
 }
 
-func (n *layeredNamer) parseFullHashKey(raw, rest string) (DefaultKey, error) {
+func (n *namerImpl) parseFullHashKey(raw, rest string) (Key, error) {
 	hashLoc, afterLoc, foundLoc := strings.Cut(rest, "/")
 	if !foundLoc || hashLoc == "" {
-		return DefaultKey{}, errInvalidKey(raw, "hash key missing hashLocation segment")
+		return Key{}, errInvalidKey(raw, "hash key missing hashLocation segment")
 	}
 
 	hasherName, ok := n.hashIndex[hashLoc]
 	if !ok {
-		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown hash location %q", hashLoc))
+		return Key{}, errInvalidKey(raw, fmt.Sprintf("unknown hash location %q", hashLoc))
 	}
 
 	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, afterLoc, "hash")
 		if err != nil {
-			return DefaultKey{}, err
+			return Key{}, err
 		}
 
-		return NewDefaultKey(afterLoc, KeyTypeHash, hasherName, raw), nil
+		return NewKey(afterLoc, KeyTypeHash, hasherName, raw), nil
 	}
 
 	after, ok := strings.CutPrefix(afterLoc, n.objectLocation+"/")
 	if !ok {
-		return DefaultKey{}, errInvalidKey(raw,
+		return Key{}, errInvalidKey(raw,
 			fmt.Sprintf("hash key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "hash")
 	if err != nil {
-		return DefaultKey{}, err
+		return Key{}, err
 	}
 
-	return NewDefaultKey(after, KeyTypeHash, hasherName, raw), nil
+	return NewKey(after, KeyTypeHash, hasherName, raw), nil
 }
 
-func (n *layeredNamer) parseSigKey(raw, rest string) (DefaultKey, error) {
+func (n *namerImpl) parseSigKey(raw, rest string) (Key, error) {
 	if n.compactSig {
 		return n.parseCompactSigKey(raw, rest)
 	}
@@ -739,62 +738,62 @@ func (n *layeredNamer) parseSigKey(raw, rest string) (DefaultKey, error) {
 	return n.parseFullSigKey(raw, rest)
 }
 
-func (n *layeredNamer) parseCompactSigKey(raw, rest string) (DefaultKey, error) {
+func (n *namerImpl) parseCompactSigKey(raw, rest string) (Key, error) {
 	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, rest, "sig")
 		if err != nil {
-			return DefaultKey{}, err
+			return Key{}, err
 		}
 
-		return NewDefaultKey(rest, KeyTypeSignature, n.sigLocations[0].SignerName, raw), nil
+		return NewKey(rest, KeyTypeSignature, n.sigLocations[0].SignerName, raw), nil
 	}
 
 	after, ok := strings.CutPrefix(rest, n.objectLocation+"/")
 	if !ok {
-		return DefaultKey{}, errInvalidKey(raw,
+		return Key{}, errInvalidKey(raw,
 			fmt.Sprintf("sig key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "sig")
 	if err != nil {
-		return DefaultKey{}, err
+		return Key{}, err
 	}
 
-	return NewDefaultKey(after, KeyTypeSignature, n.sigLocations[0].SignerName, raw), nil
+	return NewKey(after, KeyTypeSignature, n.sigLocations[0].SignerName, raw), nil
 }
 
-func (n *layeredNamer) parseFullSigKey(raw, rest string) (DefaultKey, error) {
+func (n *namerImpl) parseFullSigKey(raw, rest string) (Key, error) {
 	sigLoc, afterLoc, foundLoc := strings.Cut(rest, "/")
 	if !foundLoc || sigLoc == "" {
-		return DefaultKey{}, errInvalidKey(raw, "sig key missing sigLocation segment")
+		return Key{}, errInvalidKey(raw, "sig key missing sigLocation segment")
 	}
 
 	signerName, ok := n.sigIndex[sigLoc]
 	if !ok {
-		return DefaultKey{}, errInvalidKey(raw, fmt.Sprintf("unknown sig location %q", sigLoc))
+		return Key{}, errInvalidKey(raw, fmt.Sprintf("unknown sig location %q", sigLoc))
 	}
 
 	if n.omitObjLocFromHashSig() {
 		err := validateNamePart(raw, afterLoc, "sig")
 		if err != nil {
-			return DefaultKey{}, err
+			return Key{}, err
 		}
 
-		return NewDefaultKey(afterLoc, KeyTypeSignature, signerName, raw), nil
+		return NewKey(afterLoc, KeyTypeSignature, signerName, raw), nil
 	}
 
 	after, ok := strings.CutPrefix(afterLoc, n.objectLocation+"/")
 	if !ok {
-		return DefaultKey{}, errInvalidKey(raw,
+		return Key{}, errInvalidKey(raw,
 			fmt.Sprintf("sig key objectLocation does not match %q", n.objectLocation))
 	}
 
 	err := validateNamePart(raw, after, "sig")
 	if err != nil {
-		return DefaultKey{}, err
+		return Key{}, err
 	}
 
-	return NewDefaultKey(after, KeyTypeSignature, signerName, raw), nil
+	return NewKey(after, KeyTypeSignature, signerName, raw), nil
 }
 
 // stripKeyPrefix returns raw with the configured keyPrefix removed. When no
@@ -802,7 +801,7 @@ func (n *layeredNamer) parseFullSigKey(raw, rest string) (DefaultKey, error) {
 // followed by '/' (or end exactly at the prefix), else ErrKeyPrefixMissing is
 // returned. The follow-up-slash check prevents a prefix like "/p" from
 // falsely matching keys under a sibling prefix like "/pp/...".
-func (n *layeredNamer) stripKeyPrefix(raw string) (string, error) {
+func (n *namerImpl) stripKeyPrefix(raw string) (string, error) {
 	if n.keyPrefix == "" {
 		return raw, nil
 	}

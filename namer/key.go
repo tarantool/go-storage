@@ -29,25 +29,17 @@ func (t KeyType) String() string {
 	}
 }
 
-// Key defines the minimal interface required by keys.
-type Key interface {
-	Name() string     // Get object name.
-	Type() KeyType    // Get key type.
-	Property() string // Get metadata (e.g., algorithm version).
-	Build() string    // Reconstruct raw key string.
-}
-
-// DefaultKey implements default realization.
-type DefaultKey struct {
+// Key is a single key emitted or parsed by a Namer.
+type Key struct {
 	name     string  // Object identifier.
 	keyType  KeyType // Type of object (hash/signature/value).
 	property string  // Additional metadata (version/algorithm).
 	raw      string  // Raw key string.
 }
 
-// NewDefaultKey returns new Key object.
-func NewDefaultKey(name string, keytype KeyType, property string, raw string) DefaultKey {
-	return DefaultKey{
+// NewKey returns a new Key.
+func NewKey(name string, keytype KeyType, property string, raw string) Key {
+	return Key{
 		name:     name,
 		keyType:  keytype,
 		property: property,
@@ -56,21 +48,21 @@ func NewDefaultKey(name string, keytype KeyType, property string, raw string) De
 }
 
 // Name returns name of the key.
-func (k DefaultKey) Name() string {
+func (k Key) Name() string {
 	return k.name
 }
 
 // Type returns type of the key.
-func (k DefaultKey) Type() KeyType {
+func (k Key) Type() KeyType {
 	return k.keyType
 }
 
 // Property returns property of the key.
-func (k DefaultKey) Property() string {
+func (k Key) Property() string {
 	return k.property
 }
 
 // Build reconstructs key string.
-func (k DefaultKey) Build() string {
+func (k Key) Build() string {
 	return k.raw
 }
