@@ -14,7 +14,7 @@ func TestMarshalError_Error(t *testing.T) {
 
 	parentErr := errors.New("yaml marshal error")
 	err := MarshalError{parent: parentErr}
-	assert.Equal(t, "Failed to marshal: yaml marshal error", err.Error())
+	assert.Equal(t, "failed to marshal: yaml marshal error", err.Error())
 }
 
 func TestMarshalError_Unwrap(t *testing.T) {
@@ -34,7 +34,7 @@ func Test_errMarshal(t *testing.T) {
 		parentErr := errors.New("yaml marshal error")
 		err := errMarshal(parentErr)
 		require.Error(t, err)
-		assert.Equal(t, "Failed to marshal: yaml marshal error", err.Error())
+		assert.Equal(t, "failed to marshal: yaml marshal error", err.Error())
 
 		var marshalErr MarshalError
 		require.ErrorAs(t, err, &marshalErr)
@@ -54,7 +54,7 @@ func TestUnmarshalError_Error(t *testing.T) {
 
 	parentErr := errors.New("yaml unmarshal error")
 	err := UnmarshalError{parent: parentErr}
-	assert.Equal(t, "Failed to unmarshal: yaml unmarshal error", err.Error())
+	assert.Equal(t, "failed to unmarshal: yaml unmarshal error", err.Error())
 }
 
 func TestUnmarshalError_Unwrap(t *testing.T) {
@@ -74,7 +74,7 @@ func Test_errUnmarshal(t *testing.T) {
 		parentErr := errors.New("yaml unmarshal error")
 		err := errUnmarshal(parentErr)
 		require.Error(t, err)
-		assert.Equal(t, "Failed to unmarshal: yaml unmarshal error", err.Error())
+		assert.Equal(t, "failed to unmarshal: yaml unmarshal error", err.Error())
 
 		var unmarshalErr UnmarshalError
 		require.ErrorAs(t, err, &unmarshalErr)
