@@ -24,7 +24,7 @@ func (e MarshalError) Unwrap() error {
 
 // Error returns a string representation of the marshalling error.
 func (e MarshalError) Error() string {
-	return fmt.Sprintf("Failed to marshal: %s", e.parent)
+	return fmt.Sprintf("failed to marshal: %s", e.parent)
 }
 
 // UnmarshalError represents an error when unmarshalling fails.
@@ -47,5 +47,5 @@ func (e UnmarshalError) Unwrap() error {
 
 // Error returns a string representation of the unmarshalling error.
 func (e UnmarshalError) Error() string {
-	return fmt.Sprintf("Failed to unmarshal: %s", e.parent)
+	return fmt.Sprintf("failed to unmarshal: %s", e.parent)
 }
