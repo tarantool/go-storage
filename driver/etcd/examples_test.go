@@ -368,7 +368,7 @@ func ExampleDriver_Watch_basic() {
 
 	select {
 	case event := <-eventCh:
-		fmt.Printf("Received watch event for key: %s\n", string(event.Prefix))
+		fmt.Printf("Received watch event for key: %s\n", string(event.Key))
 	case <-watchCtx.Done():
 		fmt.Println("Watch context expired")
 	}
@@ -421,7 +421,7 @@ func ExampleDriver_Watch_multipleOperations() {
 	for eventCount < 3 {
 		select {
 		case event := <-eventCh:
-			fmt.Printf("Event %d: change detected on %s\n", eventCount+1, string(event.Prefix))
+			fmt.Printf("Event %d: change detected on %s\n", eventCount+1, string(event.Key))
 
 			eventCount++
 		case <-watchCtx.Done():
@@ -476,7 +476,7 @@ func ExampleDriver_Watch_gracefulTermination() {
 				return
 			}
 
-			fmt.Printf("Received event: %s\n", string(event.Prefix))
+			fmt.Printf("Received event: %s\n", string(event.Key))
 		case <-watchCtx.Done():
 			return
 		}

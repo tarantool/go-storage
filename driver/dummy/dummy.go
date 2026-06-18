@@ -88,7 +88,7 @@ func (d *Driver) Execute(
 // Watch monitors changes to a specific key and returns a stream of events.
 // The returned channel receives watch.Event when the key (or keys with matching prefix) is modified.
 // The cancel function stops the watcher and closes the channel.
-func (d *Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
+func (d *Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
 	ch, cancel := d.addWatcher(ctx, string(key))
 	return ch, cancel, nil
 }
@@ -317,7 +317,7 @@ func (d *Driver) notifyWatchers(key string) {
 			for _, ch := range watchers.chans {
 				select {
 				case ch <- watch.Event{
-					Prefix: []byte(emitted),
+					Key: []byte(emitted),
 				}:
 				default:
 				}

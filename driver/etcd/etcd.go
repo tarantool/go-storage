@@ -104,8 +104,8 @@ const (
 )
 
 // Watch monitors changes to a specific key and returns a stream of events.
-// event.Prefix is the watched key with any trailing "/" stripped.
-func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-chan watch.Event, func(), error) {
+// event.Key is the watched key with any trailing "/" stripped.
+func (d Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
 	eventCh := make(chan watch.Event, eventChannelSize)
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -138,7 +138,7 @@ func (d Driver) Watch(ctx context.Context, key []byte, _ ...watch.Option) (<-cha
 				for range watchResp.Events {
 					select {
 					case eventCh <- watch.Event{
-						Prefix: emitted,
+						Key: emitted,
 					}:
 					case <-ctx.Done():
 						return

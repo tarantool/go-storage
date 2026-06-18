@@ -450,7 +450,7 @@ func TestStorage_Watch(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 
 		// Send an event.
-		event := watch.Event{Prefix: []byte("key")}
+		event := watch.Event{Key: []byte("key")}
 		rawCh <- event
 
 		select {
@@ -483,7 +483,7 @@ func TestStorage_Watch(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 
 		// Send an event.
-		event := watch.Event{Prefix: []byte("key")}
+		event := watch.Event{Key: []byte("key")}
 		rawCh <- event
 
 		select {

@@ -27,7 +27,7 @@ var ErrPrefixNoLeadingSlash = errors.New("storage.Prefixed: prefix must start wi
 
 // Prefixed returns a Storage that scopes every operation, predicate, range,
 // and watch under prefix. Keys returned to the caller (RequestResponse.Values,
-// kv.KeyValue, watch.Event.Prefix) have prefix stripped — callers never see
+// kv.KeyValue, watch.Event.Key) have prefix stripped — callers never see
 // absolute keys.
 //
 // Composition: Prefixed("/a", Prefixed("/b", base)) ≡ Prefixed("/a/b", base).
@@ -102,9 +102,9 @@ func StoragePrefix(s Storage) []byte {
 	return nil
 }
 
-func (p *prefixed) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event {
+func (p *prefixed) Watch(ctx context.Context, key []byte) <-chan watch.Event {
 	absKey := concatKey(p.prefix, key)
-	innerCh := p.inner.Watch(ctx, absKey, opts...)
+	innerCh := p.inner.Watch(ctx, absKey)
 
 	out := make(chan watch.Event, cap(innerCh))
 
@@ -120,7 +120,7 @@ func (p *prefixed) Watch(ctx context.Context, key []byte, opts ...watch.Option) 
 					return
 				}
 
-				event.Prefix = stripPrefix(p.prefix, event.Prefix)
+				event.Key = stripPrefix(p.prefix, event.Key)
 
 				select {
 				case <-ctx.Done():
@@ -167,7 +167,7 @@ func (p *prefixed) LockerFactory() locker.Factory {
 }
 
 func (p *prefixed) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error) {
-	rangeOpts := &rangeOptions{Prefix: "", Limit: 0}
+	rangeOpts := &rangeOptions{Prefix: ""}
 	for _, opt := range opts {
 		opt(rangeOpts)
 	}
@@ -176,10 +176,6 @@ func (p *prefixed) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValu
 
 	if rangeOpts.Prefix != "" {
 		newOpts = append(newOpts, WithPrefix(string(p.prefix)+rangeOpts.Prefix))
-	}
-
-	if rangeOpts.Limit != 0 {
-		newOpts = append(newOpts, WithLimit(rangeOpts.Limit))
 	}
 
 	kvs, err := p.inner.Range(ctx, newOpts...)
@@ -252,11 +248,11 @@ func rewriteOperation(prefix []byte, oper operation.Operation) operation.Operati
 
 	switch oper.Type() {
 	case operation.TypeGet:
-		return operation.Get(newKey, oper.Options()...)
+		return operation.Get(newKey)
 	case operation.TypePut:
-		return operation.Put(newKey, oper.Value(), oper.Options()...)
+		return operation.Put(newKey, oper.Value())
 	case operation.TypeDelete:
-		return operation.Delete(newKey, oper.Options()...)
+		return operation.Delete(newKey)
 	}
 
 	panic(fmt.Sprintf("storage.Prefixed: unknown operation type %s", oper.Type()))

@@ -471,7 +471,7 @@ func TestDummyDriver_WatchPutEvent(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix)
+		assert.Equal(t, key, event.Key)
 	case <-watchCtx.Done():
 		t.Fatal("Timeout waiting for put event")
 	}
@@ -516,7 +516,7 @@ func TestDummyDriver_WatchDeleteEvent(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix)
+		assert.Equal(t, key, event.Key)
 	case <-watchCtx.Done():
 		t.Fatal("Timeout waiting for delete event")
 	}
@@ -843,8 +843,8 @@ func TestDummyDriver_Watch_Recursive(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, bytes.TrimSuffix(prefix, []byte("/")), event.Prefix,
-			"event.Prefix is the watched prefix with trailing slash stripped")
+		assert.Equal(t, bytes.TrimSuffix(prefix, []byte("/")), event.Key,
+			"event.Key is the watched prefix with trailing slash stripped")
 	case <-watchCtx.Done():
 		t.Fatal("Timeout waiting for recursive watch event")
 	}

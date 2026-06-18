@@ -199,7 +199,7 @@ func TestDriver_Watch_CallbackOnceCalled(t *testing.T) {
 	select {
 	case val, ok := <-events:
 		require.True(t, ok)
-		assert.Equal(t, []byte("test-key"), val.Prefix)
+		assert.Equal(t, []byte("test-key"), val.Key)
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "timeout")
 	}
@@ -250,7 +250,7 @@ func TestDriver_Watch_CallbackTwiceCalled(t *testing.T) {
 		select {
 		case val, ok := <-events:
 			require.True(t, ok)
-			assert.Equal(t, []byte("test-key"), val.Prefix)
+			assert.Equal(t, []byte("test-key"), val.Key)
 		case <-time.After(defaultWaitTimeout):
 			assert.Fail(t, "timeout waiting for event", ": #%d", attempt+1)
 		}
@@ -297,7 +297,7 @@ func TestDriver_Watch_PrefixKeyStripsTrailingSlash(t *testing.T) {
 	select {
 	case val, ok := <-events:
 		require.True(t, ok)
-		assert.Equal(t, []byte("/acl"), val.Prefix,
+		assert.Equal(t, []byte("/acl"), val.Key,
 			"emitted event drops the trailing slash so consumers can ParseKey it")
 	case <-time.After(defaultWaitTimeout):
 		assert.Fail(t, "timeout")

@@ -35,9 +35,9 @@ type DriverMock struct {
 	beforeNewLockerCounter uint64
 	NewLockerMock          mDriverMockNewLocker
 
-	funcWatch          func(ctx context.Context, key []byte, opts ...watch.Option) (ch1 <-chan watch.Event, f1 func(), err error)
+	funcWatch          func(ctx context.Context, key []byte) (ch1 <-chan watch.Event, f1 func(), err error)
 	funcWatchOrigin    string
-	inspectFuncWatch   func(ctx context.Context, key []byte, opts ...watch.Option)
+	inspectFuncWatch   func(ctx context.Context, key []byte)
 	afterWatchCounter  uint64
 	beforeWatchCounter uint64
 	WatchMock          mDriverMockWatch
@@ -870,16 +870,14 @@ type DriverMockWatchExpectation struct {
 
 // DriverMockWatchParams contains parameters of the Driver.Watch
 type DriverMockWatchParams struct {
-	ctx  context.Context
-	key  []byte
-	opts []watch.Option
+	ctx context.Context
+	key []byte
 }
 
 // DriverMockWatchParamPtrs contains pointers to parameters of the Driver.Watch
 type DriverMockWatchParamPtrs struct {
-	ctx  *context.Context
-	key  *[]byte
-	opts *[]watch.Option
+	ctx *context.Context
+	key *[]byte
 }
 
 // DriverMockWatchResults contains results of the Driver.Watch
@@ -891,10 +889,9 @@ type DriverMockWatchResults struct {
 
 // DriverMockWatchOrigins contains origins of expectations of the Driver.Watch
 type DriverMockWatchExpectationOrigins struct {
-	origin     string
-	originCtx  string
-	originKey  string
-	originOpts string
+	origin    string
+	originCtx string
+	originKey string
 }
 
 // Marks this method to be optional. The default behavior of any method with Return() is '1 or more', meaning
@@ -908,7 +905,7 @@ func (mmWatch *mDriverMockWatch) Optional() *mDriverMockWatch {
 }
 
 // Expect sets up expected params for Driver.Watch
-func (mmWatch *mDriverMockWatch) Expect(ctx context.Context, key []byte, opts ...watch.Option) *mDriverMockWatch {
+func (mmWatch *mDriverMockWatch) Expect(ctx context.Context, key []byte) *mDriverMockWatch {
 	if mmWatch.mock.funcWatch != nil {
 		mmWatch.mock.t.Fatalf("DriverMock.Watch mock is already set by Set")
 	}
@@ -921,7 +918,7 @@ func (mmWatch *mDriverMockWatch) Expect(ctx context.Context, key []byte, opts ..
 		mmWatch.mock.t.Fatalf("DriverMock.Watch mock is already set by ExpectParams functions")
 	}
 
-	mmWatch.defaultExpectation.params = &DriverMockWatchParams{ctx, key, opts}
+	mmWatch.defaultExpectation.params = &DriverMockWatchParams{ctx, key}
 	mmWatch.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
 	for _, e := range mmWatch.expectations {
 		if minimock.Equal(e.params, mmWatch.defaultExpectation.params) {
@@ -978,31 +975,8 @@ func (mmWatch *mDriverMockWatch) ExpectKeyParam2(key []byte) *mDriverMockWatch {
 	return mmWatch
 }
 
-// ExpectOptsParam3 sets up expected param opts for Driver.Watch
-func (mmWatch *mDriverMockWatch) ExpectOptsParam3(opts ...watch.Option) *mDriverMockWatch {
-	if mmWatch.mock.funcWatch != nil {
-		mmWatch.mock.t.Fatalf("DriverMock.Watch mock is already set by Set")
-	}
-
-	if mmWatch.defaultExpectation == nil {
-		mmWatch.defaultExpectation = &DriverMockWatchExpectation{}
-	}
-
-	if mmWatch.defaultExpectation.params != nil {
-		mmWatch.mock.t.Fatalf("DriverMock.Watch mock is already set by Expect")
-	}
-
-	if mmWatch.defaultExpectation.paramPtrs == nil {
-		mmWatch.defaultExpectation.paramPtrs = &DriverMockWatchParamPtrs{}
-	}
-	mmWatch.defaultExpectation.paramPtrs.opts = &opts
-	mmWatch.defaultExpectation.expectationOrigins.originOpts = minimock.CallerInfo(1)
-
-	return mmWatch
-}
-
 // Inspect accepts an inspector function that has same arguments as the Driver.Watch
-func (mmWatch *mDriverMockWatch) Inspect(f func(ctx context.Context, key []byte, opts ...watch.Option)) *mDriverMockWatch {
+func (mmWatch *mDriverMockWatch) Inspect(f func(ctx context.Context, key []byte)) *mDriverMockWatch {
 	if mmWatch.mock.inspectFuncWatch != nil {
 		mmWatch.mock.t.Fatalf("Inspect function is already set for DriverMock.Watch")
 	}
@@ -1027,7 +1001,7 @@ func (mmWatch *mDriverMockWatch) Return(ch1 <-chan watch.Event, f1 func(), err e
 }
 
 // Set uses given function f to mock the Driver.Watch method
-func (mmWatch *mDriverMockWatch) Set(f func(ctx context.Context, key []byte, opts ...watch.Option) (ch1 <-chan watch.Event, f1 func(), err error)) *DriverMock {
+func (mmWatch *mDriverMockWatch) Set(f func(ctx context.Context, key []byte) (ch1 <-chan watch.Event, f1 func(), err error)) *DriverMock {
 	if mmWatch.defaultExpectation != nil {
 		mmWatch.mock.t.Fatalf("Default expectation is already set for the Driver.Watch method")
 	}
@@ -1043,14 +1017,14 @@ func (mmWatch *mDriverMockWatch) Set(f func(ctx context.Context, key []byte, opt
 
 // When sets expectation for the Driver.Watch which will trigger the result defined by the following
 // Then helper
-func (mmWatch *mDriverMockWatch) When(ctx context.Context, key []byte, opts ...watch.Option) *DriverMockWatchExpectation {
+func (mmWatch *mDriverMockWatch) When(ctx context.Context, key []byte) *DriverMockWatchExpectation {
 	if mmWatch.mock.funcWatch != nil {
 		mmWatch.mock.t.Fatalf("DriverMock.Watch mock is already set by Set")
 	}
 
 	expectation := &DriverMockWatchExpectation{
 		mock:               mmWatch.mock,
-		params:             &DriverMockWatchParams{ctx, key, opts},
+		params:             &DriverMockWatchParams{ctx, key},
 		expectationOrigins: DriverMockWatchExpectationOrigins{origin: minimock.CallerInfo(1)},
 	}
 	mmWatch.expectations = append(mmWatch.expectations, expectation)
@@ -1085,17 +1059,17 @@ func (mmWatch *mDriverMockWatch) invocationsDone() bool {
 }
 
 // Watch implements mm_driver.Driver
-func (mmWatch *DriverMock) Watch(ctx context.Context, key []byte, opts ...watch.Option) (ch1 <-chan watch.Event, f1 func(), err error) {
+func (mmWatch *DriverMock) Watch(ctx context.Context, key []byte) (ch1 <-chan watch.Event, f1 func(), err error) {
 	mm_atomic.AddUint64(&mmWatch.beforeWatchCounter, 1)
 	defer mm_atomic.AddUint64(&mmWatch.afterWatchCounter, 1)
 
 	mmWatch.t.Helper()
 
 	if mmWatch.inspectFuncWatch != nil {
-		mmWatch.inspectFuncWatch(ctx, key, opts...)
+		mmWatch.inspectFuncWatch(ctx, key)
 	}
 
-	mm_params := DriverMockWatchParams{ctx, key, opts}
+	mm_params := DriverMockWatchParams{ctx, key}
 
 	// Record call args
 	mmWatch.WatchMock.mutex.Lock()
@@ -1114,7 +1088,7 @@ func (mmWatch *DriverMock) Watch(ctx context.Context, key []byte, opts ...watch.
 		mm_want := mmWatch.WatchMock.defaultExpectation.params
 		mm_want_ptrs := mmWatch.WatchMock.defaultExpectation.paramPtrs
 
-		mm_got := DriverMockWatchParams{ctx, key, opts}
+		mm_got := DriverMockWatchParams{ctx, key}
 
 		if mm_want_ptrs != nil {
 
@@ -1126,11 +1100,6 @@ func (mmWatch *DriverMock) Watch(ctx context.Context, key []byte, opts ...watch.
 			if mm_want_ptrs.key != nil && !minimock.Equal(*mm_want_ptrs.key, mm_got.key) {
 				mmWatch.t.Errorf("DriverMock.Watch got unexpected parameter key, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 					mmWatch.WatchMock.defaultExpectation.expectationOrigins.originKey, *mm_want_ptrs.key, mm_got.key, minimock.Diff(*mm_want_ptrs.key, mm_got.key))
-			}
-
-			if mm_want_ptrs.opts != nil && !minimock.Equal(*mm_want_ptrs.opts, mm_got.opts) {
-				mmWatch.t.Errorf("DriverMock.Watch got unexpected parameter opts, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
-					mmWatch.WatchMock.defaultExpectation.expectationOrigins.originOpts, *mm_want_ptrs.opts, mm_got.opts, minimock.Diff(*mm_want_ptrs.opts, mm_got.opts))
 			}
 
 		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
@@ -1145,9 +1114,9 @@ func (mmWatch *DriverMock) Watch(ctx context.Context, key []byte, opts ...watch.
 		return (*mm_results).ch1, (*mm_results).f1, (*mm_results).err
 	}
 	if mmWatch.funcWatch != nil {
-		return mmWatch.funcWatch(ctx, key, opts...)
+		return mmWatch.funcWatch(ctx, key)
 	}
-	mmWatch.t.Fatalf("Unexpected call to DriverMock.Watch. %v %v %v", ctx, key, opts)
+	mmWatch.t.Fatalf("Unexpected call to DriverMock.Watch. %v %v", ctx, key)
 	return
 }
 

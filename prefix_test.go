@@ -61,7 +61,7 @@ func (s *recordingStorage) LockerFactory() locker.Factory {
 	return s
 }
 
-func (s *recordingStorage) Watch(_ context.Context, key []byte, _ ...watch.Option) <-chan watch.Event {
+func (s *recordingStorage) Watch(_ context.Context, key []byte) <-chan watch.Event {
 	s.lastWatchKey = key
 
 	watchCh := make(chan watch.Event, len(s.watchEvents)+1)
@@ -491,7 +491,7 @@ func TestPrefixed_Watch(t *testing.T) {
 			txErr:        nil,
 			lastWatchKey: nil,
 			watchEvents: []watch.Event{
-				{Prefix: []byte("/testfoo")},
+				{Key: []byte("/testfoo")},
 			},
 		}
 		prefixedStore := mustPrefix(t, namespace, inner)
@@ -503,7 +503,7 @@ func TestPrefixed_Watch(t *testing.T) {
 		select {
 		case event, ok := <-watchCh:
 			require.True(t, ok)
-			assert.Equal(t, []byte("foo"), event.Prefix,
+			assert.Equal(t, []byte("foo"), event.Key,
 				"event Prefix must have namespace prefix stripped")
 		case <-time.After(500 * time.Millisecond):
 			t.Fatal("expected event from Watch channel")
@@ -596,7 +596,7 @@ func (b *blockingWatchStorage) LockerFactory() locker.Factory {
 	return b
 }
 
-func (b *blockingWatchStorage) Watch(_ context.Context, _ []byte, _ ...watch.Option) <-chan watch.Event {
+func (b *blockingWatchStorage) Watch(_ context.Context, _ []byte) <-chan watch.Event {
 	return b.ch
 }
 

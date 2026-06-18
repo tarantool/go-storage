@@ -29,7 +29,7 @@ type Driver interface {
 	// The returned channel will receive events as changes occur.
 	// The returned cleanup function should be called to stop the watch and release resources.
 	// An error is returned if the watch could not be established.
-	Watch(ctx context.Context, key []byte, opts ...watch.Option) (<-chan watch.Event, func(), error)
+	Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error)
 
 	// NewLocker creates a Locker for name. ctx is the locker-lifetime context:
 	// cancelling it stops any keepalive goroutine and aborts a blocking Lock.

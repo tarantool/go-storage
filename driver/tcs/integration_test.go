@@ -666,7 +666,7 @@ func TestTCSDriver_WatchPutEvent(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix)
+		assert.Equal(t, key, event.Key)
 	case <-watchCtx.Done():
 		t.Fatal("Timeout waiting for put event")
 	}
@@ -713,7 +713,7 @@ func TestTCSDriver_WatchDeleteEvent(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, key, event.Prefix)
+		assert.Equal(t, key, event.Key)
 	case <-watchCtx.Done():
 		t.Fatal("Timeout waiting for delete event")
 	}
