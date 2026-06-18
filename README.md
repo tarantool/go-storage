@@ -168,7 +168,7 @@ func main() {
     }
 
     // Automatically tries etcd first, then TCS.
-    stor, cleanup, err := connect.NewStorage(ctx, cfg)
+    stor, cleanup, err := connect.Connect(ctx, cfg)
     if err != nil {
         log.Fatal(err)
     }
@@ -209,9 +209,9 @@ cfg := connect.Config{
 #### Storage Interface
 The core `Storage` interface (`storage.Storage`) provides high‑level methods:
 
-- `Watch(ctx, key, opts) <-chan watch.Event` – watch for changes
+- `Watch(ctx, key) <-chan watch.Event` – watch for changes (key ending in `/` watches a prefix)
 - `Tx(ctx) tx.Tx` – create a transaction builder
-- `Range(ctx, opts) ([]kv.KeyValue, error)` – range query with prefix/limit
+- `Range(ctx, opts) ([]kv.KeyValue, error)` – range query filtered by `WithPrefix`
 - `NewLocker(ctx, name, opts) (locker.Locker, error)` – create a distributed lock bound to this storage
 
 #### Namespace Scoping with `Prefixed`
@@ -243,8 +243,7 @@ resp, err := storage.Tx(ctx).
 ```
 
 #### Operations
-The `operation` package defines `Get`, `Put`, `Delete` operations. Each
-operation can be configured with options.
+The `operation` package defines `Get`, `Put`, `Delete` operations.
 
 #### Predicates
 The `predicate` package provides value and version comparisons:
@@ -284,103 +283,12 @@ if err != nil {
 }
 ```
 
-#### Data Integrity with Typed Storage
+#### Data Integrity (`Codec`, `Store`, `Tx`)
+
 The [`integrity`](https://pkg.go.dev/github.com/tarantool/go-storage/v2/integrity)
- package provides a high‑level `Typed` interface for storing and retrieving
-  values with built‑in integrity protection. It automatically computes hashes
-   and signatures (using configurable algorithms) and verifies them on
-   retrieval.
-
-##### Creating a Typed Storage Instance
-
-```go
-package main
-
-import (
-    "context"
-    "crypto/rand"
-    "crypto/rsa"
-    "log"
-
-    clientv3 "go.etcd.io/etcd/client/v3"
-    "github.com/tarantool/go-storage/v2"
-    "github.com/tarantool/go-storage/v2/driver/etcd"
-    "github.com/tarantool/go-storage/v2/hasher"
-    "github.com/tarantool/go-storage/v2/crypto"
-    "github.com/tarantool/go-storage/v2/integrity"
-)
-
-func main() {
-    // 1. Create a base storage (e.g., etcd driver).
-    cli, err := clientv3.New(clientv3.Config{Endpoints: []string{"localhost:2379"}})
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer cli.Close()
-
-    driver := etcd.New(cli)
-    baseStorage := storage.NewStorage(driver)
-
-    // 2. Generate RSA keys (in production, load from secure storage).
-    privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // 3. Build typed storage with integrity protection.
-    typed := integrity.NewTypedBuilder[MyConfig](baseStorage).
-        WithPrefix("/config").
-        WithHasher(hasher.NewSHA256Hasher()).          // adds SHA‑256 hash verification.
-        WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privKey)). // adds RSA‑PSS signatures.
-        Build()
-
-    ctx := context.Background()
-
-    // 4. Store a configuration object with automatic integrity data.
-    config := MyConfig{Environment: "production", Timeout: 30}
-    if err := typed.Put(ctx, "app/settings", config); err != nil {
-        log.Fatal(err)
-    }
-
-    // 4.5 Store an object using predicates.
-    p, _ := typed.ValueEqual(config)
-
-    if err := typed.Put(ctx,
-        "app/settings",
-        config,
-        integrity.WithPutPredicates(p),
-    ); err != nil {
-        log.Fatal(err)
-    }
-
-    // 5. Retrieve and verify integrity.
-    result, err := typed.Get(ctx, "app/settings")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    if result.Error != nil {
-        log.Printf("Integrity check failed: %v", result.Error)
-    } else {
-        cfg, _ := result.Value.Get()
-        log.Printf("Retrieved valid config: %+v", cfg)
-    }
-
-    // 6. Range over all configurations under a prefix.
-    results, err := typed.Range(ctx, "app/")
-    if err != nil {
-        log.Fatal(err)
-    }
-    for _, res := range results {
-        log.Printf("Found config %s (valid: %v)", res.Name, res.Error == nil)
-    }
-}
-
-type MyConfig struct {
-    Environment string `yaml:"environment"`
-    Timeout     int    `yaml:"timeout"`
-}
-```
+package stores and retrieves values with built‑in integrity protection. It
+automatically computes hashes and signatures (using configurable algorithms)
+and verifies them on retrieval.
 
 ##### Key Features
 - Automatic Hash & Signature Generation: Values are stored together with
@@ -389,18 +297,11 @@ type MyConfig struct {
   signatures; invalid data is reported.
 - Configurable Algorithms: Plug in any hasher (`hasher.Hasher`) and
   signer/verifier (`crypto.SignerVerifier`).
-- **Prefix Isolation**: Each typed storage uses a configurable key prefix,
-  avoiding collisions.
-- **Watch Support**: `Watch` method filters events for the typed namespace.
+- **Layered Key Layout**: each key category lives under its own top-level
+  location segment, keeping value/hash/signature keys collision-free.
+- **Watch Support**: `Watch` reports changes for the codec's namespace.
 
-The `integrity.Typed` builder also accepts custom marshallers (default is
-YAML), custom namers, and separate signer/verifier instances for asymmetric
-setups.
-
-#### Schema-Driven Integrity API (`Codec`, `Store`, `Tx`)
-
-Alongside `integrity.Typed`, the package exposes a schema-first API split
-into three pieces:
+The API is split into three pieces:
 
 - `integrity.Codec[T]` describes the on-disk layout (object location,
   hashers, signers, marshaller) without binding to any storage handle. It is
@@ -417,6 +318,11 @@ into three pieces:
 ##### Codec and Store
 
 ```go
+type MyConfig struct {
+    Environment string `yaml:"environment"`
+    Timeout     int    `yaml:"timeout"`
+}
+
 codec, err := integrity.NewCodecBuilder[MyConfig]().
     WithObjectLocation("config").
     WithHasher(hasher.NewSHA256Hasher()).
@@ -466,8 +372,8 @@ if !resp.Succeeded {
 
 ##### Layered Key Layout
 
-The new API uses `namer.LayeredNamer` by default, which places each key
-category under its own top-level location segment:
+The integrity API builds its namer via `namer.New` by default, which places
+each key category under its own top-level location segment:
 
 ```
 /<objectLocation>/<name>                         (value)
@@ -533,9 +439,9 @@ to the singleton's value-layer key for use in `Tx.If`.
 
 Beyond the default YAML marshaller, the `marshaller` package now ships:
 
-- `TypedJSONMarshaller[T]` — `encoding/json`-based marshalling for any
+- `JSONMarshaller[T]` — `encoding/json`-based marshalling for any
   Go type.
-- `TypedBytesMarshaller` — passthrough `TypedMarshaller[[]byte]` for values
+- `BytesMarshaller` — passthrough `Marshaller[[]byte]` for values
   that are already serialized or stored as opaque blobs.
 
 ### Examples

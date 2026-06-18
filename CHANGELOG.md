@@ -11,7 +11,67 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **BREAKING:** dropped the redundant `Layered` qualifier from the `namer`
+  API now that it is the only namer: `NewLayeredNamer` → `namer.New`,
+  `LayeredHashLocation` → `namer.HashLocation`, `LayeredSigLocation` →
+  `namer.SigLocation`, `LayeredOption` → `namer.Option`. Behaviour and the key
+  layout are unchanged; the `namer.Namer` interface and the option
+  constructors (`CompactSingleHash`, `CompactSingleSig`, `LegacyHashSigLayout`,
+  `WithKeyPrefix`) keep their names.
+- **BREAKING:** dropped the redundant `Typed` qualifier from the `marshaller`
+  API: `TypedMarshaller[T]` → `marshaller.Marshaller[T]`,
+  `NewTypedYamlMarshaller` → `NewYamlMarshaller`, `TypedJSONMarshaller` →
+  `JSONMarshaller`, `TypedBytesMarshaller` → `BytesMarshaller` (and the
+  matching `YamlMarshaller`/`New…` names). The generic parameter already
+  conveys "typed".
+- **BREAKING:** collapsed the single-implementation `namer.Key` interface into
+  a concrete struct: `namer.DefaultKey` → `namer.Key`, `NewDefaultKey` →
+  `namer.NewKey`. `Namer.ParseKey` now returns `Key` (was the concrete
+  `DefaultKey`), matching `GenerateNames`'s `[]Key`.
+- **BREAKING:** renamed `watch.Event.Prefix` to `watch.Event.Key` — the field
+  carries the changed key, not a prefix.
+- **BREAKING:** renamed `connect.NewStorage` to `connect.Connect` (the
+  probe-etcd-then-TCS helper) so it no longer collides with the unrelated
+  `storage.NewStorage(driver)` constructor.
+- **BREAKING:** dropped the unused `opts ...watch.Option` parameter from
+  `storage.Storage.Watch` and `driver.Driver.Watch`. Prefix watches are still
+  selected by ending the key with `/`.
+
+### Removed
+
+- **BREAKING:** removed the legacy `integrity.Typed[T]` storage and its
+  `integrity.NewTypedBuilder`/`TypedBuilder` (and the `NamerConstructor` type).
+  Use the schema-first `integrity.Codec[T]` API (`NewCodecBuilder` +
+  `Bind`/`BindSingleton`) instead, which covers the same Get/Put/Delete/Range/
+  Watch surface plus multi-key transactions. The shared options
+  (`WithPutPredicates`, `WithDeletePredicates`, `WithPrefix`,
+  `IgnoreVerificationError`, `IgnoreMoreThanOneResult`), error sentinels, and
+  the `Generator`/`Validator`/`marshaller` building blocks are unchanged.
+- **BREAKING:** removed `namer.DefaultNamer` and `namer.NewDefaultNamer`, the
+  flat `/<prefix>/<category>/...` namer used only by the removed `Typed` API.
+  Use `namer.New` (the default for `integrity.Codec`), which emits the layered
+  `/<category>/<location>/<objectLocation>/<name>` layout. The `namer.Namer`
+  interface is unchanged.
+- **BREAKING:** removed non-functional placeholder options that were no-ops:
+  `storage.Option` with `storage.WithTimeout()`/`storage.WithRetry()` (and
+  `NewStorage`'s variadic), `storage.WithLimit` (`Range` never honored a
+  limit), `watch.Option` (had no constructors and every driver ignored it),
+  and `operation.Option` (an empty struct) together with `Operation.Options()`.
+- **BREAKING:** removed the unused untyped `marshaller.Marshaller` and
+  `marshaller.Marshallable` interfaces (nothing referenced them).
+- **BREAKING:** removed the `integrity.InvalidNameError` type; `ErrInvalidName`
+  is now a plain sentinel (see Fixed).
+
 ### Fixed
+
+- `integrity.ValidationError` now implements `Unwrap()` (was `Unpack()`), so
+  the wrapped cause of hash/signature/unmarshal failures is reachable via
+  `errors.Is`/`errors.As`.
+- `integrity.ErrInvalidName` is now a plain `errors.New` sentinel instead of a
+  zero-valued `InvalidNameError` struct, so `errors.Is(err, ErrInvalidName)` is
+  reliable.
+- `marshaller` error strings are now lowercased per Go convention
+  (`failed to marshal`/`failed to unmarshal`).
 
 ## [v2.0.0]
 
