@@ -19,7 +19,7 @@ func TestNewStorage_NoEndpoints(t *testing.T) {
 
 	ctx := context.Background()
 
-	_, _, err := connect.NewStorage(ctx, connect.Config{}) //nolint:exhaustruct
+	_, _, err := connect.Connect(ctx, connect.Config{}) //nolint:exhaustruct
 	require.Error(t, err)
 	assert.ErrorIs(t, err, connect.ErrNoEndpoint)
 }
@@ -445,7 +445,7 @@ func TestNewStorage_BothFail(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	_, _, err := connect.NewStorage(ctx, connect.Config{ //nolint:exhaustruct
+	_, _, err := connect.Connect(ctx, connect.Config{ //nolint:exhaustruct
 		Endpoints:   []string{"127.0.0.1:12345"},
 		DialTimeout: 1 * time.Second,
 	})

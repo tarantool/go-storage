@@ -197,7 +197,7 @@ func TestNewStorage_AutoDetect_Etcd(t *testing.T) {
 	cfg := createEtcdTestConfig(t)
 
 	ctx := context.Background()
-	stor, cancel, err := connect.NewStorage(ctx, cfg)
+	stor, cancel, err := connect.Connect(ctx, cfg)
 	require.NoError(t, err)
 
 	defer cancel()
@@ -225,7 +225,7 @@ func TestNewStorage_AutoDetect_TCS(t *testing.T) {
 
 	ctx := context.Background()
 
-	stor, cancel, err := connect.NewStorage(ctx, connect.Config{ //nolint:exhaustruct
+	stor, cancel, err := connect.Connect(ctx, connect.Config{ //nolint:exhaustruct
 		Endpoints: tcsEndpoints,
 		Username:  "client",
 		Password:  "secret",
