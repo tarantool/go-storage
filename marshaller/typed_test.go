@@ -20,17 +20,17 @@ type NestedStruct struct {
 	Active bool       `json:"active" yaml:"active"`
 }
 
-func TestTypedYamlMarshaller_New(t *testing.T) {
+func TestYamlMarshaller_New(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 	require.NotNil(t, marsh)
 }
 
-func TestTypedYamlMarshaller_Marshal_Success(t *testing.T) {
+func TestYamlMarshaller_Marshal_Success(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 
 	data := TestStruct{
 		Name:  "test",
@@ -51,10 +51,10 @@ tags:
 	require.YAMLEq(t, expectedYaml, string(result))
 }
 
-func TestTypedYamlMarshaller_Marshal_EmptyStruct(t *testing.T) {
+func TestYamlMarshaller_Marshal_EmptyStruct(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 
 	data := TestStruct{
 		Name:  "",
@@ -72,10 +72,10 @@ value: 0
 	require.YAMLEq(t, expectedYaml, string(result))
 }
 
-func TestTypedYamlMarshaller_Marshal_NestedStruct(t *testing.T) {
+func TestYamlMarshaller_Marshal_NestedStruct(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[NestedStruct]()
+	marsh := marshaller.NewYamlMarshaller[NestedStruct]()
 
 	data := NestedStruct{
 		ID: 1,
@@ -100,10 +100,10 @@ active: true
 	require.YAMLEq(t, expectedYaml, string(result))
 }
 
-func TestTypedYamlMarshaller_Unmarshal_Success(t *testing.T) {
+func TestYamlMarshaller_Unmarshal_Success(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 
 	yamlData := []byte(`name: test
 value: 42
@@ -123,10 +123,10 @@ tags:
 	require.Equal(t, expected, result)
 }
 
-func TestTypedYamlMarshaller_Unmarshal_EmptyYaml(t *testing.T) {
+func TestYamlMarshaller_Unmarshal_EmptyYaml(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 
 	yamlData := []byte(``)
 
@@ -141,10 +141,10 @@ func TestTypedYamlMarshaller_Unmarshal_EmptyYaml(t *testing.T) {
 	require.Equal(t, expected, result)
 }
 
-func TestTypedYamlMarshaller_Unmarshal_NestedStruct(t *testing.T) {
+func TestYamlMarshaller_Unmarshal_NestedStruct(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[NestedStruct]()
+	marsh := marshaller.NewYamlMarshaller[NestedStruct]()
 
 	yamlData := []byte(`id: 1
 data:
@@ -168,10 +168,10 @@ active: true
 	require.Equal(t, expected, result)
 }
 
-func TestTypedYamlMarshaller_Unmarshal_InvalidYaml(t *testing.T) {
+func TestYamlMarshaller_Unmarshal_InvalidYaml(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 
 	invalidYaml := []byte(`name: test
 value: not_a_number
@@ -179,13 +179,13 @@ value: not_a_number
 
 	_, err := marsh.Unmarshal(invalidYaml)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Failed to unmarshal")
+	require.Contains(t, err.Error(), "failed to unmarshal")
 }
 
-func TestTypedYamlMarshaller_RoundTrip(t *testing.T) {
+func TestYamlMarshaller_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[TestStruct]()
+	marsh := marshaller.NewYamlMarshaller[TestStruct]()
 
 	original := TestStruct{
 		Name:  "roundtrip",
@@ -203,10 +203,10 @@ func TestTypedYamlMarshaller_RoundTrip(t *testing.T) {
 	require.Equal(t, original, unmarshaled)
 }
 
-func TestTypedYamlMarshaller_WithPrimitiveType(t *testing.T) {
+func TestYamlMarshaller_WithPrimitiveType(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[int]()
+	marsh := marshaller.NewYamlMarshaller[int]()
 
 	yamlData := []byte(`42`)
 
@@ -219,10 +219,10 @@ func TestTypedYamlMarshaller_WithPrimitiveType(t *testing.T) {
 	require.Equal(t, "100\n", string(marshaled))
 }
 
-func TestTypedYamlMarshaller_WithSliceType(t *testing.T) {
+func TestYamlMarshaller_WithSliceType(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedYamlMarshaller[[]string]()
+	marsh := marshaller.NewYamlMarshaller[[]string]()
 
 	yamlData := []byte(`- item1
 - item2
@@ -242,10 +242,10 @@ func TestTypedYamlMarshaller_WithSliceType(t *testing.T) {
 	require.Equal(t, original, unmarshaled)
 }
 
-func TestTypedJSONMarshaller_RoundTrip(t *testing.T) {
+func TestJSONMarshaller_RoundTrip(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedJSONMarshaller[TestStruct]()
+	marsh := marshaller.NewJSONMarshaller[TestStruct]()
 
 	original := TestStruct{
 		Name:  "roundtrip",
@@ -262,10 +262,10 @@ func TestTypedJSONMarshaller_RoundTrip(t *testing.T) {
 	require.Equal(t, original, unmarshaled)
 }
 
-func TestTypedJSONMarshaller_NestedStruct(t *testing.T) {
+func TestJSONMarshaller_NestedStruct(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedJSONMarshaller[NestedStruct]()
+	marsh := marshaller.NewJSONMarshaller[NestedStruct]()
 
 	original := NestedStruct{
 		ID: 1,
@@ -285,20 +285,20 @@ func TestTypedJSONMarshaller_NestedStruct(t *testing.T) {
 	require.Equal(t, original, unmarshaled)
 }
 
-func TestTypedJSONMarshaller_Unmarshal_InvalidJSON(t *testing.T) {
+func TestJSONMarshaller_Unmarshal_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedJSONMarshaller[TestStruct]()
+	marsh := marshaller.NewJSONMarshaller[TestStruct]()
 
 	_, err := marsh.Unmarshal([]byte(`{not json}`))
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "Failed to unmarshal")
+	require.Contains(t, err.Error(), "failed to unmarshal")
 }
 
-func TestTypedBytesMarshaller_Passthrough(t *testing.T) {
+func TestBytesMarshaller_Passthrough(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedBytesMarshaller()
+	marsh := marshaller.NewBytesMarshaller()
 
 	original := []byte{0x00, 0x01, 0x02, 0xff}
 
@@ -311,10 +311,10 @@ func TestTypedBytesMarshaller_Passthrough(t *testing.T) {
 	require.Equal(t, original, unmarshaled)
 }
 
-func TestTypedBytesMarshaller_Nil(t *testing.T) {
+func TestBytesMarshaller_Nil(t *testing.T) {
 	t.Parallel()
 
-	marsh := marshaller.NewTypedBytesMarshaller()
+	marsh := marshaller.NewBytesMarshaller()
 
 	marshaled, err := marsh.Marshal(nil)
 	require.NoError(t, err)
@@ -325,8 +325,8 @@ func TestTypedBytesMarshaller_Nil(t *testing.T) {
 	require.Nil(t, unmarshaled)
 }
 
-func TestTypedBytesMarshaller_ImplementsTypedMarshaller(t *testing.T) {
+func TestBytesMarshaller_ImplementsMarshaller(t *testing.T) {
 	t.Parallel()
 
-	var _ marshaller.TypedMarshaller[[]byte] = marshaller.NewTypedBytesMarshaller()
+	var _ marshaller.Marshaller[[]byte] = marshaller.NewBytesMarshaller()
 }
