@@ -236,7 +236,7 @@ func ExampleDriver_Watch() {
 
 		select {
 		case event := <-eventCh:
-			fmt.Printf("Received watch event for key: %s\n", string(event.Prefix))
+			fmt.Printf("Received watch event for key: %s\n", string(event.Key))
 		case <-watchCtx.Done():
 			fmt.Println("Watch context expired")
 		}
@@ -266,7 +266,7 @@ func ExampleDriver_Watch() {
 
 		select {
 		case event := <-eventCh:
-			fmt.Printf("Received watch event for prefix: %s\n", string(event.Prefix))
+			fmt.Printf("Received watch event for prefix: %s\n", string(event.Key))
 		case <-watchCtx.Done():
 			fmt.Println("Watch context expired")
 		}
@@ -301,7 +301,7 @@ func ExampleDriver_Watch() {
 					return
 				}
 
-				fmt.Printf("Received event: %s\n", string(event.Prefix))
+				fmt.Printf("Received event: %s\n", string(event.Key))
 			case <-watchCtx.Done():
 				return
 			}

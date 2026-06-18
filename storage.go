@@ -20,7 +20,6 @@ import (
 // rangeOptions contains configuration options for range operations.
 type rangeOptions struct {
 	Prefix string // Prefix filter for range queries.
-	Limit  int    // Maximum number of results to return.
 }
 
 // RangeOption is a function that configures range operation options.
@@ -33,20 +32,12 @@ func WithPrefix(prefix string) RangeOption {
 	}
 }
 
-// WithLimit configures a range operation to limit the number of results returned.
-func WithLimit(limit int) RangeOption {
-	return func(opts *rangeOptions) {
-		opts.Limit = limit
-	}
-}
-
 // Storage is the main interface for key-value storage operations.
 // It provides methods for watching changes, transaction management, and range queries.
 type Storage interface {
-	// Watch streams changes for a specific key or prefix.
-	// Options:
-	//   - WithPrefix: watch for changes on keys with the specified prefix
-	Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event
+	// Watch streams changes for a specific key, or for a key prefix when key
+	// ends with "/".
+	Watch(ctx context.Context, key []byte) <-chan watch.Event
 
 	// Tx creates a new transaction.
 	// The context manages timeouts and cancellation for the transaction.
@@ -57,10 +48,7 @@ type Storage interface {
 	// Storage interface.
 	TxFactory() txPkg.Factory
 
-	// Range queries a range of keys with optional filtering.
-	// Options:
-	//   - WithPrefix: filter keys by prefix
-	//   - WithLimit: limit the number of results returned
+	// Range queries a range of keys, filtered by WithPrefix.
 	Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error)
 
 	// NewLocker creates a Locker for name. ctx is the locker-lifetime context:
@@ -73,28 +61,6 @@ type Storage interface {
 	LockerFactory() locker.Factory
 }
 
-// storageOptions contains configuration options for storage instances.
-type storageOptions struct{}
-
-// Option is a function that configures storage options.
-type Option func(*storageOptions)
-
-// WithTimeout configures a default timeout for storage operations.
-// This is a dummy option for demonstration purposes.
-func WithTimeout() Option {
-	return func(_ *storageOptions) {
-		// Dummy implementation.
-	}
-}
-
-// WithRetry configures retry behavior for failed operations.
-// This is a dummy option for demonstration purposes.
-func WithRetry() Option {
-	return func(_ *storageOptions) {
-		// Dummy implementation.
-	}
-}
-
 // storage is the concrete implementation of the Storage interface.
 type storage struct {
 	driver driver.Driver // Underlying storage driver.
@@ -103,8 +69,8 @@ type storage struct {
 var _ Storage = (*storage)(nil)
 
 // Watch implements the Storage interface for watching key changes.
-func (s storage) Watch(ctx context.Context, key []byte, opts ...watch.Option) <-chan watch.Event {
-	eventCh, cleanup, err := s.driver.Watch(ctx, key, opts...)
+func (s storage) Watch(ctx context.Context, key []byte) <-chan watch.Event {
+	eventCh, cleanup, err := s.driver.Watch(ctx, key)
 	if err != nil {
 		// Return a closed channel on error.
 		ch := make(chan watch.Event)
@@ -168,7 +134,7 @@ func (s storage) TxFactory() txPkg.Factory {
 
 // Range implements the Storage interface for range queries.
 func (s storage) Range(ctx context.Context, opts ...RangeOption) ([]kv.KeyValue, error) {
-	rangeOpts := &rangeOptions{Prefix: "", Limit: 0}
+	rangeOpts := &rangeOptions{Prefix: ""}
 	for _, opt := range opts {
 		opt(rangeOpts)
 	}
@@ -213,8 +179,7 @@ func (s storage) LockerFactory() locker.Factory {
 }
 
 // NewStorage creates a new Storage instance with the specified driver.
-// Optional StorageOption parameters can be provided to configure the storage.
-func NewStorage(driver driver.Driver, _ ...Option) Storage {
+func NewStorage(driver driver.Driver) Storage {
 	return &storage{
 		driver: driver,
 	}

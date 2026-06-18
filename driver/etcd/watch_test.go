@@ -128,8 +128,8 @@ func TestDriver_Watch_EventsForwarded(t *testing.T) {
 
 	select {
 	case event := <-eventCh:
-		assert.Equal(t, []byte("test-prefix"), event.Prefix,
-			"event.Prefix is the watched key with trailing slash stripped")
+		assert.Equal(t, []byte("test-prefix"), event.Key,
+			"event.Key is the watched key with trailing slash stripped")
 	case <-time.After(time.Second):
 		t.Fatal("expected event to be forwarded")
 	}
