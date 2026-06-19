@@ -107,6 +107,10 @@ for the full list.
 * [watch.Event field rename](#watch-event)
 * [connect.NewStorage renamed](#connect-rename)
 * [Error handling](#error-handling)
+* [hasher/crypto: encoding modes](#encoding-modes)
+* [hasher.Hasher gains a Verify method](#hasher-verify)
+* [crypto.NewRSAPSSSignerVerifier renamed](#rsapss-rename)
+* [On-disk encoding of hashes and signatures](#on-disk-encoding)
 
 ### <a id="integrity-typed">integrity: Typed storage removed</a>
 
@@ -217,5 +221,80 @@ are unchanged.
 * `integrity.ErrInvalidName` is now a plain `errors.New` sentinel (the
   `integrity.InvalidNameError` type is removed). Match it with
   `errors.Is(err, integrity.ErrInvalidName)` as before.
+
+### <a id="encoding-modes">hasher/crypto: encoding modes</a>
+
+`hasher.Hasher` and the `crypto` RSA-PSS signer/verifier gained variadic
+options and an explicit encoding mode, selected with `WithMode()`:
+
+* `ModeAuto` (default) — produces **raw** bytes and, on verification, accepts a
+  stored digest/signature in **either raw or lower-case hex** form.
+* `ModeHex` — produces and accepts **only** lower-case hex.
+* `ModeBin` — produces and accepts **only** raw bytes.
+
+The default (`ModeAuto`) keeps the previous raw output, so writes are
+unchanged; the only new behaviour is that verification now also tolerates a hex
+encoding, which lets you migrate stored data to hex incrementally.
+
+```Go
+// Default: raw output, reads both raw and hex.
+h := hasher.NewSHA256Hasher()
+digest, _ := h.Hash(data) // 32 raw bytes, as before
+
+// Force hex everywhere.
+hexHasher := hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeHex))
+hexDigest, _ := hexHasher.Hash(data) // 64-char hex string
+
+// Force raw everywhere.
+binHasher := hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeBin))
+
+sv := crypto.NewRSAPSS(priv, crypto.WithMode(crypto.ModeHex)) // hex signatures
+v := crypto.NewRSAPSSVerifier(pub)                            // auto: accepts both
+```
+
+`Name()` is unchanged for both, so the on-disk key layout is preserved — only
+the stored payload encoding can change (see below). The digest fed internally to
+RSA-PSS is always raw, regardless of the mode.
+
+### <a id="hasher-verify">hasher.Hasher gains a Verify method</a>
+
+The `Hasher` interface now requires:
+
+```Go
+Verify(data, stored []byte) error
+```
+
+It reports whether `stored` is an accepted encoding of the digest of `data`
+under the hasher's mode (`nil` on match). The built-in SHA-1/SHA-256 hashers
+implement it; **custom `Hasher` implementations must add it**. The integrity
+validator now calls `Verify` instead of byte-comparing `Hash` output, so hash
+verification respects the mode (and `ModeAuto` accepts both encodings).
+
+### <a id="rsapss-rename">crypto.NewRSAPSSSignerVerifier renamed</a>
+
+`crypto.NewRSAPSSSignerVerifier` is renamed to `crypto.NewRSAPSS`. Both it and
+`crypto.NewRSAPSSVerifier` now take variadic options.
+
+```Go
+// Before:                                  // After:
+sv := crypto.NewRSAPSSSignerVerifier(priv)  sv := crypto.NewRSAPSS(priv)
+```
+
+### <a id="on-disk-encoding">On-disk encoding of hashes and signatures</a>
+
+With the default `ModeAuto`, an `integrity.Codec` built with the default hasher
+and signer/verifier still stores **raw** hashes and signatures, exactly as
+before — so data round-trips with older versions. Because `ModeAuto` also reads
+hex, you can move a store to hex incrementally: switch writers to `ModeHex`
+while readers stay on `ModeAuto`, then tighten readers to `ModeHex` once all
+data is migrated.
+
+```Go
+// Write hex, while existing readers on ModeAuto keep accepting old raw data.
+codec, _ := integrity.NewCodecBuilder[MyConfig]().
+	WithHasher(hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeHex))).
+	WithSignerVerifier(crypto.NewRSAPSS(priv, crypto.WithMode(crypto.ModeHex))).
+	Build()
+```
 
 [go-modules-v2]: https://go.dev/ref/mod#major-version-suffixes

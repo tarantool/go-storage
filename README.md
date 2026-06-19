@@ -407,7 +407,7 @@ for multi-op transactions) drop the `name` parameter:
 ```go
 codec, err := integrity.NewCodecBuilder[AuthConfig]().
     WithObjectLocation("settings").
-    WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*privKey)).
+    WithSignerVerifier(crypto.NewRSAPSS(*privKey)).
     Build()
 if err != nil {
     log.Fatal(err)
