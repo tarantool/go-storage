@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- hasher, crypto: hex-encoding decorators that wrap an existing `Hasher` or
+  `SignerVerifier` so the stored payload is lower-case hex while `Name()` is
+  passed through unchanged, preserving the on-disk key layout. New
+  constructors: `hasher.NewHexHasher`, `hasher.NewHexSHA256Hasher`,
+  `hasher.NewHexSHA1Hasher`, `crypto.NewHexSignerVerifier`,
+  `crypto.NewHexVerifier`, `crypto.NewHexRSAPSSSignerVerifier`, and
+  `crypto.NewHexRSAPSSVerifier`. The raw constructors are unchanged (#114).
+
 ### Changed
 
 ### Fixed
