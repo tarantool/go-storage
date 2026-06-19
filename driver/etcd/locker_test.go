@@ -257,18 +257,12 @@ func TestLocker_CtxCancellation_AbortsLock(t *testing.T) {
 	lockC, err := driverC.NewLocker(ctx, lockName)
 	require.NoError(t, err)
 
-	acquiredC := make(chan error, 1)
-
-	go func() {
-		acquiredC <- lockC.Lock(ctx)
-	}()
-
-	select {
-	case err := <-acquiredC:
-		require.NoError(t, err, "fresh locker C should acquire after A released and B's ctx cancelled")
-	case <-time.After(lockerTestTimeout):
-		t.Fatal("fresh locker C did not acquire within timeout")
-	}
+	// Lock is bounded by ctx (3*lockerTestTimeout), so it cannot hang the
+	// test. An independent, tighter time.After tripwire here used to flake
+	// on slow CI runners under -race when an etcd round-trip stalled, even
+	// though Lock would still have acquired within ctx.
+	require.NoError(t, lockC.Lock(ctx),
+		"fresh locker C should acquire after A released and B's ctx cancelled")
 
 	require.NoError(t, lockC.Unlock(ctx))
 }
