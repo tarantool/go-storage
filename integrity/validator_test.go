@@ -898,7 +898,7 @@ func TestValidatorValidate_EmptyValue_WithVerifier(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 
 	sig, err := signerVerifier.Sign(nil)
 	require.NoError(t, err)

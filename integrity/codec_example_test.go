@@ -118,7 +118,7 @@ func ExampleCodecBuilder_WithSignerVerifier() {
 
 	codec, err := integrity.NewCodecBuilder[codecExampleConfig]().WithObjectLocation("objects").
 		WithHasher(hasher.NewSHA256Hasher()).
-		WithSignerVerifier(crypto.NewRSAPSSSignerVerifier(*priv)).
+		WithSignerVerifier(crypto.NewRSAPSS(*priv)).
 		Build()
 	if err != nil {
 		log.Fatalf("build codec: %v", err)

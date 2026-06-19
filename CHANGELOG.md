@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- hasher, crypto: three encoding modes selected via `WithMode()` —
+  `ModeAuto` (default), `ModeHex` and `ModeBin`. All hasher/crypto constructors
+  (`NewSHA256Hasher`, `NewSHA1Hasher`, `NewRSAPSS`, `NewRSAPSSVerifier`) take
+  variadic options. `ModeAuto` produces raw bytes and, on verification, accepts
+  a stored digest/signature in either raw or lower-case hex form — the
+  migration-friendly read path. `ModeHex` produces and accepts only hex;
+  `ModeBin` produces and accepts only raw bytes.
+- hasher: `Hasher` interface gains `Verify(data, stored []byte) error`, which
+  reports whether a stored digest matches under the hasher's mode. The integrity
+  validator uses it so hash verification is encoding-aware.
+
 ### Changed
 
 - **BREAKING:** dropped the redundant `Layered` qualifier from the `namer`
@@ -36,6 +47,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - **BREAKING:** dropped the unused `opts ...watch.Option` parameter from
   `storage.Storage.Watch` and `driver.Driver.Watch`. Prefix watches are still
   selected by ending the key with `/`.
+- **BREAKING:** the `hasher.Hasher` interface now requires a
+  `Verify(data, stored []byte) error` method; custom implementations must add
+  it. The built-in SHA-1/SHA-256 hashers implement it.
+- **BREAKING:** `crypto.NewRSAPSSSignerVerifier` is renamed to
+  `crypto.NewRSAPSS`.
 
 ### Removed
 

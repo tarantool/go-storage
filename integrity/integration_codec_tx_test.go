@@ -240,7 +240,7 @@ func TestStoreIntegration_Range_EmptyWithSignerVerifier(t *testing.T) {
 
 		ctx := t.Context()
 		shaHash := hasher.NewSHA256Hasher()
-		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+		rsaSV := crypto.NewRSAPSS(*rsaPK2048)
 
 		_, store := newIntegrationCodecStore(t, driverInstance,
 			func(b integrity.CodecBuilder[IntegrationStruct]) integrity.CodecBuilder[IntegrationStruct] {
@@ -294,7 +294,7 @@ func TestStoreIntegration_WithSignerVerifier(t *testing.T) {
 
 		ctx := t.Context()
 		shaHash := hasher.NewSHA256Hasher()
-		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+		rsaSV := crypto.NewRSAPSS(*rsaPK2048)
 
 		_, store := newIntegrationCodecStore(t, driverInstance,
 			func(b integrity.CodecBuilder[IntegrationStruct]) integrity.CodecBuilder[IntegrationStruct] {
@@ -600,7 +600,7 @@ func TestTxIntegration_EmptyValue_RoundTrip(t *testing.T) {
 		base := scopedStorage(t, driverInstance)
 
 		shaHash := hasher.NewSHA256Hasher()
-		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+		rsaSV := crypto.NewRSAPSS(*rsaPK2048)
 
 		codec, err := integrity.NewCodecBuilder[[]byte]().
 			WithObjectLocation("objects").
@@ -645,7 +645,7 @@ func TestStoreIntegration_EmptyValue_GetPut(t *testing.T) {
 		base := scopedStorage(t, driverInstance)
 
 		shaHash := hasher.NewSHA256Hasher()
-		rsaSV := crypto.NewRSAPSSSignerVerifier(*rsaPK2048)
+		rsaSV := crypto.NewRSAPSS(*rsaPK2048)
 
 		codec, err := integrity.NewCodecBuilder[[]byte]().
 			WithObjectLocation("objects").

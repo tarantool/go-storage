@@ -1,8 +1,6 @@
 package integrity
 
 import (
-	"bytes"
-
 	"github.com/tarantool/go-option"
 
 	"github.com/tarantool/go-storage/v2/crypto"
@@ -140,12 +138,16 @@ func (v Validator[T]) validateSingle(name string, kvs []extendedKV) ValidatedRes
 
 			delete(expectedHashers, kvi.parsedKey.Property())
 
-			hash, err := hasher.Hash(body)
-			switch {
-			case err != nil:
-				aggregatedError.Append(errFailedToComputeHashWith(kvi.parsedKey.Property(), err))
-			case !bytes.Equal(hash, kvi.keyValue.Value):
-				aggregatedError.Append(errHashMismatch(kvi.parsedKey.Property(), kvi.keyValue.Value, hash))
+			err := hasher.Verify(body, kvi.keyValue.Value)
+			if err != nil {
+				// Recompute to produce a precise diagnostic and to tell a
+				// compute failure apart from a genuine mismatch.
+				computed, herr := hasher.Hash(body)
+				if herr != nil {
+					aggregatedError.Append(errFailedToComputeHashWith(kvi.parsedKey.Property(), herr))
+				} else {
+					aggregatedError.Append(errHashMismatch(kvi.parsedKey.Property(), kvi.keyValue.Value, computed))
+				}
 			}
 		case namer.KeyTypeSignature:
 			verifier, ok := expectedVerifiers[kvi.parsedKey.Property()]
