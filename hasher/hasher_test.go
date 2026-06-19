@@ -33,11 +33,22 @@ func TestSHA1Hasher(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Default (ModeAuto) output is the raw digest.
 			h := hasher.NewSHA1Hasher()
 
 			result, err := h.Hash(test.in)
 			require.NoError(t, err)
 			assert.Equal(t, test.out, hex.EncodeToString(result))
+
+			// ModeHex returns lower-case hex.
+			hexResult, err := hasher.NewSHA1Hasher(hasher.WithMode(hasher.ModeHex)).Hash(test.in)
+			require.NoError(t, err)
+			assert.Equal(t, test.out, string(hexResult))
+
+			// ModeBin returns the raw digest.
+			binResult, err := hasher.NewSHA1Hasher(hasher.WithMode(hasher.ModeBin)).Hash(test.in)
+			require.NoError(t, err)
+			assert.Equal(t, test.out, hex.EncodeToString(binResult))
 		})
 	}
 }
@@ -76,11 +87,65 @@ func TestSHA256Hasher(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Default (ModeAuto) output is the raw digest.
 			h := hasher.NewSHA256Hasher()
 
 			result, err := h.Hash(test.in)
 			require.NoError(t, err)
 			assert.Equal(t, test.expected, hex.EncodeToString(result))
+
+			// ModeHex returns lower-case hex.
+			hexResult, err := hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeHex)).Hash(test.in)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, string(hexResult))
+
+			// ModeBin returns the raw digest.
+			binResult, err := hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeBin)).Hash(test.in)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, hex.EncodeToString(binResult))
+		})
+	}
+}
+
+// TestHasherVerify_Modes pins the per-mode Verify contract: ModeAuto accepts a
+// stored digest in either raw or hex form, ModeHex only hex, ModeBin only raw.
+func TestHasherVerify_Modes(t *testing.T) {
+	t.Parallel()
+
+	data := []byte("abc")
+	raw, err := hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeBin)).Hash(data)
+	require.NoError(t, err)
+
+	hexDigest, err := hasher.NewSHA256Hasher(hasher.WithMode(hasher.ModeHex)).Hash(data)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name      string
+		mode      hasher.Mode
+		stored    []byte
+		wantError bool
+	}{
+		{"auto accepts raw", hasher.ModeAuto, raw, false},
+		{"auto accepts hex", hasher.ModeAuto, hexDigest, false},
+		{"auto rejects garbage", hasher.ModeAuto, []byte("nope"), true},
+		{"hex accepts hex", hasher.ModeHex, hexDigest, false},
+		{"hex rejects raw", hasher.ModeHex, raw, true},
+		{"bin accepts raw", hasher.ModeBin, raw, false},
+		{"bin rejects hex", hasher.ModeBin, hexDigest, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			h := hasher.NewSHA256Hasher(hasher.WithMode(test.mode))
+
+			err := h.Verify(data, test.stored)
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

@@ -28,7 +28,7 @@ func newTestRSAPSS(t *testing.T) crypto.SignerVerifier {
 	pk, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	return crypto.NewRSAPSSSignerVerifier(*pk)
+	return crypto.NewRSAPSS(*pk)
 }
 
 func TestCodecBuilder_Defaults(t *testing.T) {

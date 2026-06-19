@@ -1,6 +1,7 @@
 package integrity_test
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -40,6 +41,19 @@ func (m *mockHasher) Hash(data []byte) ([]byte, error) {
 	}
 
 	return []byte("mock-hash-" + m.name), nil
+}
+
+func (m *mockHasher) Verify(data, stored []byte) error {
+	h, err := m.Hash(data)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(stored, h) {
+		return errors.New("mock hash mismatch")
+	}
+
+	return nil
 }
 
 type mockSigner struct {

@@ -13,7 +13,7 @@ import (
 func TestRsaWithoutKeys(t *testing.T) {
 	t.Parallel()
 
-	rsapss := crypto.NewRSAPSSSignerVerifier(rsa.PrivateKey{}) //nolint:exhaustruct
+	rsapss := crypto.NewRSAPSS(rsa.PrivateKey{}) //nolint:exhaustruct
 	require.NotNil(t, rsapss, "rsapss must be returned")
 
 	data := []byte("abc")
@@ -32,7 +32,7 @@ func TestRsaOnlyPrivateKey(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signer := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signer := crypto.NewRSAPSS(*privateKey)
 	require.NotNil(t, signer, "signer must be returned")
 
 	verifier := crypto.NewRSAPSSVerifier(rsa.PublicKey{}) //nolint:exhaustruct
@@ -68,7 +68,7 @@ func TestRsaOnlyPublicKey(t *testing.T) {
 	require.Nil(t, sig, "signature must be nil")
 
 	// Create signer+verifier with private key.
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 	require.NotNil(t, signerVerifier, "signerVerifier must be returned")
 
 	sign, err := signerVerifier.Sign(data)
@@ -85,7 +85,7 @@ func TestRsaSignVerify(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 	require.NotNil(t, signerVerifier, "signerVerifier must be returned")
 
 	data := []byte("abc")
@@ -107,7 +107,7 @@ func TestRsaSign_EmptyData_NoExplosion(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signer := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signer := crypto.NewRSAPSS(*privateKey)
 
 	for _, data := range [][]byte{nil, {}} {
 		sig, err := signer.Sign(data)
@@ -125,7 +125,7 @@ func TestRsaVerify_EmptyData_NoExplosion(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 
 	sig, err := signerVerifier.Sign(nil)
 	require.NoError(t, err)
@@ -145,7 +145,7 @@ func TestRsaVerify_EmptySignature(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 
 	for _, sig := range [][]byte{nil, {}} {
 		err := signerVerifier.Verify([]byte("payload"), sig)
@@ -163,7 +163,7 @@ func TestRsaSignVerify_EmptyData(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 
 	for _, data := range [][]byte{nil, {}} {
 		sig, err := signerVerifier.Sign(data)
@@ -192,6 +192,6 @@ func TestRSAPSS_Name(t *testing.T) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	signerVerifier := crypto.NewRSAPSSSignerVerifier(*privateKey)
+	signerVerifier := crypto.NewRSAPSS(*privateKey)
 	require.Equal(t, "rsapss", signerVerifier.Name())
 }
