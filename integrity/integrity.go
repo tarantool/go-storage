@@ -60,10 +60,21 @@ type deleteOptions struct {
 	Predicates []Predicate
 }
 
+// GetOption configures Get and Range operations (see [IgnoreVerificationError],
+// [IgnoreMoreThanOneResult]).
+type GetOption = options.OptionCallback[getOptions]
+
+// PutOption configures Put operations (see [WithPutPredicates]).
+type PutOption = options.OptionCallback[putOptions]
+
+// DeleteOption configures Delete operations (see [WithDeletePredicates],
+// [WithPrefix]).
+type DeleteOption = options.OptionCallback[deleteOptions]
+
 // WithPutPredicates configures predicates for conditional Put operations.
 // The Put operation will only succeed if all predicates evaluate to true.
 // If predicates are specified but fail, [ErrPredicateFailed] is returned.
-func WithPutPredicates(predicates ...Predicate) options.OptionCallback[putOptions] {
+func WithPutPredicates(predicates ...Predicate) PutOption {
 	return func(opts *putOptions) {
 		opts.Predicates = append(opts.Predicates, predicates...)
 	}
@@ -72,14 +83,14 @@ func WithPutPredicates(predicates ...Predicate) options.OptionCallback[putOption
 // WithDeletePredicates configures predicates for conditional Delete operations.
 // The Delete operation will only succeed if all predicates evaluate to true.
 // If predicates are specified but fail, [ErrPredicateFailed] is returned.
-func WithDeletePredicates(predicates ...Predicate) options.OptionCallback[deleteOptions] {
+func WithDeletePredicates(predicates ...Predicate) DeleteOption {
 	return func(opts *deleteOptions) {
 		opts.Predicates = append(opts.Predicates, predicates...)
 	}
 }
 
 // WithPrefix configures the ability to delete keys by a prefix.
-func WithPrefix() options.OptionCallback[deleteOptions] {
+func WithPrefix() DeleteOption {
 	return func(opts *deleteOptions) {
 		opts.withPrefix = true
 	}
@@ -88,7 +99,7 @@ func WithPrefix() options.OptionCallback[deleteOptions] {
 // IgnoreVerificationError returns an option that allows Get and Range operations
 // to return results even if hash or signature verification fails.
 // The returned result will still contain the Error field with verification details.
-func IgnoreVerificationError() options.OptionCallback[getOptions] {
+func IgnoreVerificationError() GetOption {
 	return func(opts *getOptions) {
 		opts.ignoreVerificationError = true
 	}
@@ -97,7 +108,7 @@ func IgnoreVerificationError() options.OptionCallback[getOptions] {
 // IgnoreMoreThanOneResult returns an option that allows Get operation
 // to succeed when multiple results are returned for a single name.
 // By default, Get returns ErrMoreThanOneResult in such cases.
-func IgnoreMoreThanOneResult() options.OptionCallback[getOptions] {
+func IgnoreMoreThanOneResult() GetOption {
 	return func(opts *getOptions) {
 		opts.ignoreMoreThanOneResult = true
 	}

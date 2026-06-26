@@ -3,7 +3,6 @@ package integrity
 import (
 	"context"
 
-	"github.com/tarantool/go-storage/v2/internal/options"
 	"github.com/tarantool/go-storage/v2/predicate"
 	"github.com/tarantool/go-storage/v2/watch"
 )
@@ -25,7 +24,7 @@ type SingletonStore[T any] struct {
 // Get reads the singleton's value and verifies its hashes/signatures.
 func (s *SingletonStore[T]) Get(
 	ctx context.Context,
-	opts ...options.OptionCallback[getOptions],
+	opts ...GetOption,
 ) (ValidatedResult[T], error) {
 	return s.store.Get(ctx, s.name, opts...)
 }
@@ -36,7 +35,7 @@ func (s *SingletonStore[T]) Get(
 func (s *SingletonStore[T]) Put(
 	ctx context.Context,
 	value T,
-	opts ...options.OptionCallback[putOptions],
+	opts ...PutOption,
 ) error {
 	return s.store.Put(ctx, s.name, value, opts...)
 }
@@ -46,7 +45,7 @@ func (s *SingletonStore[T]) Put(
 // is returned if any predicate fails.
 func (s *SingletonStore[T]) Delete(
 	ctx context.Context,
-	opts ...options.OptionCallback[deleteOptions],
+	opts ...DeleteOption,
 ) error {
 	return s.store.Delete(ctx, s.name, opts...)
 }
@@ -63,7 +62,7 @@ func (s *SingletonStore[T]) Watch(ctx context.Context) (<-chan watch.Event, erro
 // the name parameter — the bound name is used.
 func (s *SingletonStore[T]) TxGet(
 	b Branchable,
-	opts ...options.OptionCallback[getOptions],
+	opts ...GetOption,
 ) *GetFuture[T] {
 	return s.store.codec.TxGet(b, s.name, opts...)
 }
@@ -78,7 +77,7 @@ func (s *SingletonStore[T]) TxPut(b Branchable, value T) error {
 // Codec[T].TxDelete without the name parameter.
 func (s *SingletonStore[T]) TxDelete(
 	b Branchable,
-	opts ...options.OptionCallback[deleteOptions],
+	opts ...DeleteOption,
 ) error {
 	return s.store.codec.TxDelete(b, s.name, opts...)
 }
