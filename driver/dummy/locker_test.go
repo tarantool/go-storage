@@ -174,6 +174,41 @@ func TestDummyLocker_TwoLockers_SameName_Contend(t *testing.T) {
 	require.NoError(t, lockB.Unlock(ctx))
 }
 
+func TestDummyLocker_TwoDrivers_SameName_DoNotContend(t *testing.T) {
+	t.Parallel()
+
+	ctx := t.Context()
+
+	// Two independent drivers must not share a lock namespace: a lock held on
+	// one instance must not block the same name acquired on another.
+	driverA := dummy.New()
+	driverB := dummy.New()
+
+	lockA, err := driverA.NewLocker(ctx, "shared-name")
+	require.NoError(t, err)
+
+	lockB, err := driverB.NewLocker(ctx, "shared-name")
+	require.NoError(t, err)
+
+	require.NoError(t, lockA.Lock(ctx))
+
+	lockDone := make(chan error, 1)
+
+	go func() {
+		lockDone <- lockB.Lock(ctx)
+	}()
+
+	select {
+	case err := <-lockDone:
+		require.NoError(t, err)
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("lockB.Lock timed out though it is on a separate driver instance")
+	}
+
+	require.NoError(t, lockA.Unlock(ctx))
+	require.NoError(t, lockB.Unlock(ctx))
+}
+
 func TestDummyLocker_TwoLockers_DifferentNames_DoNotContend(t *testing.T) {
 	t.Parallel()
 
