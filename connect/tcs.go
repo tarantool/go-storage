@@ -12,7 +12,7 @@ import (
 	tcsdriver "github.com/tarantool/go-storage/v2/driver/tcs"
 )
 
-func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.DoerWatcher, CleanupFunc, error) {
+func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.Client, CleanupFunc, error) {
 	if len(cfg.Endpoints) == 0 {
 		return nil, nil, ErrNoEndpoint
 	}
