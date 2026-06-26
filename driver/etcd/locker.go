@@ -35,7 +35,7 @@ var _ locker.Locker = (*etcdLocker)(nil)
 // NewLocker returns locker.ErrUnsupported when the Driver was built with a
 // Client that is not a concrete *etcd.Client — the concurrency package needs
 // the concrete type which the Client interface does not expose.
-func (d Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
 	concrete, ok := d.client.(*etcd.Client)
 	if !ok {
 		return nil, locker.ErrUnsupported

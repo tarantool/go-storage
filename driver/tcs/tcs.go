@@ -48,7 +48,7 @@ func New(doer DoerWatcher) *Driver {
 
 // Execute executes a transactional operation with conditional logic.
 // It processes predicates to determine whether to execute thenOps or elseOps.
-func (d Driver) Execute(
+func (d *Driver) Execute(
 	ctx context.Context,
 	predicates []goPredicate.Predicate,
 	thenOps []goOperation.Operation,
@@ -73,7 +73,7 @@ func (d Driver) Execute(
 
 // Watch monitors changes to a specific key and returns a stream of events.
 // event.Key is the watched key with any trailing "/" stripped.
-func (d Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
+func (d *Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
 	rvChan := make(chan watch.Event, watchEventChannelSize)
 
 	emitted := bytes.TrimSuffix(key, []byte("/"))
