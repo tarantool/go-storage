@@ -39,6 +39,9 @@ type dummyStorage struct {
 // suitable for testing and demonstration purposes.
 type Driver struct {
 	data dummyStorage
+	// lockRegistry maps lock names to shared entries, scoped to this Driver
+	// instance so independent drivers do not share a lock namespace.
+	lockRegistry *sync.Map
 }
 
 // New creates a new in-memory dummy driver instance.
@@ -51,6 +54,7 @@ func New() *Driver {
 			modRevision:      1,
 			mu:               sync.RWMutex{},
 		},
+		lockRegistry: &sync.Map{},
 	}
 }
 
