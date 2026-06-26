@@ -18,6 +18,17 @@ func TestApplyOptions_DefaultTTL(t *testing.T) {
 	assert.Equal(t, locker.DefaultTTL, opts.TTL)
 }
 
+func TestValidateName(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, locker.ValidateName("/lock"))
+	require.NoError(t, locker.ValidateName("/foo/bar"))
+
+	require.ErrorIs(t, locker.ValidateName("lock"), locker.ErrNameNoLeadingSlash)
+	require.ErrorIs(t, locker.ValidateName(""), locker.ErrNameNoLeadingSlash)
+	require.ErrorIs(t, locker.ValidateName("/lock/"), locker.ErrNameTrailingSlash)
+}
+
 func TestApplyOptions_Override(t *testing.T) {
 	t.Parallel()
 

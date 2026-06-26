@@ -36,6 +36,11 @@ var _ locker.Locker = (*etcdLocker)(nil)
 // the Client interface cannot express, so locking support is a construction-time
 // choice rather than a runtime type assertion.
 func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+	err := locker.ValidateName(name)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ValidateName returns a complete, locker-prefixed error.
+	}
+
 	if d.lockClient == nil {
 		return nil, locker.ErrUnsupported
 	}
