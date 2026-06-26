@@ -227,7 +227,7 @@ func (f *RangeFuture[T]) Result() ([]ValidatedResult[T], error) {
 func (c *Codec[T]) TxGet(
 	b Branchable,
 	name string,
-	opts ...options.OptionCallback[getOptions],
+	opts ...GetOption,
 ) *GetFuture[T] {
 	branch := b.branch()
 	txn := branch.parent
@@ -342,7 +342,7 @@ func (c *Codec[T]) TxPut(b Branchable, name string, value T) error {
 func (c *Codec[T]) TxDelete(
 	b Branchable,
 	name string,
-	opts ...options.OptionCallback[deleteOptions],
+	opts ...DeleteOption,
 ) error {
 	branch := b.branch()
 	txn := branch.parent
@@ -394,7 +394,7 @@ func (c *Codec[T]) TxDelete(
 func (c *Codec[T]) TxRange(
 	b Branchable,
 	name string,
-	opts ...options.OptionCallback[getOptions],
+	opts ...GetOption,
 ) *RangeFuture[T] {
 	branch := b.branch()
 	txn := branch.parent
