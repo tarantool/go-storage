@@ -68,7 +68,7 @@ func createTestDriverConcrete(t *testing.T) (*etcddriver.Driver, *etcdclient.Cli
 	require.NoError(t, err, "failed to create etcd client")
 	t.Cleanup(func() { _ = client.Close() })
 
-	return etcddriver.New(client), client
+	return etcddriver.NewWithLocker(client), client
 }
 
 func createSecondClient(t *testing.T, endpoints []string) *etcdclient.Client {
@@ -150,7 +150,7 @@ func TestLocker_Contention(t *testing.T) {
 	driverA, clientA := createTestDriverConcrete(t)
 	endpoints := clientA.Endpoints()
 	clientB := createSecondClient(t, endpoints)
-	driverB := etcddriver.New(clientB)
+	driverB := etcddriver.NewWithLocker(clientB)
 
 	// Outer timeout is generous (3x per-op timeout) because the test does
 	// several Lock/Unlock round-trips and an internal time.After wait of
@@ -196,7 +196,7 @@ func TestLocker_TryLock_Contended(t *testing.T) {
 	driverA, clientA := createTestDriverConcrete(t)
 	endpoints := clientA.Endpoints()
 	clientB := createSecondClient(t, endpoints)
-	driverB := etcddriver.New(clientB)
+	driverB := etcddriver.NewWithLocker(clientB)
 
 	ctx, cancel := context.WithTimeout(t.Context(), lockerTestTimeout)
 	t.Cleanup(cancel)
@@ -221,7 +221,7 @@ func TestLocker_CtxCancellation_AbortsLock(t *testing.T) {
 	driverA, clientA := createTestDriverConcrete(t)
 	endpoints := clientA.Endpoints()
 	clientB := createSecondClient(t, endpoints)
-	driverB := etcddriver.New(clientB)
+	driverB := etcddriver.NewWithLocker(clientB)
 
 	// 3x per-op timeout to cover several Lock/Unlock round-trips plus an
 	// internal time.After(lockerTestTimeout) wait for the C locker.
@@ -252,7 +252,7 @@ func TestLocker_CtxCancellation_AbortsLock(t *testing.T) {
 	require.NoError(t, lockA.Unlock(ctx))
 
 	clientC := createSecondClient(t, endpoints)
-	driverC := etcddriver.New(clientC)
+	driverC := etcddriver.NewWithLocker(clientC)
 
 	lockC, err := driverC.NewLocker(ctx, lockName)
 	require.NoError(t, err)
@@ -323,9 +323,11 @@ func TestLocker_Done_ClosedAfterUnlock(t *testing.T) {
 	}
 }
 
-func TestLocker_NewLockerOnNonConcreteClient_ReturnsErrUnsupported(t *testing.T) {
+func TestLocker_NewLockerWithoutLockSupport_ReturnsErrUnsupported(t *testing.T) {
 	mc := minimock.NewController(t)
 
+	// A driver built with New (rather than NewWithLocker) does not support
+	// locking regardless of the client type.
 	client := mocks.NewEtcdClientMock(mc)
 	driver := etcddriver.New(client)
 

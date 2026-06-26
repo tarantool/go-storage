@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	etcd "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 
 	"github.com/tarantool/go-storage/v2/locker"
@@ -32,19 +31,19 @@ var closedDone = func() chan struct{} {
 
 var _ locker.Locker = (*etcdLocker)(nil)
 
-// NewLocker returns locker.ErrUnsupported when the Driver was built with a
-// Client that is not a concrete *etcd.Client — the concurrency package needs
-// the concrete type which the Client interface does not expose.
+// NewLocker returns locker.ErrUnsupported unless the Driver was built with
+// NewWithLocker: the concurrency package needs the concrete *etcd.Client, which
+// the Client interface cannot express, so locking support is a construction-time
+// choice rather than a runtime type assertion.
 func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
-	concrete, ok := d.client.(*etcd.Client)
-	if !ok {
+	if d.lockClient == nil {
 		return nil, locker.ErrUnsupported
 	}
 
 	options := locker.ApplyOptions(opts)
 
 	session, err := concurrency.NewSession(
-		concrete,
+		d.lockClient,
 		concurrency.WithTTL(int(options.TTL.Seconds())),
 		concurrency.WithContext(ctx),
 	)

@@ -33,6 +33,11 @@ type Client interface {
 // It uses etcd as the underlying key-value storage backend.
 type Driver struct {
 	client Client
+	// lockClient is the concrete client used for locking. It is nil for drivers
+	// built with New (locking unsupported) and set by NewWithLocker. The
+	// concurrency package requires the concrete *etcd.Client type, which the
+	// Client interface cannot express.
+	lockClient *etcd.Client
 }
 
 var (
@@ -50,13 +55,23 @@ var (
 // New creates a new etcd driver instance using an existing etcd client.
 // The client should be properly configured and connected to an etcd cluster.
 //
-// NewLocker is only supported when client is a concrete *etcd.Client — the
-// concurrency package needs the concrete type which the Client interface does
-// not expose. Drivers built from a non-concrete Client return
-// locker.ErrUnsupported from NewLocker.
+// Drivers built with New do not support locking: NewLocker returns
+// locker.ErrUnsupported. Use NewWithLocker when locking is required.
 func New(client Client) *Driver {
 	return &Driver{
-		client: client,
+		client:     client,
+		lockClient: nil, // locking unsupported; see NewWithLocker.
+	}
+}
+
+// NewWithLocker creates a new etcd driver instance that supports locking.
+// It takes a concrete *etcd.Client because the underlying concurrency package
+// requires the concrete type. The same client backs key/value, watch and
+// transaction operations.
+func NewWithLocker(client *etcd.Client) *Driver {
+	return &Driver{
+		client:     client,
+		lockClient: client,
 	}
 }
 
