@@ -19,13 +19,13 @@ const (
 func (t KeyType) String() string {
 	switch t {
 	case KeyTypeValue:
-		return "KeyTypeValue"
+		return "value"
 	case KeyTypeHash:
-		return "KeyTypeHash"
+		return "hash"
 	case KeyTypeSignature:
-		return "KeyTypeSignature"
+		return "signature"
 	default:
-		return fmt.Sprintf("KeyType[%d]", t)
+		return fmt.Sprintf("KeyType(%d)", t)
 	}
 }
 

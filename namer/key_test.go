@@ -62,32 +62,32 @@ func TestKeyType_String(t *testing.T) {
 		{
 			name:     "KeyTypeValue",
 			keyType:  namer.KeyTypeValue,
-			expected: "KeyTypeValue",
+			expected: "value",
 		},
 		{
 			name:     "KeyTypeHash",
 			keyType:  namer.KeyTypeHash,
-			expected: "KeyTypeHash",
+			expected: "hash",
 		},
 		{
 			name:     "KeyTypeSignature",
 			keyType:  namer.KeyTypeSignature,
-			expected: "KeyTypeSignature",
+			expected: "signature",
 		},
 		{
 			name:     "Unknown key type zero",
 			keyType:  0,
-			expected: "KeyType[0]",
+			expected: "KeyType(0)",
 		},
 		{
 			name:     "Unknown key type negative",
 			keyType:  -1,
-			expected: "KeyType[-1]",
+			expected: "KeyType(-1)",
 		},
 		{
 			name:     "Unknown key type positive",
 			keyType:  100,
-			expected: "KeyType[100]",
+			expected: "KeyType(100)",
 		},
 	}
 
