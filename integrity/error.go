@@ -253,4 +253,4 @@ func (e *FailedToValidateAggregatedError) Finalize() error {
 
 // ErrInvalidName is returned for empty, leading-slash, or trailing-slash names.
 // Match it with errors.Is.
-var ErrInvalidName = errors.New("invalid name")
+var ErrInvalidName = errors.New("integrity: invalid name")

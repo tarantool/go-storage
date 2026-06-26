@@ -37,7 +37,7 @@ var (
 	_ driver.Driver = &Driver{} //nolint:exhaustruct
 
 	// ErrUnexpectedResponse is returned when the response from tarantool has unexpected format.
-	ErrUnexpectedResponse = errors.New("unexpected response from tarantool")
+	ErrUnexpectedResponse = errors.New("tcs: unexpected response from tarantool")
 )
 
 // New creates a new Tarantool driver instance.
