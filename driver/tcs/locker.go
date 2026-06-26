@@ -58,7 +58,7 @@ var _ locker.Locker = (*tcsLocker)(nil)
 //
 // Returns ErrUnsupportedFeatures if the TCS server does not advertise
 // features.ttl and features.keepalive.
-func (d Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
 	if !strings.HasPrefix(name, "/") || strings.HasSuffix(name, "/") {
 		return nil, errInvalidLockerName
 	}
