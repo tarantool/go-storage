@@ -20,7 +20,9 @@ func NewEtcdStorage(ctx context.Context, cfg Config) (storage.Storage, CleanupFu
 		return nil, nil, err
 	}
 
-	drv := etcddriver.New(client)
+	// NewWithLocker so storage built via connect supports locking; client is the
+	// concrete *etcd.Client the concurrency package requires.
+	drv := etcddriver.NewWithLocker(client)
 
 	return storage.NewStorage(drv), cleanup, nil
 }

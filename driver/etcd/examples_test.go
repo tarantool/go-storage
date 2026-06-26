@@ -63,7 +63,9 @@ func createEtcdDriver(tb testing.TB) (*etcd.Driver, func()) {
 
 	tb.Cleanup(func() { _ = client.Close() })
 
-	driver := etcd.New(client)
+	// NewWithLocker so the locker example can acquire locks; KV/watch/tx
+	// examples work the same on a locker-capable driver.
+	driver := etcd.NewWithLocker(client)
 
 	return driver, func() {}
 }
