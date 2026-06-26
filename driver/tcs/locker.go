@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,13 +14,9 @@ import (
 	"github.com/tarantool/go-storage/v2/locker"
 )
 
-var (
-	errInvalidLockerName = errors.New("tcs locker: name must start with '/' and must not end with '/'")
-
-	// ErrUnsupportedFeatures is returned by NewLocker when the TCS instance does
-	// not advertise both the ttl and keepalive features required by the locker.
-	ErrUnsupportedFeatures = errors.New("tcs locker: server does not support ttl+keepalive — schema upgrade required")
-)
+// ErrUnsupportedFeatures is returned by NewLocker when the TCS instance does
+// not advertise both the ttl and keepalive features required by the locker.
+var ErrUnsupportedFeatures = errors.New("tcs locker: server does not support ttl+keepalive — schema upgrade required")
 
 // tcsLocker implements "smallest mod_revision wins" locking over the prefix
 // `name + "/"`. Each attempt writes a unique ephemeral key with a TTL renewed
@@ -59,8 +54,9 @@ var _ locker.Locker = (*tcsLocker)(nil)
 // Returns ErrUnsupportedFeatures if the TCS server does not advertise
 // features.ttl and features.keepalive.
 func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
-	if !strings.HasPrefix(name, "/") || strings.HasSuffix(name, "/") {
-		return nil, errInvalidLockerName
+	err := locker.ValidateName(name)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ValidateName returns a complete, locker-prefixed error.
 	}
 
 	hasTTL, hasKeepalive, err := infoFeatures(ctx, d.conn)

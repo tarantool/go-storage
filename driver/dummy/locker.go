@@ -42,6 +42,11 @@ var closedDone = func() chan struct{} {
 var _ locker.Locker = (*dummyLocker)(nil)
 
 func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+	err := locker.ValidateName(name)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ValidateName returns a complete, locker-prefixed error.
+	}
+
 	_ = locker.ApplyOptions(opts)
 
 	return &dummyLocker{ //nolint:exhaustruct // mu/held/key are zero-initialized by design.

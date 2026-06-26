@@ -28,14 +28,14 @@ func newLocker(t *testing.T, name string) locker.Locker {
 func TestDummyLocker_LockUnlock_HappyPath(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "test-lock")
+	lock := newLocker(t, "/test-lock")
 
 	assert.Empty(t, lock.Key())
 
 	err := lock.Lock(context.Background())
 	require.NoError(t, err)
 
-	assert.Equal(t, "test-lock", lock.Key())
+	assert.Equal(t, "/test-lock", lock.Key())
 
 	err = lock.Unlock(context.Background())
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestDummyLocker_LockUnlock_HappyPath(t *testing.T) {
 func TestDummyLocker_ReLock_IsNoOp(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "relock-test")
+	lock := newLocker(t, "/relock-test")
 
 	err := lock.Lock(context.Background())
 	require.NoError(t, err)
@@ -64,10 +64,10 @@ func TestDummyLocker_TryLock_Contended(t *testing.T) {
 	ctx := context.Background()
 	d := dummy.New()
 
-	lockA, err := d.NewLocker(ctx, "trylock-contend")
+	lockA, err := d.NewLocker(ctx, "/trylock-contend")
 	require.NoError(t, err)
 
-	lockB, err := d.NewLocker(ctx, "trylock-contend")
+	lockB, err := d.NewLocker(ctx, "/trylock-contend")
 	require.NoError(t, err)
 
 	require.NoError(t, lockA.Lock(ctx))
@@ -81,11 +81,11 @@ func TestDummyLocker_TryLock_Contended(t *testing.T) {
 func TestDummyLocker_TryLock_Free(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "trylock-free")
+	lock := newLocker(t, "/trylock-free")
 
 	err := lock.TryLock(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, "trylock-free", lock.Key())
+	assert.Equal(t, "/trylock-free", lock.Key())
 
 	require.NoError(t, lock.Unlock(context.Background()))
 }
@@ -93,7 +93,7 @@ func TestDummyLocker_TryLock_Free(t *testing.T) {
 func TestDummyLocker_TryLock_AlreadyHeld(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "trylock-held")
+	lock := newLocker(t, "/trylock-held")
 
 	require.NoError(t, lock.Lock(context.Background()))
 	require.NoError(t, lock.TryLock(context.Background()))
@@ -103,7 +103,7 @@ func TestDummyLocker_TryLock_AlreadyHeld(t *testing.T) {
 func TestDummyLocker_DoubleUnlock(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "double-unlock")
+	lock := newLocker(t, "/double-unlock")
 
 	require.NoError(t, lock.Lock(context.Background()))
 	require.NoError(t, lock.Unlock(context.Background()))
@@ -115,7 +115,7 @@ func TestDummyLocker_DoubleUnlock(t *testing.T) {
 func TestDummyLocker_Unlock_NeverLocked(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "never-locked")
+	lock := newLocker(t, "/never-locked")
 
 	err := lock.Unlock(context.Background())
 	require.ErrorIs(t, err, locker.ErrLockReleased)
@@ -127,11 +127,11 @@ func TestDummyLocker_Lock_CtxCancellation(t *testing.T) {
 	ctx := context.Background()
 	driver := dummy.New()
 
-	lockA, err := driver.NewLocker(ctx, "ctx-cancel")
+	lockA, err := driver.NewLocker(ctx, "/ctx-cancel")
 	require.NoError(t, err)
 	require.NoError(t, lockA.Lock(ctx))
 
-	lockB, err := driver.NewLocker(ctx, "ctx-cancel")
+	lockB, err := driver.NewLocker(ctx, "/ctx-cancel")
 	require.NoError(t, err)
 
 	callCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
@@ -157,10 +157,10 @@ func TestDummyLocker_TwoLockers_SameName_Contend(t *testing.T) {
 	ctx := context.Background()
 	driver := dummy.New()
 
-	lockA, err := driver.NewLocker(ctx, "shared-name")
+	lockA, err := driver.NewLocker(ctx, "/shared-name")
 	require.NoError(t, err)
 
-	lockB, err := driver.NewLocker(ctx, "shared-name")
+	lockB, err := driver.NewLocker(ctx, "/shared-name")
 	require.NoError(t, err)
 
 	require.NoError(t, lockA.Lock(ctx))
@@ -184,10 +184,10 @@ func TestDummyLocker_TwoDrivers_SameName_DoNotContend(t *testing.T) {
 	driverA := dummy.New()
 	driverB := dummy.New()
 
-	lockA, err := driverA.NewLocker(ctx, "shared-name")
+	lockA, err := driverA.NewLocker(ctx, "/shared-name")
 	require.NoError(t, err)
 
-	lockB, err := driverB.NewLocker(ctx, "shared-name")
+	lockB, err := driverB.NewLocker(ctx, "/shared-name")
 	require.NoError(t, err)
 
 	require.NoError(t, lockA.Lock(ctx))
@@ -215,10 +215,10 @@ func TestDummyLocker_TwoLockers_DifferentNames_DoNotContend(t *testing.T) {
 	ctx := context.Background()
 	driver := dummy.New()
 
-	lockA, err := driver.NewLocker(ctx, "name-a")
+	lockA, err := driver.NewLocker(ctx, "/name-a")
 	require.NoError(t, err)
 
-	lockB, err := driver.NewLocker(ctx, "name-b")
+	lockB, err := driver.NewLocker(ctx, "/name-b")
 	require.NoError(t, err)
 
 	require.NoError(t, lockA.Lock(ctx))
@@ -243,7 +243,7 @@ func TestDummyLocker_TwoLockers_DifferentNames_DoNotContend(t *testing.T) {
 func TestDummyLocker_Done_NeverLocked_IsClosed(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "done-never")
+	lock := newLocker(t, "/done-never")
 
 	select {
 	case <-lock.Done():
@@ -255,7 +255,7 @@ func TestDummyLocker_Done_NeverLocked_IsClosed(t *testing.T) {
 func TestDummyLocker_Done_WhileHeld_IsOpen(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "done-held")
+	lock := newLocker(t, "/done-held")
 	require.NoError(t, lock.Lock(context.Background()))
 
 	t.Cleanup(func() { _ = lock.Unlock(context.Background()) })
@@ -270,7 +270,7 @@ func TestDummyLocker_Done_WhileHeld_IsOpen(t *testing.T) {
 func TestDummyLocker_Done_ClosedAfterUnlock(t *testing.T) {
 	t.Parallel()
 
-	lock := newLocker(t, "done-unlock")
+	lock := newLocker(t, "/done-unlock")
 	require.NoError(t, lock.Lock(context.Background()))
 
 	done := lock.Done()
@@ -290,12 +290,12 @@ func TestDummyLocker_LifeCtxCancellation_AbortsBlockingLock(t *testing.T) {
 	driver := dummy.New()
 
 	holderCtx := context.Background()
-	lockA, err := driver.NewLocker(holderCtx, "life-ctx-test")
+	lockA, err := driver.NewLocker(holderCtx, "/life-ctx-test")
 	require.NoError(t, err)
 	require.NoError(t, lockA.Lock(holderCtx))
 
 	lifeCtx, cancelLife := context.WithCancel(ctx)
-	lockB, err := driver.NewLocker(lifeCtx, "life-ctx-test")
+	lockB, err := driver.NewLocker(lifeCtx, "/life-ctx-test")
 	require.NoError(t, err)
 
 	var (
