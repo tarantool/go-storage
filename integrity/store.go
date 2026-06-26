@@ -25,7 +25,7 @@ type Store[T any] struct {
 func (s *Store[T]) Get(
 	ctx context.Context,
 	name string,
-	opts ...options.OptionCallback[getOptions],
+	opts ...GetOption,
 ) (ValidatedResult[T], error) {
 	tx := NewTx(s.storage)
 	fut := s.codec.TxGet(tx, name, opts...)
@@ -45,7 +45,7 @@ func (s *Store[T]) Put(
 	ctx context.Context,
 	name string,
 	value T,
-	vOpts ...options.OptionCallback[putOptions],
+	vOpts ...PutOption,
 ) error {
 	opts := options.ApplyOptions[putOptions](nil, vOpts)
 
@@ -83,7 +83,7 @@ func (s *Store[T]) Put(
 func (s *Store[T]) Delete(
 	ctx context.Context,
 	name string,
-	vOpts ...options.OptionCallback[deleteOptions],
+	vOpts ...DeleteOption,
 ) error {
 	opts := options.ApplyOptions[deleteOptions](nil, vOpts)
 
@@ -119,7 +119,7 @@ func (s *Store[T]) Delete(
 func (s *Store[T]) Range(
 	ctx context.Context,
 	name string,
-	opts ...options.OptionCallback[getOptions],
+	opts ...GetOption,
 ) ([]ValidatedResult[T], error) {
 	tx := NewTx(s.storage)
 	fut := s.codec.TxRange(tx, name, opts...)
