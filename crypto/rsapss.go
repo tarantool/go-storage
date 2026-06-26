@@ -15,6 +15,11 @@ var (
 	ErrEmptyPrivateKey = errors.New("crypto: cannot sign without a private key")
 )
 
+// AlgoRSAPSS is the algorithm name returned by the RSA-PSS signer/verifier's
+// Name method. Use it with integrity codec location options (e.g.
+// WithSignatureLocation) instead of retyping the bare string.
+const AlgoRSAPSS = "rsapss"
+
 func zero[T any]() (out T) { return } //nolint:nonamedreturns
 
 // RSAPSS represents RSA PSS algo for signing/verification
@@ -57,7 +62,7 @@ func NewRSAPSSVerifier(pubKey rsa.PublicKey, opts ...Option) Verifier {
 
 // Name implements SignerVerifier interface.
 func (r RSAPSS) Name() string {
-	return "rsapss"
+	return AlgoRSAPSS
 }
 
 // Sign generates SHA-256 digest and signs it using RSASSA-PSS. The returned
