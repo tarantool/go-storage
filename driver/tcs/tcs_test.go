@@ -28,7 +28,7 @@ const (
 func TestNew(t *testing.T) {
 	t.Parallel()
 
-	mockDoer := mocks.NewDoerWatcherMock(t)
+	mockDoer := mocks.NewTCSClientMock(t)
 	driver := tcs.New(mockDoer)
 
 	assert.NotNil(t, driver)
@@ -39,7 +39,7 @@ func TestDriver_Watch_WatcherSuccess(t *testing.T) {
 
 	mc := minimock.NewController(t)
 
-	mockDoer := mocks.NewDoerWatcherMock(mc)
+	mockDoer := mocks.NewTCSClientMock(mc)
 	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
 
 	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {
@@ -72,7 +72,7 @@ func TestDriver_Watch_WatcherError(t *testing.T) {
 
 	var (
 		mc         = minimock.NewController(t)
-		mockDoer   = mocks.NewDoerWatcherMock(mc)
+		mockDoer   = mocks.NewTCSClientMock(mc)
 		watcherErr = errors.New("watcher creation failed")
 	)
 
@@ -102,7 +102,7 @@ func TestDriver_Watch_ContextCanceled_Before(t *testing.T) {
 
 	mc := minimock.NewController(t)
 
-	mockDoer := mocks.NewDoerWatcherMock(mc)
+	mockDoer := mocks.NewTCSClientMock(mc)
 	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
 
 	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {
@@ -135,7 +135,7 @@ func TestDriver_Watch_ContextCanceled_After(t *testing.T) {
 
 	mc := minimock.NewController(t)
 
-	mockDoer := mocks.NewDoerWatcherMock(mc)
+	mockDoer := mocks.NewTCSClientMock(mc)
 	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
 
 	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {
@@ -169,7 +169,7 @@ func TestDriver_Watch_CallbackOnceCalled(t *testing.T) {
 
 	mc := minimock.NewController(t)
 
-	mockDoer := mocks.NewDoerWatcherMock(mc)
+	mockDoer := mocks.NewTCSClientMock(mc)
 	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
 
 	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {
@@ -213,7 +213,7 @@ func TestDriver_Watch_CallbackTwiceCalled(t *testing.T) {
 
 	mc := minimock.NewController(t)
 
-	mockDoer := mocks.NewDoerWatcherMock(mc)
+	mockDoer := mocks.NewTCSClientMock(mc)
 	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
 
 	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {
@@ -271,7 +271,7 @@ func TestDriver_Watch_PrefixKeyStripsTrailingSlash(t *testing.T) {
 
 	mc := minimock.NewController(t)
 
-	mockDoer := mocks.NewDoerWatcherMock(mc)
+	mockDoer := mocks.NewTCSClientMock(mc)
 	watcher := mocks.NewWatcherMock(mc).UnregisterMock.Expect().Times(1).Return()
 
 	mockDoer.NewWatcherMock.Set(func(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error) {

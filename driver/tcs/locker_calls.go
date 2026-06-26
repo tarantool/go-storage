@@ -17,7 +17,7 @@ type lockEntry struct {
 // assigned to the write — the same value reappears as mod_revision in
 // config.storage.get results, providing the ordering for "smallest revision
 // wins".
-func putWithTTL(ctx context.Context, conn DoerWatcher, path, value string, ttlSec int) (int64, error) {
+func putWithTTL(ctx context.Context, conn Client, path, value string, ttlSec int) (int64, error) {
 	req := tarantool.NewCallRequest("config.storage.put").
 		Args([]any{path, value, map[string]any{"ttl": ttlSec}}).
 		Context(ctx)
@@ -40,7 +40,7 @@ func putWithTTL(ctx context.Context, conn DoerWatcher, path, value string, ttlSe
 	return result[0].Revision, nil
 }
 
-func keepalivePath(ctx context.Context, conn DoerWatcher, path string, ttlSec int) error {
+func keepalivePath(ctx context.Context, conn Client, path string, ttlSec int) error {
 	req := tarantool.NewCallRequest("config.storage.keepalive").
 		Args([]any{path, ttlSec}).
 		Context(ctx)
@@ -58,7 +58,7 @@ func keepalivePath(ctx context.Context, conn DoerWatcher, path string, ttlSec in
 // getPrefix returns entries under prefix. Response shape:
 //
 //	[ { data: [ {path, value, mod_revision}, ... ], revision: N } ]
-func getPrefix(ctx context.Context, conn DoerWatcher, prefix string) ([]lockEntry, error) {
+func getPrefix(ctx context.Context, conn Client, prefix string) ([]lockEntry, error) {
 	req := tarantool.NewCallRequest("config.storage.get").
 		Args([]any{prefix}).
 		Context(ctx)
@@ -93,7 +93,7 @@ func getPrefix(ctx context.Context, conn DoerWatcher, prefix string) ([]lockEntr
 	return entries, nil
 }
 
-func deletePath(ctx context.Context, conn DoerWatcher, path string) error {
+func deletePath(ctx context.Context, conn Client, path string) error {
 	req := tarantool.NewCallRequest("config.storage.delete").
 		Args([]any{path}).
 		Context(ctx)
@@ -110,7 +110,7 @@ func deletePath(ctx context.Context, conn DoerWatcher, path string) error {
 
 // infoFeatures reports whether the server exposes the ttl and keepalive
 // features required by the locker.
-func infoFeatures(ctx context.Context, conn DoerWatcher) (bool, bool, error) {
+func infoFeatures(ctx context.Context, conn Client) (bool, bool, error) {
 	req := tarantool.NewCallRequest("config.storage.info").
 		Args([]any{}).
 		Context(ctx)
