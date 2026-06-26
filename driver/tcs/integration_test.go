@@ -74,7 +74,7 @@ func createTestDriver(ctx context.Context, t *testing.T) (*tcs.Driver, func()) {
 	conn, err := pool.New(ctx, instances)
 	require.NoError(t, err, "Failed to connect to Tarantool pool")
 
-	// Wrap the pool connection to implement DoerWatcher.
+	// Wrap the pool connection to implement Client.
 	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	return tcs.New(wrapper), func() { _ = wrapper.Close() }

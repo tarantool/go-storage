@@ -20,9 +20,10 @@ import (
 
 const watchEventChannelSize = 16
 
-// DoerWatcher is an interface that combines tarantool.Doer and NewWatcher method.
+// Client is the minimal connection capability the tcs driver needs: a Doer to
+// issue requests and a NewWatcher to subscribe to changes.
 // tarantool.Connection and pool.ConnectionAdapter implement this interface.
-type DoerWatcher interface {
+type Client interface {
 	Do(req tarantool.Request) (fut tarantool.Future)
 	NewWatcher(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error)
 }
@@ -30,7 +31,7 @@ type DoerWatcher interface {
 // Driver is a Tarantool implementation of the storage driver interface.
 // It uses TCS as the underlying key-value storage backend.
 type Driver struct {
-	conn DoerWatcher // Tarantool connection pool.
+	conn Client // Tarantool connection pool.
 }
 
 var (
@@ -42,8 +43,8 @@ var (
 
 // New creates a new Tarantool driver instance.
 // It establishes connections to Tarantool instances using the provided addresses.
-func New(doer DoerWatcher) *Driver {
-	return &Driver{conn: doer}
+func New(client Client) *Driver {
+	return &Driver{conn: client}
 }
 
 // Execute executes a transactional operation with conditional logic.

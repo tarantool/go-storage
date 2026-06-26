@@ -11,8 +11,8 @@ import (
 	"github.com/tarantool/go-tarantool/v3"
 )
 
-// DoerWatcherMock implements mm_tcs.DoerWatcher
-type DoerWatcherMock struct {
+// TCSClientMock implements mm_tcs.Client
+type TCSClientMock struct {
 	t          minimock.Tester
 	finishOnce sync.Once
 
@@ -21,76 +21,76 @@ type DoerWatcherMock struct {
 	inspectFuncDo   func(req tarantool.Request)
 	afterDoCounter  uint64
 	beforeDoCounter uint64
-	DoMock          mDoerWatcherMockDo
+	DoMock          mTCSClientMockDo
 
 	funcNewWatcher          func(key string, callback tarantool.WatchCallback) (w1 tarantool.Watcher, err error)
 	funcNewWatcherOrigin    string
 	inspectFuncNewWatcher   func(key string, callback tarantool.WatchCallback)
 	afterNewWatcherCounter  uint64
 	beforeNewWatcherCounter uint64
-	NewWatcherMock          mDoerWatcherMockNewWatcher
+	NewWatcherMock          mTCSClientMockNewWatcher
 }
 
-// NewDoerWatcherMock returns a mock for mm_tcs.DoerWatcher
-func NewDoerWatcherMock(t minimock.Tester) *DoerWatcherMock {
-	m := &DoerWatcherMock{t: t}
+// NewTCSClientMock returns a mock for mm_tcs.Client
+func NewTCSClientMock(t minimock.Tester) *TCSClientMock {
+	m := &TCSClientMock{t: t}
 
 	if controller, ok := t.(minimock.MockController); ok {
 		controller.RegisterMocker(m)
 	}
 
-	m.DoMock = mDoerWatcherMockDo{mock: m}
-	m.DoMock.callArgs = []*DoerWatcherMockDoParams{}
+	m.DoMock = mTCSClientMockDo{mock: m}
+	m.DoMock.callArgs = []*TCSClientMockDoParams{}
 
-	m.NewWatcherMock = mDoerWatcherMockNewWatcher{mock: m}
-	m.NewWatcherMock.callArgs = []*DoerWatcherMockNewWatcherParams{}
+	m.NewWatcherMock = mTCSClientMockNewWatcher{mock: m}
+	m.NewWatcherMock.callArgs = []*TCSClientMockNewWatcherParams{}
 
 	t.Cleanup(m.MinimockFinish)
 
 	return m
 }
 
-type mDoerWatcherMockDo struct {
+type mTCSClientMockDo struct {
 	optional           bool
-	mock               *DoerWatcherMock
-	defaultExpectation *DoerWatcherMockDoExpectation
-	expectations       []*DoerWatcherMockDoExpectation
+	mock               *TCSClientMock
+	defaultExpectation *TCSClientMockDoExpectation
+	expectations       []*TCSClientMockDoExpectation
 
-	callArgs []*DoerWatcherMockDoParams
+	callArgs []*TCSClientMockDoParams
 	mutex    sync.RWMutex
 
 	expectedInvocations       uint64
 	expectedInvocationsOrigin string
 }
 
-// DoerWatcherMockDoExpectation specifies expectation struct of the DoerWatcher.Do
-type DoerWatcherMockDoExpectation struct {
-	mock               *DoerWatcherMock
-	params             *DoerWatcherMockDoParams
-	paramPtrs          *DoerWatcherMockDoParamPtrs
-	expectationOrigins DoerWatcherMockDoExpectationOrigins
-	results            *DoerWatcherMockDoResults
+// TCSClientMockDoExpectation specifies expectation struct of the Client.Do
+type TCSClientMockDoExpectation struct {
+	mock               *TCSClientMock
+	params             *TCSClientMockDoParams
+	paramPtrs          *TCSClientMockDoParamPtrs
+	expectationOrigins TCSClientMockDoExpectationOrigins
+	results            *TCSClientMockDoResults
 	returnOrigin       string
 	Counter            uint64
 }
 
-// DoerWatcherMockDoParams contains parameters of the DoerWatcher.Do
-type DoerWatcherMockDoParams struct {
+// TCSClientMockDoParams contains parameters of the Client.Do
+type TCSClientMockDoParams struct {
 	req tarantool.Request
 }
 
-// DoerWatcherMockDoParamPtrs contains pointers to parameters of the DoerWatcher.Do
-type DoerWatcherMockDoParamPtrs struct {
+// TCSClientMockDoParamPtrs contains pointers to parameters of the Client.Do
+type TCSClientMockDoParamPtrs struct {
 	req *tarantool.Request
 }
 
-// DoerWatcherMockDoResults contains results of the DoerWatcher.Do
-type DoerWatcherMockDoResults struct {
+// TCSClientMockDoResults contains results of the Client.Do
+type TCSClientMockDoResults struct {
 	fut tarantool.Future
 }
 
-// DoerWatcherMockDoOrigins contains origins of expectations of the DoerWatcher.Do
-type DoerWatcherMockDoExpectationOrigins struct {
+// TCSClientMockDoOrigins contains origins of expectations of the Client.Do
+type TCSClientMockDoExpectationOrigins struct {
 	origin    string
 	originReq string
 }
@@ -100,26 +100,26 @@ type DoerWatcherMockDoExpectationOrigins struct {
 // Optional() makes method check to work in '0 or more' mode.
 // It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
 // catch the problems when the expected method call is totally skipped during test run.
-func (mmDo *mDoerWatcherMockDo) Optional() *mDoerWatcherMockDo {
+func (mmDo *mTCSClientMockDo) Optional() *mTCSClientMockDo {
 	mmDo.optional = true
 	return mmDo
 }
 
-// Expect sets up expected params for DoerWatcher.Do
-func (mmDo *mDoerWatcherMockDo) Expect(req tarantool.Request) *mDoerWatcherMockDo {
+// Expect sets up expected params for Client.Do
+func (mmDo *mTCSClientMockDo) Expect(req tarantool.Request) *mTCSClientMockDo {
 	if mmDo.mock.funcDo != nil {
-		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by Set")
+		mmDo.mock.t.Fatalf("TCSClientMock.Do mock is already set by Set")
 	}
 
 	if mmDo.defaultExpectation == nil {
-		mmDo.defaultExpectation = &DoerWatcherMockDoExpectation{}
+		mmDo.defaultExpectation = &TCSClientMockDoExpectation{}
 	}
 
 	if mmDo.defaultExpectation.paramPtrs != nil {
-		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by ExpectParams functions")
+		mmDo.mock.t.Fatalf("TCSClientMock.Do mock is already set by ExpectParams functions")
 	}
 
-	mmDo.defaultExpectation.params = &DoerWatcherMockDoParams{req}
+	mmDo.defaultExpectation.params = &TCSClientMockDoParams{req}
 	mmDo.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
 	for _, e := range mmDo.expectations {
 		if minimock.Equal(e.params, mmDo.defaultExpectation.params) {
@@ -130,22 +130,22 @@ func (mmDo *mDoerWatcherMockDo) Expect(req tarantool.Request) *mDoerWatcherMockD
 	return mmDo
 }
 
-// ExpectReqParam1 sets up expected param req for DoerWatcher.Do
-func (mmDo *mDoerWatcherMockDo) ExpectReqParam1(req tarantool.Request) *mDoerWatcherMockDo {
+// ExpectReqParam1 sets up expected param req for Client.Do
+func (mmDo *mTCSClientMockDo) ExpectReqParam1(req tarantool.Request) *mTCSClientMockDo {
 	if mmDo.mock.funcDo != nil {
-		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by Set")
+		mmDo.mock.t.Fatalf("TCSClientMock.Do mock is already set by Set")
 	}
 
 	if mmDo.defaultExpectation == nil {
-		mmDo.defaultExpectation = &DoerWatcherMockDoExpectation{}
+		mmDo.defaultExpectation = &TCSClientMockDoExpectation{}
 	}
 
 	if mmDo.defaultExpectation.params != nil {
-		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by Expect")
+		mmDo.mock.t.Fatalf("TCSClientMock.Do mock is already set by Expect")
 	}
 
 	if mmDo.defaultExpectation.paramPtrs == nil {
-		mmDo.defaultExpectation.paramPtrs = &DoerWatcherMockDoParamPtrs{}
+		mmDo.defaultExpectation.paramPtrs = &TCSClientMockDoParamPtrs{}
 	}
 	mmDo.defaultExpectation.paramPtrs.req = &req
 	mmDo.defaultExpectation.expectationOrigins.originReq = minimock.CallerInfo(1)
@@ -153,10 +153,10 @@ func (mmDo *mDoerWatcherMockDo) ExpectReqParam1(req tarantool.Request) *mDoerWat
 	return mmDo
 }
 
-// Inspect accepts an inspector function that has same arguments as the DoerWatcher.Do
-func (mmDo *mDoerWatcherMockDo) Inspect(f func(req tarantool.Request)) *mDoerWatcherMockDo {
+// Inspect accepts an inspector function that has same arguments as the Client.Do
+func (mmDo *mTCSClientMockDo) Inspect(f func(req tarantool.Request)) *mTCSClientMockDo {
 	if mmDo.mock.inspectFuncDo != nil {
-		mmDo.mock.t.Fatalf("Inspect function is already set for DoerWatcherMock.Do")
+		mmDo.mock.t.Fatalf("Inspect function is already set for TCSClientMock.Do")
 	}
 
 	mmDo.mock.inspectFuncDo = f
@@ -164,28 +164,28 @@ func (mmDo *mDoerWatcherMockDo) Inspect(f func(req tarantool.Request)) *mDoerWat
 	return mmDo
 }
 
-// Return sets up results that will be returned by DoerWatcher.Do
-func (mmDo *mDoerWatcherMockDo) Return(fut tarantool.Future) *DoerWatcherMock {
+// Return sets up results that will be returned by Client.Do
+func (mmDo *mTCSClientMockDo) Return(fut tarantool.Future) *TCSClientMock {
 	if mmDo.mock.funcDo != nil {
-		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by Set")
+		mmDo.mock.t.Fatalf("TCSClientMock.Do mock is already set by Set")
 	}
 
 	if mmDo.defaultExpectation == nil {
-		mmDo.defaultExpectation = &DoerWatcherMockDoExpectation{mock: mmDo.mock}
+		mmDo.defaultExpectation = &TCSClientMockDoExpectation{mock: mmDo.mock}
 	}
-	mmDo.defaultExpectation.results = &DoerWatcherMockDoResults{fut}
+	mmDo.defaultExpectation.results = &TCSClientMockDoResults{fut}
 	mmDo.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
 	return mmDo.mock
 }
 
-// Set uses given function f to mock the DoerWatcher.Do method
-func (mmDo *mDoerWatcherMockDo) Set(f func(req tarantool.Request) (fut tarantool.Future)) *DoerWatcherMock {
+// Set uses given function f to mock the Client.Do method
+func (mmDo *mTCSClientMockDo) Set(f func(req tarantool.Request) (fut tarantool.Future)) *TCSClientMock {
 	if mmDo.defaultExpectation != nil {
-		mmDo.mock.t.Fatalf("Default expectation is already set for the DoerWatcher.Do method")
+		mmDo.mock.t.Fatalf("Default expectation is already set for the Client.Do method")
 	}
 
 	if len(mmDo.expectations) > 0 {
-		mmDo.mock.t.Fatalf("Some expectations are already set for the DoerWatcher.Do method")
+		mmDo.mock.t.Fatalf("Some expectations are already set for the Client.Do method")
 	}
 
 	mmDo.mock.funcDo = f
@@ -193,39 +193,39 @@ func (mmDo *mDoerWatcherMockDo) Set(f func(req tarantool.Request) (fut tarantool
 	return mmDo.mock
 }
 
-// When sets expectation for the DoerWatcher.Do which will trigger the result defined by the following
+// When sets expectation for the Client.Do which will trigger the result defined by the following
 // Then helper
-func (mmDo *mDoerWatcherMockDo) When(req tarantool.Request) *DoerWatcherMockDoExpectation {
+func (mmDo *mTCSClientMockDo) When(req tarantool.Request) *TCSClientMockDoExpectation {
 	if mmDo.mock.funcDo != nil {
-		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by Set")
+		mmDo.mock.t.Fatalf("TCSClientMock.Do mock is already set by Set")
 	}
 
-	expectation := &DoerWatcherMockDoExpectation{
+	expectation := &TCSClientMockDoExpectation{
 		mock:               mmDo.mock,
-		params:             &DoerWatcherMockDoParams{req},
-		expectationOrigins: DoerWatcherMockDoExpectationOrigins{origin: minimock.CallerInfo(1)},
+		params:             &TCSClientMockDoParams{req},
+		expectationOrigins: TCSClientMockDoExpectationOrigins{origin: minimock.CallerInfo(1)},
 	}
 	mmDo.expectations = append(mmDo.expectations, expectation)
 	return expectation
 }
 
-// Then sets up DoerWatcher.Do return parameters for the expectation previously defined by the When method
-func (e *DoerWatcherMockDoExpectation) Then(fut tarantool.Future) *DoerWatcherMock {
-	e.results = &DoerWatcherMockDoResults{fut}
+// Then sets up Client.Do return parameters for the expectation previously defined by the When method
+func (e *TCSClientMockDoExpectation) Then(fut tarantool.Future) *TCSClientMock {
+	e.results = &TCSClientMockDoResults{fut}
 	return e.mock
 }
 
-// Times sets number of times DoerWatcher.Do should be invoked
-func (mmDo *mDoerWatcherMockDo) Times(n uint64) *mDoerWatcherMockDo {
+// Times sets number of times Client.Do should be invoked
+func (mmDo *mTCSClientMockDo) Times(n uint64) *mTCSClientMockDo {
 	if n == 0 {
-		mmDo.mock.t.Fatalf("Times of DoerWatcherMock.Do mock can not be zero")
+		mmDo.mock.t.Fatalf("Times of TCSClientMock.Do mock can not be zero")
 	}
 	mm_atomic.StoreUint64(&mmDo.expectedInvocations, n)
 	mmDo.expectedInvocationsOrigin = minimock.CallerInfo(1)
 	return mmDo
 }
 
-func (mmDo *mDoerWatcherMockDo) invocationsDone() bool {
+func (mmDo *mTCSClientMockDo) invocationsDone() bool {
 	if len(mmDo.expectations) == 0 && mmDo.defaultExpectation == nil && mmDo.mock.funcDo == nil {
 		return true
 	}
@@ -236,8 +236,8 @@ func (mmDo *mDoerWatcherMockDo) invocationsDone() bool {
 	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
 }
 
-// Do implements mm_tcs.DoerWatcher
-func (mmDo *DoerWatcherMock) Do(req tarantool.Request) (fut tarantool.Future) {
+// Do implements mm_tcs.Client
+func (mmDo *TCSClientMock) Do(req tarantool.Request) (fut tarantool.Future) {
 	mm_atomic.AddUint64(&mmDo.beforeDoCounter, 1)
 	defer mm_atomic.AddUint64(&mmDo.afterDoCounter, 1)
 
@@ -247,7 +247,7 @@ func (mmDo *DoerWatcherMock) Do(req tarantool.Request) (fut tarantool.Future) {
 		mmDo.inspectFuncDo(req)
 	}
 
-	mm_params := DoerWatcherMockDoParams{req}
+	mm_params := TCSClientMockDoParams{req}
 
 	// Record call args
 	mmDo.DoMock.mutex.Lock()
@@ -266,49 +266,49 @@ func (mmDo *DoerWatcherMock) Do(req tarantool.Request) (fut tarantool.Future) {
 		mm_want := mmDo.DoMock.defaultExpectation.params
 		mm_want_ptrs := mmDo.DoMock.defaultExpectation.paramPtrs
 
-		mm_got := DoerWatcherMockDoParams{req}
+		mm_got := TCSClientMockDoParams{req}
 
 		if mm_want_ptrs != nil {
 
 			if mm_want_ptrs.req != nil && !minimock.Equal(*mm_want_ptrs.req, mm_got.req) {
-				mmDo.t.Errorf("DoerWatcherMock.Do got unexpected parameter req, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+				mmDo.t.Errorf("TCSClientMock.Do got unexpected parameter req, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 					mmDo.DoMock.defaultExpectation.expectationOrigins.originReq, *mm_want_ptrs.req, mm_got.req, minimock.Diff(*mm_want_ptrs.req, mm_got.req))
 			}
 
 		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
-			mmDo.t.Errorf("DoerWatcherMock.Do got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+			mmDo.t.Errorf("TCSClientMock.Do got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 				mmDo.DoMock.defaultExpectation.expectationOrigins.origin, *mm_want, mm_got, minimock.Diff(*mm_want, mm_got))
 		}
 
 		mm_results := mmDo.DoMock.defaultExpectation.results
 		if mm_results == nil {
-			mmDo.t.Fatal("No results are set for the DoerWatcherMock.Do")
+			mmDo.t.Fatal("No results are set for the TCSClientMock.Do")
 		}
 		return (*mm_results).fut
 	}
 	if mmDo.funcDo != nil {
 		return mmDo.funcDo(req)
 	}
-	mmDo.t.Fatalf("Unexpected call to DoerWatcherMock.Do. %v", req)
+	mmDo.t.Fatalf("Unexpected call to TCSClientMock.Do. %v", req)
 	return
 }
 
-// DoAfterCounter returns a count of finished DoerWatcherMock.Do invocations
-func (mmDo *DoerWatcherMock) DoAfterCounter() uint64 {
+// DoAfterCounter returns a count of finished TCSClientMock.Do invocations
+func (mmDo *TCSClientMock) DoAfterCounter() uint64 {
 	return mm_atomic.LoadUint64(&mmDo.afterDoCounter)
 }
 
-// DoBeforeCounter returns a count of DoerWatcherMock.Do invocations
-func (mmDo *DoerWatcherMock) DoBeforeCounter() uint64 {
+// DoBeforeCounter returns a count of TCSClientMock.Do invocations
+func (mmDo *TCSClientMock) DoBeforeCounter() uint64 {
 	return mm_atomic.LoadUint64(&mmDo.beforeDoCounter)
 }
 
-// Calls returns a list of arguments used in each call to DoerWatcherMock.Do.
+// Calls returns a list of arguments used in each call to TCSClientMock.Do.
 // The list is in the same order as the calls were made (i.e. recent calls have a higher index)
-func (mmDo *mDoerWatcherMockDo) Calls() []*DoerWatcherMockDoParams {
+func (mmDo *mTCSClientMockDo) Calls() []*TCSClientMockDoParams {
 	mmDo.mutex.RLock()
 
-	argCopy := make([]*DoerWatcherMockDoParams, len(mmDo.callArgs))
+	argCopy := make([]*TCSClientMockDoParams, len(mmDo.callArgs))
 	copy(argCopy, mmDo.callArgs)
 
 	mmDo.mutex.RUnlock()
@@ -318,7 +318,7 @@ func (mmDo *mDoerWatcherMockDo) Calls() []*DoerWatcherMockDoParams {
 
 // MinimockDoDone returns true if the count of the Do invocations corresponds
 // the number of defined expectations
-func (m *DoerWatcherMock) MinimockDoDone() bool {
+func (m *TCSClientMock) MinimockDoDone() bool {
 	if m.DoMock.optional {
 		// Optional methods provide '0 or more' call count restriction.
 		return true
@@ -334,10 +334,10 @@ func (m *DoerWatcherMock) MinimockDoDone() bool {
 }
 
 // MinimockDoInspect logs each unmet expectation
-func (m *DoerWatcherMock) MinimockDoInspect() {
+func (m *TCSClientMock) MinimockDoInspect() {
 	for _, e := range m.DoMock.expectations {
 		if mm_atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to DoerWatcherMock.Do at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
+			m.t.Errorf("Expected call to TCSClientMock.Do at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
 		}
 	}
 
@@ -345,66 +345,66 @@ func (m *DoerWatcherMock) MinimockDoInspect() {
 	// if default expectation was set then invocations count should be greater than zero
 	if m.DoMock.defaultExpectation != nil && afterDoCounter < 1 {
 		if m.DoMock.defaultExpectation.params == nil {
-			m.t.Errorf("Expected call to DoerWatcherMock.Do at\n%s", m.DoMock.defaultExpectation.returnOrigin)
+			m.t.Errorf("Expected call to TCSClientMock.Do at\n%s", m.DoMock.defaultExpectation.returnOrigin)
 		} else {
-			m.t.Errorf("Expected call to DoerWatcherMock.Do at\n%s with params: %#v", m.DoMock.defaultExpectation.expectationOrigins.origin, *m.DoMock.defaultExpectation.params)
+			m.t.Errorf("Expected call to TCSClientMock.Do at\n%s with params: %#v", m.DoMock.defaultExpectation.expectationOrigins.origin, *m.DoMock.defaultExpectation.params)
 		}
 	}
 	// if func was set then invocations count should be greater than zero
 	if m.funcDo != nil && afterDoCounter < 1 {
-		m.t.Errorf("Expected call to DoerWatcherMock.Do at\n%s", m.funcDoOrigin)
+		m.t.Errorf("Expected call to TCSClientMock.Do at\n%s", m.funcDoOrigin)
 	}
 
 	if !m.DoMock.invocationsDone() && afterDoCounter > 0 {
-		m.t.Errorf("Expected %d calls to DoerWatcherMock.Do at\n%s but found %d calls",
+		m.t.Errorf("Expected %d calls to TCSClientMock.Do at\n%s but found %d calls",
 			mm_atomic.LoadUint64(&m.DoMock.expectedInvocations), m.DoMock.expectedInvocationsOrigin, afterDoCounter)
 	}
 }
 
-type mDoerWatcherMockNewWatcher struct {
+type mTCSClientMockNewWatcher struct {
 	optional           bool
-	mock               *DoerWatcherMock
-	defaultExpectation *DoerWatcherMockNewWatcherExpectation
-	expectations       []*DoerWatcherMockNewWatcherExpectation
+	mock               *TCSClientMock
+	defaultExpectation *TCSClientMockNewWatcherExpectation
+	expectations       []*TCSClientMockNewWatcherExpectation
 
-	callArgs []*DoerWatcherMockNewWatcherParams
+	callArgs []*TCSClientMockNewWatcherParams
 	mutex    sync.RWMutex
 
 	expectedInvocations       uint64
 	expectedInvocationsOrigin string
 }
 
-// DoerWatcherMockNewWatcherExpectation specifies expectation struct of the DoerWatcher.NewWatcher
-type DoerWatcherMockNewWatcherExpectation struct {
-	mock               *DoerWatcherMock
-	params             *DoerWatcherMockNewWatcherParams
-	paramPtrs          *DoerWatcherMockNewWatcherParamPtrs
-	expectationOrigins DoerWatcherMockNewWatcherExpectationOrigins
-	results            *DoerWatcherMockNewWatcherResults
+// TCSClientMockNewWatcherExpectation specifies expectation struct of the Client.NewWatcher
+type TCSClientMockNewWatcherExpectation struct {
+	mock               *TCSClientMock
+	params             *TCSClientMockNewWatcherParams
+	paramPtrs          *TCSClientMockNewWatcherParamPtrs
+	expectationOrigins TCSClientMockNewWatcherExpectationOrigins
+	results            *TCSClientMockNewWatcherResults
 	returnOrigin       string
 	Counter            uint64
 }
 
-// DoerWatcherMockNewWatcherParams contains parameters of the DoerWatcher.NewWatcher
-type DoerWatcherMockNewWatcherParams struct {
+// TCSClientMockNewWatcherParams contains parameters of the Client.NewWatcher
+type TCSClientMockNewWatcherParams struct {
 	key      string
 	callback tarantool.WatchCallback
 }
 
-// DoerWatcherMockNewWatcherParamPtrs contains pointers to parameters of the DoerWatcher.NewWatcher
-type DoerWatcherMockNewWatcherParamPtrs struct {
+// TCSClientMockNewWatcherParamPtrs contains pointers to parameters of the Client.NewWatcher
+type TCSClientMockNewWatcherParamPtrs struct {
 	key      *string
 	callback *tarantool.WatchCallback
 }
 
-// DoerWatcherMockNewWatcherResults contains results of the DoerWatcher.NewWatcher
-type DoerWatcherMockNewWatcherResults struct {
+// TCSClientMockNewWatcherResults contains results of the Client.NewWatcher
+type TCSClientMockNewWatcherResults struct {
 	w1  tarantool.Watcher
 	err error
 }
 
-// DoerWatcherMockNewWatcherOrigins contains origins of expectations of the DoerWatcher.NewWatcher
-type DoerWatcherMockNewWatcherExpectationOrigins struct {
+// TCSClientMockNewWatcherOrigins contains origins of expectations of the Client.NewWatcher
+type TCSClientMockNewWatcherExpectationOrigins struct {
 	origin         string
 	originKey      string
 	originCallback string
@@ -415,26 +415,26 @@ type DoerWatcherMockNewWatcherExpectationOrigins struct {
 // Optional() makes method check to work in '0 or more' mode.
 // It is NOT RECOMMENDED to use this option unless you really need it, as default behaviour helps to
 // catch the problems when the expected method call is totally skipped during test run.
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Optional() *mDoerWatcherMockNewWatcher {
+func (mmNewWatcher *mTCSClientMockNewWatcher) Optional() *mTCSClientMockNewWatcher {
 	mmNewWatcher.optional = true
 	return mmNewWatcher
 }
 
-// Expect sets up expected params for DoerWatcher.NewWatcher
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Expect(key string, callback tarantool.WatchCallback) *mDoerWatcherMockNewWatcher {
+// Expect sets up expected params for Client.NewWatcher
+func (mmNewWatcher *mTCSClientMockNewWatcher) Expect(key string, callback tarantool.WatchCallback) *mTCSClientMockNewWatcher {
 	if mmNewWatcher.mock.funcNewWatcher != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Set")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Set")
 	}
 
 	if mmNewWatcher.defaultExpectation == nil {
-		mmNewWatcher.defaultExpectation = &DoerWatcherMockNewWatcherExpectation{}
+		mmNewWatcher.defaultExpectation = &TCSClientMockNewWatcherExpectation{}
 	}
 
 	if mmNewWatcher.defaultExpectation.paramPtrs != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by ExpectParams functions")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by ExpectParams functions")
 	}
 
-	mmNewWatcher.defaultExpectation.params = &DoerWatcherMockNewWatcherParams{key, callback}
+	mmNewWatcher.defaultExpectation.params = &TCSClientMockNewWatcherParams{key, callback}
 	mmNewWatcher.defaultExpectation.expectationOrigins.origin = minimock.CallerInfo(1)
 	for _, e := range mmNewWatcher.expectations {
 		if minimock.Equal(e.params, mmNewWatcher.defaultExpectation.params) {
@@ -445,22 +445,22 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) Expect(key string, callback tara
 	return mmNewWatcher
 }
 
-// ExpectKeyParam1 sets up expected param key for DoerWatcher.NewWatcher
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) ExpectKeyParam1(key string) *mDoerWatcherMockNewWatcher {
+// ExpectKeyParam1 sets up expected param key for Client.NewWatcher
+func (mmNewWatcher *mTCSClientMockNewWatcher) ExpectKeyParam1(key string) *mTCSClientMockNewWatcher {
 	if mmNewWatcher.mock.funcNewWatcher != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Set")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Set")
 	}
 
 	if mmNewWatcher.defaultExpectation == nil {
-		mmNewWatcher.defaultExpectation = &DoerWatcherMockNewWatcherExpectation{}
+		mmNewWatcher.defaultExpectation = &TCSClientMockNewWatcherExpectation{}
 	}
 
 	if mmNewWatcher.defaultExpectation.params != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Expect")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Expect")
 	}
 
 	if mmNewWatcher.defaultExpectation.paramPtrs == nil {
-		mmNewWatcher.defaultExpectation.paramPtrs = &DoerWatcherMockNewWatcherParamPtrs{}
+		mmNewWatcher.defaultExpectation.paramPtrs = &TCSClientMockNewWatcherParamPtrs{}
 	}
 	mmNewWatcher.defaultExpectation.paramPtrs.key = &key
 	mmNewWatcher.defaultExpectation.expectationOrigins.originKey = minimock.CallerInfo(1)
@@ -468,22 +468,22 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) ExpectKeyParam1(key string) *mDo
 	return mmNewWatcher
 }
 
-// ExpectCallbackParam2 sets up expected param callback for DoerWatcher.NewWatcher
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) ExpectCallbackParam2(callback tarantool.WatchCallback) *mDoerWatcherMockNewWatcher {
+// ExpectCallbackParam2 sets up expected param callback for Client.NewWatcher
+func (mmNewWatcher *mTCSClientMockNewWatcher) ExpectCallbackParam2(callback tarantool.WatchCallback) *mTCSClientMockNewWatcher {
 	if mmNewWatcher.mock.funcNewWatcher != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Set")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Set")
 	}
 
 	if mmNewWatcher.defaultExpectation == nil {
-		mmNewWatcher.defaultExpectation = &DoerWatcherMockNewWatcherExpectation{}
+		mmNewWatcher.defaultExpectation = &TCSClientMockNewWatcherExpectation{}
 	}
 
 	if mmNewWatcher.defaultExpectation.params != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Expect")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Expect")
 	}
 
 	if mmNewWatcher.defaultExpectation.paramPtrs == nil {
-		mmNewWatcher.defaultExpectation.paramPtrs = &DoerWatcherMockNewWatcherParamPtrs{}
+		mmNewWatcher.defaultExpectation.paramPtrs = &TCSClientMockNewWatcherParamPtrs{}
 	}
 	mmNewWatcher.defaultExpectation.paramPtrs.callback = &callback
 	mmNewWatcher.defaultExpectation.expectationOrigins.originCallback = minimock.CallerInfo(1)
@@ -491,10 +491,10 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) ExpectCallbackParam2(callback ta
 	return mmNewWatcher
 }
 
-// Inspect accepts an inspector function that has same arguments as the DoerWatcher.NewWatcher
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Inspect(f func(key string, callback tarantool.WatchCallback)) *mDoerWatcherMockNewWatcher {
+// Inspect accepts an inspector function that has same arguments as the Client.NewWatcher
+func (mmNewWatcher *mTCSClientMockNewWatcher) Inspect(f func(key string, callback tarantool.WatchCallback)) *mTCSClientMockNewWatcher {
 	if mmNewWatcher.mock.inspectFuncNewWatcher != nil {
-		mmNewWatcher.mock.t.Fatalf("Inspect function is already set for DoerWatcherMock.NewWatcher")
+		mmNewWatcher.mock.t.Fatalf("Inspect function is already set for TCSClientMock.NewWatcher")
 	}
 
 	mmNewWatcher.mock.inspectFuncNewWatcher = f
@@ -502,28 +502,28 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) Inspect(f func(key string, callb
 	return mmNewWatcher
 }
 
-// Return sets up results that will be returned by DoerWatcher.NewWatcher
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Return(w1 tarantool.Watcher, err error) *DoerWatcherMock {
+// Return sets up results that will be returned by Client.NewWatcher
+func (mmNewWatcher *mTCSClientMockNewWatcher) Return(w1 tarantool.Watcher, err error) *TCSClientMock {
 	if mmNewWatcher.mock.funcNewWatcher != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Set")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Set")
 	}
 
 	if mmNewWatcher.defaultExpectation == nil {
-		mmNewWatcher.defaultExpectation = &DoerWatcherMockNewWatcherExpectation{mock: mmNewWatcher.mock}
+		mmNewWatcher.defaultExpectation = &TCSClientMockNewWatcherExpectation{mock: mmNewWatcher.mock}
 	}
-	mmNewWatcher.defaultExpectation.results = &DoerWatcherMockNewWatcherResults{w1, err}
+	mmNewWatcher.defaultExpectation.results = &TCSClientMockNewWatcherResults{w1, err}
 	mmNewWatcher.defaultExpectation.returnOrigin = minimock.CallerInfo(1)
 	return mmNewWatcher.mock
 }
 
-// Set uses given function f to mock the DoerWatcher.NewWatcher method
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Set(f func(key string, callback tarantool.WatchCallback) (w1 tarantool.Watcher, err error)) *DoerWatcherMock {
+// Set uses given function f to mock the Client.NewWatcher method
+func (mmNewWatcher *mTCSClientMockNewWatcher) Set(f func(key string, callback tarantool.WatchCallback) (w1 tarantool.Watcher, err error)) *TCSClientMock {
 	if mmNewWatcher.defaultExpectation != nil {
-		mmNewWatcher.mock.t.Fatalf("Default expectation is already set for the DoerWatcher.NewWatcher method")
+		mmNewWatcher.mock.t.Fatalf("Default expectation is already set for the Client.NewWatcher method")
 	}
 
 	if len(mmNewWatcher.expectations) > 0 {
-		mmNewWatcher.mock.t.Fatalf("Some expectations are already set for the DoerWatcher.NewWatcher method")
+		mmNewWatcher.mock.t.Fatalf("Some expectations are already set for the Client.NewWatcher method")
 	}
 
 	mmNewWatcher.mock.funcNewWatcher = f
@@ -531,39 +531,39 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) Set(f func(key string, callback 
 	return mmNewWatcher.mock
 }
 
-// When sets expectation for the DoerWatcher.NewWatcher which will trigger the result defined by the following
+// When sets expectation for the Client.NewWatcher which will trigger the result defined by the following
 // Then helper
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) When(key string, callback tarantool.WatchCallback) *DoerWatcherMockNewWatcherExpectation {
+func (mmNewWatcher *mTCSClientMockNewWatcher) When(key string, callback tarantool.WatchCallback) *TCSClientMockNewWatcherExpectation {
 	if mmNewWatcher.mock.funcNewWatcher != nil {
-		mmNewWatcher.mock.t.Fatalf("DoerWatcherMock.NewWatcher mock is already set by Set")
+		mmNewWatcher.mock.t.Fatalf("TCSClientMock.NewWatcher mock is already set by Set")
 	}
 
-	expectation := &DoerWatcherMockNewWatcherExpectation{
+	expectation := &TCSClientMockNewWatcherExpectation{
 		mock:               mmNewWatcher.mock,
-		params:             &DoerWatcherMockNewWatcherParams{key, callback},
-		expectationOrigins: DoerWatcherMockNewWatcherExpectationOrigins{origin: minimock.CallerInfo(1)},
+		params:             &TCSClientMockNewWatcherParams{key, callback},
+		expectationOrigins: TCSClientMockNewWatcherExpectationOrigins{origin: minimock.CallerInfo(1)},
 	}
 	mmNewWatcher.expectations = append(mmNewWatcher.expectations, expectation)
 	return expectation
 }
 
-// Then sets up DoerWatcher.NewWatcher return parameters for the expectation previously defined by the When method
-func (e *DoerWatcherMockNewWatcherExpectation) Then(w1 tarantool.Watcher, err error) *DoerWatcherMock {
-	e.results = &DoerWatcherMockNewWatcherResults{w1, err}
+// Then sets up Client.NewWatcher return parameters for the expectation previously defined by the When method
+func (e *TCSClientMockNewWatcherExpectation) Then(w1 tarantool.Watcher, err error) *TCSClientMock {
+	e.results = &TCSClientMockNewWatcherResults{w1, err}
 	return e.mock
 }
 
-// Times sets number of times DoerWatcher.NewWatcher should be invoked
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Times(n uint64) *mDoerWatcherMockNewWatcher {
+// Times sets number of times Client.NewWatcher should be invoked
+func (mmNewWatcher *mTCSClientMockNewWatcher) Times(n uint64) *mTCSClientMockNewWatcher {
 	if n == 0 {
-		mmNewWatcher.mock.t.Fatalf("Times of DoerWatcherMock.NewWatcher mock can not be zero")
+		mmNewWatcher.mock.t.Fatalf("Times of TCSClientMock.NewWatcher mock can not be zero")
 	}
 	mm_atomic.StoreUint64(&mmNewWatcher.expectedInvocations, n)
 	mmNewWatcher.expectedInvocationsOrigin = minimock.CallerInfo(1)
 	return mmNewWatcher
 }
 
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) invocationsDone() bool {
+func (mmNewWatcher *mTCSClientMockNewWatcher) invocationsDone() bool {
 	if len(mmNewWatcher.expectations) == 0 && mmNewWatcher.defaultExpectation == nil && mmNewWatcher.mock.funcNewWatcher == nil {
 		return true
 	}
@@ -574,8 +574,8 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) invocationsDone() bool {
 	return totalInvocations > 0 && (expectedInvocations == 0 || expectedInvocations == totalInvocations)
 }
 
-// NewWatcher implements mm_tcs.DoerWatcher
-func (mmNewWatcher *DoerWatcherMock) NewWatcher(key string, callback tarantool.WatchCallback) (w1 tarantool.Watcher, err error) {
+// NewWatcher implements mm_tcs.Client
+func (mmNewWatcher *TCSClientMock) NewWatcher(key string, callback tarantool.WatchCallback) (w1 tarantool.Watcher, err error) {
 	mm_atomic.AddUint64(&mmNewWatcher.beforeNewWatcherCounter, 1)
 	defer mm_atomic.AddUint64(&mmNewWatcher.afterNewWatcherCounter, 1)
 
@@ -585,7 +585,7 @@ func (mmNewWatcher *DoerWatcherMock) NewWatcher(key string, callback tarantool.W
 		mmNewWatcher.inspectFuncNewWatcher(key, callback)
 	}
 
-	mm_params := DoerWatcherMockNewWatcherParams{key, callback}
+	mm_params := TCSClientMockNewWatcherParams{key, callback}
 
 	// Record call args
 	mmNewWatcher.NewWatcherMock.mutex.Lock()
@@ -604,54 +604,54 @@ func (mmNewWatcher *DoerWatcherMock) NewWatcher(key string, callback tarantool.W
 		mm_want := mmNewWatcher.NewWatcherMock.defaultExpectation.params
 		mm_want_ptrs := mmNewWatcher.NewWatcherMock.defaultExpectation.paramPtrs
 
-		mm_got := DoerWatcherMockNewWatcherParams{key, callback}
+		mm_got := TCSClientMockNewWatcherParams{key, callback}
 
 		if mm_want_ptrs != nil {
 
 			if mm_want_ptrs.key != nil && !minimock.Equal(*mm_want_ptrs.key, mm_got.key) {
-				mmNewWatcher.t.Errorf("DoerWatcherMock.NewWatcher got unexpected parameter key, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+				mmNewWatcher.t.Errorf("TCSClientMock.NewWatcher got unexpected parameter key, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 					mmNewWatcher.NewWatcherMock.defaultExpectation.expectationOrigins.originKey, *mm_want_ptrs.key, mm_got.key, minimock.Diff(*mm_want_ptrs.key, mm_got.key))
 			}
 
 			if mm_want_ptrs.callback != nil && !minimock.Equal(*mm_want_ptrs.callback, mm_got.callback) {
-				mmNewWatcher.t.Errorf("DoerWatcherMock.NewWatcher got unexpected parameter callback, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+				mmNewWatcher.t.Errorf("TCSClientMock.NewWatcher got unexpected parameter callback, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 					mmNewWatcher.NewWatcherMock.defaultExpectation.expectationOrigins.originCallback, *mm_want_ptrs.callback, mm_got.callback, minimock.Diff(*mm_want_ptrs.callback, mm_got.callback))
 			}
 
 		} else if mm_want != nil && !minimock.Equal(*mm_want, mm_got) {
-			mmNewWatcher.t.Errorf("DoerWatcherMock.NewWatcher got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
+			mmNewWatcher.t.Errorf("TCSClientMock.NewWatcher got unexpected parameters, expected at\n%s:\nwant: %#v\n got: %#v%s\n",
 				mmNewWatcher.NewWatcherMock.defaultExpectation.expectationOrigins.origin, *mm_want, mm_got, minimock.Diff(*mm_want, mm_got))
 		}
 
 		mm_results := mmNewWatcher.NewWatcherMock.defaultExpectation.results
 		if mm_results == nil {
-			mmNewWatcher.t.Fatal("No results are set for the DoerWatcherMock.NewWatcher")
+			mmNewWatcher.t.Fatal("No results are set for the TCSClientMock.NewWatcher")
 		}
 		return (*mm_results).w1, (*mm_results).err
 	}
 	if mmNewWatcher.funcNewWatcher != nil {
 		return mmNewWatcher.funcNewWatcher(key, callback)
 	}
-	mmNewWatcher.t.Fatalf("Unexpected call to DoerWatcherMock.NewWatcher. %v %v", key, callback)
+	mmNewWatcher.t.Fatalf("Unexpected call to TCSClientMock.NewWatcher. %v %v", key, callback)
 	return
 }
 
-// NewWatcherAfterCounter returns a count of finished DoerWatcherMock.NewWatcher invocations
-func (mmNewWatcher *DoerWatcherMock) NewWatcherAfterCounter() uint64 {
+// NewWatcherAfterCounter returns a count of finished TCSClientMock.NewWatcher invocations
+func (mmNewWatcher *TCSClientMock) NewWatcherAfterCounter() uint64 {
 	return mm_atomic.LoadUint64(&mmNewWatcher.afterNewWatcherCounter)
 }
 
-// NewWatcherBeforeCounter returns a count of DoerWatcherMock.NewWatcher invocations
-func (mmNewWatcher *DoerWatcherMock) NewWatcherBeforeCounter() uint64 {
+// NewWatcherBeforeCounter returns a count of TCSClientMock.NewWatcher invocations
+func (mmNewWatcher *TCSClientMock) NewWatcherBeforeCounter() uint64 {
 	return mm_atomic.LoadUint64(&mmNewWatcher.beforeNewWatcherCounter)
 }
 
-// Calls returns a list of arguments used in each call to DoerWatcherMock.NewWatcher.
+// Calls returns a list of arguments used in each call to TCSClientMock.NewWatcher.
 // The list is in the same order as the calls were made (i.e. recent calls have a higher index)
-func (mmNewWatcher *mDoerWatcherMockNewWatcher) Calls() []*DoerWatcherMockNewWatcherParams {
+func (mmNewWatcher *mTCSClientMockNewWatcher) Calls() []*TCSClientMockNewWatcherParams {
 	mmNewWatcher.mutex.RLock()
 
-	argCopy := make([]*DoerWatcherMockNewWatcherParams, len(mmNewWatcher.callArgs))
+	argCopy := make([]*TCSClientMockNewWatcherParams, len(mmNewWatcher.callArgs))
 	copy(argCopy, mmNewWatcher.callArgs)
 
 	mmNewWatcher.mutex.RUnlock()
@@ -661,7 +661,7 @@ func (mmNewWatcher *mDoerWatcherMockNewWatcher) Calls() []*DoerWatcherMockNewWat
 
 // MinimockNewWatcherDone returns true if the count of the NewWatcher invocations corresponds
 // the number of defined expectations
-func (m *DoerWatcherMock) MinimockNewWatcherDone() bool {
+func (m *TCSClientMock) MinimockNewWatcherDone() bool {
 	if m.NewWatcherMock.optional {
 		// Optional methods provide '0 or more' call count restriction.
 		return true
@@ -677,10 +677,10 @@ func (m *DoerWatcherMock) MinimockNewWatcherDone() bool {
 }
 
 // MinimockNewWatcherInspect logs each unmet expectation
-func (m *DoerWatcherMock) MinimockNewWatcherInspect() {
+func (m *TCSClientMock) MinimockNewWatcherInspect() {
 	for _, e := range m.NewWatcherMock.expectations {
 		if mm_atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to DoerWatcherMock.NewWatcher at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
+			m.t.Errorf("Expected call to TCSClientMock.NewWatcher at\n%s with params: %#v", e.expectationOrigins.origin, *e.params)
 		}
 	}
 
@@ -688,24 +688,24 @@ func (m *DoerWatcherMock) MinimockNewWatcherInspect() {
 	// if default expectation was set then invocations count should be greater than zero
 	if m.NewWatcherMock.defaultExpectation != nil && afterNewWatcherCounter < 1 {
 		if m.NewWatcherMock.defaultExpectation.params == nil {
-			m.t.Errorf("Expected call to DoerWatcherMock.NewWatcher at\n%s", m.NewWatcherMock.defaultExpectation.returnOrigin)
+			m.t.Errorf("Expected call to TCSClientMock.NewWatcher at\n%s", m.NewWatcherMock.defaultExpectation.returnOrigin)
 		} else {
-			m.t.Errorf("Expected call to DoerWatcherMock.NewWatcher at\n%s with params: %#v", m.NewWatcherMock.defaultExpectation.expectationOrigins.origin, *m.NewWatcherMock.defaultExpectation.params)
+			m.t.Errorf("Expected call to TCSClientMock.NewWatcher at\n%s with params: %#v", m.NewWatcherMock.defaultExpectation.expectationOrigins.origin, *m.NewWatcherMock.defaultExpectation.params)
 		}
 	}
 	// if func was set then invocations count should be greater than zero
 	if m.funcNewWatcher != nil && afterNewWatcherCounter < 1 {
-		m.t.Errorf("Expected call to DoerWatcherMock.NewWatcher at\n%s", m.funcNewWatcherOrigin)
+		m.t.Errorf("Expected call to TCSClientMock.NewWatcher at\n%s", m.funcNewWatcherOrigin)
 	}
 
 	if !m.NewWatcherMock.invocationsDone() && afterNewWatcherCounter > 0 {
-		m.t.Errorf("Expected %d calls to DoerWatcherMock.NewWatcher at\n%s but found %d calls",
+		m.t.Errorf("Expected %d calls to TCSClientMock.NewWatcher at\n%s but found %d calls",
 			mm_atomic.LoadUint64(&m.NewWatcherMock.expectedInvocations), m.NewWatcherMock.expectedInvocationsOrigin, afterNewWatcherCounter)
 	}
 }
 
 // MinimockFinish checks that all mocked methods have been called the expected number of times
-func (m *DoerWatcherMock) MinimockFinish() {
+func (m *TCSClientMock) MinimockFinish() {
 	m.finishOnce.Do(func() {
 		if !m.minimockDone() {
 			m.MinimockDoInspect()
@@ -716,7 +716,7 @@ func (m *DoerWatcherMock) MinimockFinish() {
 }
 
 // MinimockWait waits for all mocked methods to be called the expected number of times
-func (m *DoerWatcherMock) MinimockWait(timeout mm_time.Duration) {
+func (m *TCSClientMock) MinimockWait(timeout mm_time.Duration) {
 	timeoutCh := mm_time.After(timeout)
 	for {
 		if m.minimockDone() {
@@ -731,7 +731,7 @@ func (m *DoerWatcherMock) MinimockWait(timeout mm_time.Duration) {
 	}
 }
 
-func (m *DoerWatcherMock) minimockDone() bool {
+func (m *TCSClientMock) minimockDone() bool {
 	done := true
 	return done &&
 		m.MinimockDoDone() &&

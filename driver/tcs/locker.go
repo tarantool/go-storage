@@ -28,7 +28,7 @@ var (
 // at ttl/3 cadence, which assumes replication_synchro_timeout + RTT < ttl/3
 // on a healthy cluster.
 type tcsLocker struct {
-	conn   DoerWatcher
+	conn   Client
 	name   string
 	ttlSec int
 	//nolint:containedctx // lifeCtx scopes the locker; cancellation aborts a blocking Lock.
