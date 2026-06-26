@@ -18,7 +18,23 @@ func TestValueNotEqual(t *testing.T) {
 	assert.Equal(t, key, p.Key())
 	assert.Equal(t, predicate.OpNotEqual, p.Operation())
 	assert.Equal(t, predicate.TargetValue, p.Target())
-	assert.Equal(t, value, p.Value())
+	assert.Equal(t, []byte(value), p.Value())
+}
+
+func TestValuePredicates_StringNormalizedToBytes(t *testing.T) {
+	t.Parallel()
+
+	key := []byte("test-key")
+
+	eq := predicate.ValueEqual(key, "hello")
+	assert.Equal(t, []byte("hello"), eq.Value())
+
+	ne := predicate.ValueNotEqual(key, "hello")
+	assert.Equal(t, []byte("hello"), ne.Value())
+
+	// Non-string values pass through unchanged.
+	raw := predicate.ValueEqual(key, []byte("world"))
+	assert.Equal(t, []byte("world"), raw.Value())
 }
 
 func TestValueEqual(t *testing.T) {
