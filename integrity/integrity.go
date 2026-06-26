@@ -115,12 +115,12 @@ func IgnoreMoreThanOneResult() GetOption {
 }
 
 var (
-	ErrNotFound                  = errors.New("not found")
-	ErrMoreThanOneResult         = errors.New("more than one result was returned")
-	ErrInvalidPredicateValueType = errors.New("invalid predicate value type")
-	ErrNoValueKey                = errors.New("no value key found in generated keys")
+	ErrNotFound                  = errors.New("integrity: not found")
+	ErrMoreThanOneResult         = errors.New("integrity: more than one result was returned")
+	ErrInvalidPredicateValueType = errors.New("integrity: invalid predicate value type")
+	ErrNoValueKey                = errors.New("integrity: no value key found in generated keys")
 	// ErrPredicateFailed is returned by Put or Delete when predicates are specified
 	// but the transaction predicate check fails (i.e., the conditions are not met).
 	// Use [WithPutPredicates] or [WithDeletePredicates] to specify predicates.
-	ErrPredicateFailed = errors.New("predicate check failed")
+	ErrPredicateFailed = errors.New("integrity: predicate check failed")
 )
