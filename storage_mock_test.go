@@ -2,8 +2,6 @@
 
 package storage
 
-//go:generate minimock -i github.com/tarantool/go-storage/v2.Storage -o storage_mock_test.go -n StorageMock -p storage
-
 import (
 	"context"
 	"sync"

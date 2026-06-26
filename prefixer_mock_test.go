@@ -2,8 +2,6 @@
 
 package storage
 
-//go:generate minimock -i github.com/tarantool/go-storage/v2.Prefixer -o prefixer_mock_test.go -n PrefixerMock -p storage
-
 import (
 	"sync"
 	mm_atomic "sync/atomic"
