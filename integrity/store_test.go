@@ -300,7 +300,7 @@ func TestStore_Get_Success(t *testing.T) {
 	namedValue, err := store.Get(ctx, "my-object")
 	require.NoError(t, err)
 	assert.Equal(t, "my-object", namedValue.Name)
-	assert.Equal(t, int64(integrity.ModRevisionEmpty), namedValue.ModRevision)
+	assert.Equal(t, int64(0), namedValue.ModRevision)
 	assert.True(t, namedValue.Value.IsSome())
 
 	val, ok := namedValue.Value.Get()
@@ -1438,7 +1438,7 @@ func TestStore_Range_Success(t *testing.T) {
 
 	for _, result := range results {
 		require.NoError(t, result.Error)
-		require.Equal(t, int64(integrity.ModRevisionEmpty), result.ModRevision)
+		require.Equal(t, int64(0), result.ModRevision)
 		require.True(t, result.Value.IsSome())
 
 		val, ok := result.Value.Get()
