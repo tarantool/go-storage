@@ -10,8 +10,8 @@ import (
 	"github.com/tarantool/go-storage/v2/namer"
 )
 
-// ModRevisionEmpty is used to initialize the ModRevision field by default.
-const ModRevisionEmpty = 0
+// modRevisionEmpty is used to initialize the ModRevision field by default.
+const modRevisionEmpty = 0
 
 // Validator verifies integrity-protected key-value pairs.
 type Validator[T any] struct {
@@ -100,7 +100,7 @@ func (v Validator[T]) validateSingle(name string, kvs []extendedKV) ValidatedRes
 	output := ValidatedResult[T]{
 		Name:        name,
 		Value:       option.None[T](),
-		ModRevision: ModRevisionEmpty,
+		ModRevision: modRevisionEmpty,
 		Error:       nil,
 	}
 
