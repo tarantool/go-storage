@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ErrEmptyPrivateKey = errors.New("trying to sign without private key")
+	ErrEmptyPrivateKey = errors.New("crypto: cannot sign without a private key")
 )
 
 func zero[T any]() (out T) { return } //nolint:nonamedreturns

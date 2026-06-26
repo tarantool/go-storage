@@ -13,7 +13,7 @@ import (
 
 // ErrHashMismatch is returned by Verify when the stored digest does not match
 // any encoding of the computed digest accepted under the hasher's Mode.
-var ErrHashMismatch = errors.New("hash mismatch")
+var ErrHashMismatch = errors.New("hasher: hash mismatch")
 
 // Hasher is the interface that storage hashers must implement.
 // It provides low-level operations for hash calculating.
