@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - hasher: `Hasher` interface gains `Verify(data, stored []byte) error`, which
   reports whether a stored digest matches under the hasher's mode. The integrity
   validator uses it so hash verification is encoding-aware.
+- integrity: exported the option aliases `GetOption`, `PutOption` and
+  `DeleteOption` for the `With…`/`Ignore…` option constructors. The option type
+  was previously `internal/options.OptionCallback[…]` over an unexported struct
+  in an internal package, so callers could not name it to forward options.
+- hasher, crypto: exported the algorithm-name constants returned by `Name()` —
+  `hasher.AlgoSHA256`, `hasher.AlgoSHA1` and `crypto.AlgoRSAPSS` — so codec
+  callers can pass a compile-checked constant to `WithHashLocation` /
+  `WithSignatureLocation` instead of retyping the bare string.
+- driver/etcd: `NewWithLocker(client *etcd.Client)` builds a locking-capable
+  driver (see Changed).
 
 ### Changed
 
@@ -52,6 +62,41 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   it. The built-in SHA-1/SHA-256 hashers implement it.
 - **BREAKING:** `crypto.NewRSAPSSSignerVerifier` is renamed to
   `crypto.NewRSAPSS`.
+- **BREAKING:** `driver/etcd` makes locking a construction-time choice. `New`
+  now builds a driver without locking — `NewLocker` returns
+  `locker.ErrUnsupported` — and the new `NewWithLocker(*etcd.Client)` builds a
+  locking-capable driver. This replaces the previous runtime
+  `client.(*etcd.Client)` type assertion, which silently disabled locking for
+  any wrapper that implemented the `Client` interface. `connect` uses
+  `NewWithLocker`, so locking via `connect` is unaffected.
+- **BREAKING:** renamed the `driver/tcs` connection interface `DoerWatcher` to
+  `Client`, matching `driver/etcd.Client` so every driver's connection
+  dependency shares one name. The generated mock is now `mocks.TCSClientMock`
+  (was `mocks.DoerWatcherMock`).
+- **BREAKING:** lock-name validation is now uniform across drivers. Every
+  driver's `NewLocker` requires `name` to start with `/` and not end with `/`;
+  previously only tcs enforced this and etcd/dummy accepted any string.
+  Violations return the new `locker.ErrNameNoLeadingSlash` /
+  `locker.ErrNameTrailingSlash`, checked by the shared `locker.ValidateName`.
+- **BREAKING:** `predicate.ValueEqual` / `ValueNotEqual` normalize a `string`
+  comparison value to `[]byte`, so `Predicate.Value()` returns `[]byte` for
+  both `[]byte` and `string` inputs. Previously a `string` value worked on the
+  dummy and tcs drivers but was rejected by etcd; every driver now receives
+  `[]byte`.
+- **BREAKING:** `namer.KeyType.String()` returns the wire form (`"value"`,
+  `"hash"`, `"signature"`) instead of the Go identifier (`"KeyTypeValue"`, …);
+  unknown values format as `KeyType(N)`. The method is display-only and does
+  not affect key construction.
+- **BREAKING:** `driver/etcd.Driver` and `driver/tcs.Driver` use pointer
+  receivers (matching `driver/dummy`). Both constructors already returned
+  `*Driver`, so typical callers are unaffected.
+- error sentinels in `connect`, `crypto`, `hasher`, `driver/tcs` and
+  `integrity` are now prefixed with their package name (e.g. `not found` →
+  `integrity: not found`, `hash mismatch` → `hasher: hash mismatch`). Sentinel
+  identity (`errors.Is`) is unchanged; only `Error()` strings differ.
+- `namer.Results` accessors (`SelectSingle`, `Items`, `Result`, `Select`,
+  `Len`) use value receivers instead of pointer receivers; existing call sites
+  keep compiling.
 
 ### Removed
 
@@ -77,6 +122,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `marshaller.Marshallable` interfaces (nothing referenced them).
 - **BREAKING:** removed the `integrity.InvalidNameError` type; `ErrInvalidName`
   is now a plain sentinel (see Fixed).
+- **BREAKING:** unexported `crypto.RSAPSS`. `NewRSAPSS` / `NewRSAPSSVerifier`
+  return the `SignerVerifier` / `Verifier` interfaces, so the concrete type is
+  no longer part of the public surface — matching the `hasher` package, whose
+  algorithm types are unexported.
+- **BREAKING:** unexported `integrity.ModRevisionEmpty`, an internal sentinel
+  (value `0`) used only by the generator and validator.
 
 ### Fixed
 
@@ -88,6 +139,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   reliable.
 - `marshaller` error strings are now lowercased per Go convention
   (`failed to marshal`/`failed to unmarshal`).
+- `driver/dummy` scopes its lock registry to the `Driver` instance instead of a
+  process-global `sync.Map`, so two independent dummy drivers no longer share a
+  lock namespace.
 
 ## [v2.0.0]
 

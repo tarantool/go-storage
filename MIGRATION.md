@@ -111,6 +111,13 @@ for the full list.
 * [hasher.Hasher gains a Verify method](#hasher-verify)
 * [crypto.NewRSAPSSSignerVerifier renamed](#rsapss-rename)
 * [On-disk encoding of hashes and signatures](#on-disk-encoding)
+* [driver/etcd: locking constructor](#etcd-locker)
+* [driver/tcs: DoerWatcher renamed to Client](#tcs-client)
+* [locker: lock-name validation](#locker-name)
+* [predicate: string values normalized to bytes](#predicate-normalize)
+* [namer.KeyType.String wire form](#keytype-string)
+* [crypto.RSAPSS unexported](#rsapss-unexport)
+* [Other source-level changes](#other-cleanup)
 
 ### <a id="integrity-typed">integrity: Typed storage removed</a>
 
@@ -296,5 +303,105 @@ codec, _ := integrity.NewCodecBuilder[MyConfig]().
 	WithSignerVerifier(crypto.NewRSAPSS(priv, crypto.WithMode(crypto.ModeHex))).
 	Build()
 ```
+
+### <a id="etcd-locker">driver/etcd: locking constructor</a>
+
+`driver/etcd.New` now builds a driver **without** locking support: its
+`NewLocker` returns `locker.ErrUnsupported`. To get a locking-capable driver,
+build it with the new `NewWithLocker(*etcd.Client)`.
+
+```Go
+// Before — locking worked implicitly when client was a concrete *etcd.Client:
+drv := etcd.New(client)
+
+// After — choose locking explicitly:
+drv := etcd.NewWithLocker(client) // KV/watch/tx + locking
+// or
+drv := etcd.New(client)           // KV/watch/tx only; NewLocker → ErrUnsupported
+```
+
+`connect.NewEtcdStorage` / `connect.Connect` use `NewWithLocker`, so storage
+obtained through `connect` keeps locking with no change on your side.
+
+### <a id="tcs-client">driver/tcs: DoerWatcher renamed to Client</a>
+
+The `driver/tcs` connection interface `DoerWatcher` is renamed to `Client`
+(matching `driver/etcd.Client`). The interface contents are unchanged. The
+generated mock is now `mocks.TCSClientMock` (was `mocks.DoerWatcherMock`).
+
+```Go
+// Before:                        // After:
+var c tcs.DoerWatcher             var c tcs.Client
+m := mocks.NewDoerWatcherMock(t)  m := mocks.NewTCSClientMock(t)
+```
+
+### <a id="locker-name">locker: lock-name validation</a>
+
+Every driver's `NewLocker` now requires `name` to **start with `/`** and **not
+end with `/`** (previously only tcs enforced this; etcd and dummy accepted any
+string). Prefix bare names with `/`:
+
+```Go
+// Before:                          // After:
+lk, err := stg.NewLocker(ctx, "leader")  lk, err := stg.NewLocker(ctx, "/leader")
+```
+
+Violations return `locker.ErrNameNoLeadingSlash` / `locker.ErrNameTrailingSlash`.
+The shared `locker.ValidateName(name)` helper is exported if you want to
+pre-check.
+
+### <a id="predicate-normalize">predicate: string values normalized to bytes</a>
+
+`predicate.ValueEqual` / `ValueNotEqual` now convert a `string` comparison
+value to `[]byte`, so `Predicate.Value()` returns `[]byte` for both `[]byte`
+and `string` inputs. This removes a driver-dependent difference (a `string`
+value used to work on dummy/tcs but was rejected by etcd). If you inspected
+`Value()` and type-switched on `string`, expect `[]byte` now.
+
+### <a id="keytype-string">namer.KeyType.String wire form</a>
+
+`namer.KeyType.String()` returns the wire form instead of the Go identifier:
+
+| KeyType | Before | After |
+|---|---|---|
+| `KeyTypeValue` | `"KeyTypeValue"` | `"value"` |
+| `KeyTypeHash` | `"KeyTypeHash"` | `"hash"` |
+| `KeyTypeSignature` | `"KeyTypeSignature"` | `"signature"` |
+| unknown | `"KeyType[N]"` | `"KeyType(N)"` |
+
+The method is display-only (key construction is unaffected). Update any logs or
+assertions that relied on the old strings.
+
+### <a id="rsapss-unexport">crypto.RSAPSS unexported</a>
+
+The concrete `crypto.RSAPSS` type is unexported. The constructors already
+return interfaces, so hold the interface type instead of the concrete struct:
+
+```Go
+// Before:                                // After:
+var sv crypto.RSAPSS = ...                var sv crypto.SignerVerifier = crypto.NewRSAPSS(priv)
+```
+
+`NewRSAPSS` / `NewRSAPSSVerifier` and the `crypto.AlgoRSAPSS` name constant are
+unchanged.
+
+### <a id="other-cleanup">Other source-level changes</a>
+
+These rarely require action:
+
+* **Error message prefixes.** Leaf error sentinels in `connect`, `crypto`,
+  `hasher`, `driver/tcs` and `integrity` now carry a package prefix (e.g.
+  `integrity: not found`, `hasher: hash mismatch`). Sentinel **identity** is
+  unchanged, so `errors.Is` keeps working; only match on `Error()` text needs
+  updating.
+* **Driver receivers.** `driver/etcd.Driver` and `driver/tcs.Driver` use
+  pointer receivers (the constructors already returned `*Driver`).
+* **`namer.Results` receivers.** Its accessors switched to value receivers;
+  existing call sites keep compiling.
+* **`integrity.ModRevisionEmpty` removed.** It was an internal `0` sentinel;
+  compare `ModRevision` against `0` directly.
+* **New exported names.** `integrity.GetOption`/`PutOption`/`DeleteOption`
+  option aliases and the `hasher.AlgoSHA256`/`AlgoSHA1`/`crypto.AlgoRSAPSS`
+  algorithm-name constants are additive.
 
 [go-modules-v2]: https://go.dev/ref/mod#major-version-suffixes
