@@ -32,9 +32,9 @@ func ExampleNew() {
 	}
 
 	// Output:
-	// KeyTypeValue -> /objects/alice
-	// KeyTypeHash -> /hashes/sha256/objects/alice
-	// KeyTypeSignature -> /sig/rsa/objects/alice
+	// value -> /objects/alice
+	// hash -> /hashes/sha256/objects/alice
+	// signature -> /sig/rsa/objects/alice
 }
 
 // ExampleCompactSingleHash shows the compact hash layout, which drops the
@@ -60,8 +60,8 @@ func ExampleCompactSingleHash() {
 	}
 
 	// Output:
-	// KeyTypeValue -> /objects/alice
-	// KeyTypeHash -> /hashes/objects/alice
+	// value -> /objects/alice
+	// hash -> /hashes/objects/alice
 }
 
 // ExampleCompactSingleSig shows the compact sig layout, which drops the
@@ -87,8 +87,8 @@ func ExampleCompactSingleSig() {
 	}
 
 	// Output:
-	// KeyTypeValue -> /objects/alice
-	// KeyTypeSignature -> /sig/objects/alice
+	// value -> /objects/alice
+	// signature -> /sig/objects/alice
 }
 
 // ExampleLegacyHashSigLayout shows the legacy product layout: hash and sig
@@ -114,9 +114,9 @@ func ExampleLegacyHashSigLayout() {
 	}
 
 	// Output:
-	// KeyTypeValue -> /config/all
-	// KeyTypeHash -> /hashes/sha256/all
-	// KeyTypeSignature -> /sig/ed25519/all
+	// value -> /config/all
+	// hash -> /hashes/sha256/all
+	// signature -> /sig/ed25519/all
 }
 
 // ExampleNew_parse shows how ParseKey resolves a raw key path
@@ -144,8 +144,8 @@ func ExampleNew_parse() {
 	}
 
 	// Output:
-	// KeyTypeValue name=alice property=""
-	// KeyTypeHash name=alice property="sha256"
+	// value name=alice property=""
+	// hash name=alice property="sha256"
 }
 
 // ExampleNew_prefix shows the prefix used to walk all values

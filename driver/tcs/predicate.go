@@ -10,9 +10,9 @@ import (
 
 var (
 	// ErrUnknownOperator is returned when the operator is unknown.
-	ErrUnknownOperator = errors.New("unknown operator")
+	ErrUnknownOperator = errors.New("tcs: unknown operator")
 	// ErrUnknownTarget is returned when the target is unknown.
-	ErrUnknownTarget = errors.New("unknown target")
+	ErrUnknownTarget = errors.New("tcs: unknown target")
 
 	_ msgpack.CustomEncoder = predicate{Predicate: nil}
 

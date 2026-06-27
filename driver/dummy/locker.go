@@ -12,11 +12,8 @@ type dummyLockEntry struct {
 	mu sync.Mutex
 }
 
-//nolint:gochecknoglobals // package-wide registry maps lock names to shared entries.
-var dummyLockRegistry sync.Map // name -> *dummyLockEntry.
-
-func lockEntryFor(name string) *dummyLockEntry {
-	v, _ := dummyLockRegistry.LoadOrStore(name, &dummyLockEntry{}) //nolint:exhaustruct
+func (d *Driver) lockEntryFor(name string) *dummyLockEntry {
+	v, _ := d.lockRegistry.LoadOrStore(name, &dummyLockEntry{}) //nolint:exhaustruct
 	entry, _ := v.(*dummyLockEntry)
 
 	return entry
@@ -45,10 +42,15 @@ var closedDone = func() chan struct{} {
 var _ locker.Locker = (*dummyLocker)(nil)
 
 func (d *Driver) NewLocker(ctx context.Context, name string, opts ...locker.Option) (locker.Locker, error) {
+	err := locker.ValidateName(name)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // ValidateName returns a complete, locker-prefixed error.
+	}
+
 	_ = locker.ApplyOptions(opts)
 
 	return &dummyLocker{ //nolint:exhaustruct // mu/held/key are zero-initialized by design.
-		entry:   lockEntryFor(name),
+		entry:   d.lockEntryFor(name),
 		lifeCtx: ctx,
 		name:    name,
 	}, nil

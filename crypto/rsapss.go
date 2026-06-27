@@ -12,19 +12,24 @@ import (
 )
 
 var (
-	ErrEmptyPrivateKey = errors.New("trying to sign without private key")
+	ErrEmptyPrivateKey = errors.New("crypto: cannot sign without a private key")
 )
+
+// AlgoRSAPSS is the algorithm name returned by the RSA-PSS signer/verifier's
+// Name method. Use it with integrity codec location options (e.g.
+// WithSignatureLocation) instead of retyping the bare string.
+const AlgoRSAPSS = "rsapss"
 
 func zero[T any]() (out T) { return } //nolint:nonamedreturns
 
-// RSAPSS represents RSA PSS algo for signing/verification
+// rsaPSS represents RSA PSS algo for signing/verification
 // (with SHA256 as digest calculation function).
 //
 // The encoding of produced signatures and the encodings accepted on
 // verification are controlled by the Mode (see ModeAuto, ModeHex, ModeBin). By
 // default (ModeAuto) signatures are emitted as raw bytes and Verify accepts a
 // signature in either raw or hex form.
-type RSAPSS struct {
+type rsaPSS struct {
 	publicKey  rsa.PublicKey
 	privateKey rsa.PrivateKey
 	hash       crypto.Hash
@@ -32,10 +37,10 @@ type RSAPSS struct {
 	mode       Mode
 }
 
-// NewRSAPSS creates new RSAPSS object that can both sign and verify.
+// NewRSAPSS creates new rsaPSS object that can both sign and verify.
 // The public key is derived from the private key.
 func NewRSAPSS(privKey rsa.PrivateKey, opts ...Option) SignerVerifier {
-	return RSAPSS{
+	return rsaPSS{
 		publicKey:  privKey.PublicKey,
 		privateKey: privKey,
 		hash:       crypto.SHA256,
@@ -44,9 +49,9 @@ func NewRSAPSS(privKey rsa.PrivateKey, opts ...Option) SignerVerifier {
 	}
 }
 
-// NewRSAPSSVerifier creates new RSAPSS object that can only verify signatures.
+// NewRSAPSSVerifier creates new rsaPSS object that can only verify signatures.
 func NewRSAPSSVerifier(pubKey rsa.PublicKey, opts ...Option) Verifier {
-	return RSAPSS{
+	return rsaPSS{
 		publicKey:  pubKey,
 		privateKey: zero[rsa.PrivateKey](),
 		hash:       crypto.SHA256,
@@ -56,14 +61,14 @@ func NewRSAPSSVerifier(pubKey rsa.PublicKey, opts ...Option) Verifier {
 }
 
 // Name implements SignerVerifier interface.
-func (r RSAPSS) Name() string {
-	return "rsapss"
+func (r rsaPSS) Name() string {
+	return AlgoRSAPSS
 }
 
 // Sign generates SHA-256 digest and signs it using RSASSA-PSS. The returned
 // signature is encoded according to the signer's Mode (raw bytes for ModeAuto
 // and ModeBin, hex for ModeHex).
-func (r RSAPSS) Sign(data []byte) ([]byte, error) {
+func (r rsaPSS) Sign(data []byte) ([]byte, error) {
 	if r.privateKey.N == nil {
 		return nil, ErrEmptyPrivateKey
 	}
@@ -87,7 +92,7 @@ func (r RSAPSS) Sign(data []byte) ([]byte, error) {
 // Verify compares data with signature. The accepted signature encoding depends
 // on the verifier's Mode: ModeHex expects hex, ModeBin expects raw bytes and
 // ModeAuto accepts either.
-func (r RSAPSS) Verify(data []byte, signature []byte) error {
+func (r rsaPSS) Verify(data []byte, signature []byte) error {
 	sig, err := r.decode(signature)
 	if err != nil {
 		return err
@@ -111,7 +116,7 @@ func (r RSAPSS) Verify(data []byte, signature []byte) error {
 
 // sigBytes is the raw RSA-PSS signature length in bytes for the configured key,
 // or 0 when no public modulus is set (verification will fail downstream).
-func (r RSAPSS) sigBytes() int {
+func (r rsaPSS) sigBytes() int {
 	if r.publicKey.N == nil {
 		return 0
 	}
@@ -121,7 +126,7 @@ func (r RSAPSS) sigBytes() int {
 
 // encode encodes the signature according to the receiver's Mode: hex for
 // ModeHex, raw bytes for ModeAuto and ModeBin.
-func (r RSAPSS) encode(sig []byte) []byte {
+func (r rsaPSS) encode(sig []byte) []byte {
 	if r.mode != ModeHex {
 		return sig
 	}
@@ -136,7 +141,7 @@ func (r RSAPSS) encode(sig []byte) []byte {
 // returns the bytes unchanged, ModeHex hex-decodes them, and ModeAuto detects
 // the encoding from the length: a raw signature is exactly sigBytes long, its
 // hex form exactly twice that.
-func (r RSAPSS) decode(sig []byte) ([]byte, error) {
+func (r rsaPSS) decode(sig []byte) ([]byte, error) {
 	if r.mode == ModeBin {
 		return sig, nil
 	}

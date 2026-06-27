@@ -29,7 +29,7 @@ func NewResults(initial map[string][]Key) Results {
 }
 
 // SelectSingle gets keys for single-name case (if applicable).
-func (r *Results) SelectSingle() ([]Key, bool) {
+func (r Results) SelectSingle() ([]Key, bool) {
 	if r.isSingle {
 		return r.result[r.isSingleName], true
 	}
@@ -38,7 +38,7 @@ func (r *Results) SelectSingle() ([]Key, bool) {
 }
 
 // Items return iterator over all name->keys groups.
-func (r *Results) Items() iter.Seq2[string, []Key] {
+func (r Results) Items() iter.Seq2[string, []Key] {
 	return func(yield func(str string, res []Key) bool) {
 		for i, v := range r.result {
 			if !yield(i, v) {
@@ -49,12 +49,12 @@ func (r *Results) Items() iter.Seq2[string, []Key] {
 }
 
 // Result returns the underlying results map.
-func (r *Results) Result() map[string][]Key {
+func (r Results) Result() map[string][]Key {
 	return r.result
 }
 
 // Select gets keys for a specific object name.
-func (r *Results) Select(name string) ([]Key, bool) {
+func (r Results) Select(name string) ([]Key, bool) {
 	if i, ok := r.result[name]; ok {
 		return i, true
 	}
@@ -63,6 +63,6 @@ func (r *Results) Select(name string) ([]Key, bool) {
 }
 
 // Len returns the number of unique object names.
-func (r *Results) Len() int {
+func (r Results) Len() int {
 	return len(r.result)
 }

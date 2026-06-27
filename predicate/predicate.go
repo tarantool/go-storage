@@ -44,13 +44,25 @@ func (p predicate) Value() any {
 	return p.value
 }
 
+// normalizeValue canonicalizes a value-predicate comparison value so every
+// driver receives the same representation: a string is converted to []byte.
+// Other types pass through unchanged. This closes a substitutability gap where
+// a string value worked on some drivers but was rejected by others.
+func normalizeValue(value any) any {
+	if s, ok := value.(string); ok {
+		return []byte(s)
+	}
+
+	return value
+}
+
 // ValueNotEqual creates a predicate that checks if a key's value is not equal to the specified value.
 func ValueNotEqual(key []byte, value any) Predicate {
 	return &predicate{
 		key:    key,
 		op:     OpNotEqual,
 		target: TargetValue,
-		value:  value,
+		value:  normalizeValue(value),
 	}
 }
 
@@ -60,7 +72,7 @@ func ValueEqual(key []byte, value any) Predicate {
 		key:    key,
 		op:     OpEqual,
 		target: TargetValue,
-		value:  value,
+		value:  normalizeValue(value),
 	}
 }
 

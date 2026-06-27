@@ -20,9 +20,10 @@ import (
 
 const watchEventChannelSize = 16
 
-// DoerWatcher is an interface that combines tarantool.Doer and NewWatcher method.
+// Client is the minimal connection capability the tcs driver needs: a Doer to
+// issue requests and a NewWatcher to subscribe to changes.
 // tarantool.Connection and pool.ConnectionAdapter implement this interface.
-type DoerWatcher interface {
+type Client interface {
 	Do(req tarantool.Request) (fut tarantool.Future)
 	NewWatcher(key string, callback tarantool.WatchCallback) (tarantool.Watcher, error)
 }
@@ -30,25 +31,25 @@ type DoerWatcher interface {
 // Driver is a Tarantool implementation of the storage driver interface.
 // It uses TCS as the underlying key-value storage backend.
 type Driver struct {
-	conn DoerWatcher // Tarantool connection pool.
+	conn Client // Tarantool connection pool.
 }
 
 var (
 	_ driver.Driver = &Driver{} //nolint:exhaustruct
 
 	// ErrUnexpectedResponse is returned when the response from tarantool has unexpected format.
-	ErrUnexpectedResponse = errors.New("unexpected response from tarantool")
+	ErrUnexpectedResponse = errors.New("tcs: unexpected response from tarantool")
 )
 
 // New creates a new Tarantool driver instance.
 // It establishes connections to Tarantool instances using the provided addresses.
-func New(doer DoerWatcher) *Driver {
-	return &Driver{conn: doer}
+func New(client Client) *Driver {
+	return &Driver{conn: client}
 }
 
 // Execute executes a transactional operation with conditional logic.
 // It processes predicates to determine whether to execute thenOps or elseOps.
-func (d Driver) Execute(
+func (d *Driver) Execute(
 	ctx context.Context,
 	predicates []goPredicate.Predicate,
 	thenOps []goOperation.Operation,
@@ -73,7 +74,7 @@ func (d Driver) Execute(
 
 // Watch monitors changes to a specific key and returns a stream of events.
 // event.Key is the watched key with any trailing "/" stripped.
-func (d Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
+func (d *Driver) Watch(ctx context.Context, key []byte) (<-chan watch.Event, func(), error) {
 	rvChan := make(chan watch.Event, watchEventChannelSize)
 
 	emitted := bytes.TrimSuffix(key, []byte("/"))

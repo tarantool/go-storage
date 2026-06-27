@@ -13,7 +13,15 @@ import (
 
 // ErrHashMismatch is returned by Verify when the stored digest does not match
 // any encoding of the computed digest accepted under the hasher's Mode.
-var ErrHashMismatch = errors.New("hash mismatch")
+var ErrHashMismatch = errors.New("hasher: hash mismatch")
+
+// Algorithm names returned by the built-in hashers' Name method. Use these with
+// integrity codec location options (e.g. WithHashLocation) instead of retyping
+// the bare string.
+const (
+	AlgoSHA256 = "sha256"
+	AlgoSHA1   = "sha1"
+)
 
 // Hasher is the interface that storage hashers must implement.
 // It provides low-level operations for hash calculating.
@@ -52,7 +60,7 @@ func NewSHA256Hasher(opts ...Option) Hasher {
 
 // Name implements Hasher interface.
 func (h *sha256Hasher) Name() string {
-	return "sha256"
+	return AlgoSHA256
 }
 
 // Hash implements Hasher interface.
@@ -102,7 +110,7 @@ func NewSHA1Hasher(opts ...Option) Hasher {
 
 // Name implements Hasher interface.
 func (h *sha1Hasher) Name() string {
-	return "sha1"
+	return AlgoSHA1
 }
 
 // Hash implements Hasher interface.

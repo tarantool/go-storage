@@ -4,6 +4,8 @@ package locker
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -21,7 +23,30 @@ var (
 	// ErrPrefixNoLeadingSlash is returned by Prefixed when a non-empty prefix
 	// does not start with "/".
 	ErrPrefixNoLeadingSlash = errors.New("locker: prefix must start with '/'")
+
+	// ErrNameNoLeadingSlash is returned by a driver's NewLocker when name does
+	// not start with "/".
+	ErrNameNoLeadingSlash = errors.New("locker: name must start with '/'")
+
+	// ErrNameTrailingSlash is returned by a driver's NewLocker when name ends
+	// with "/".
+	ErrNameTrailingSlash = errors.New("locker: name must not end with '/'")
 )
+
+// ValidateName checks that a lock name follows the shared contract: it must
+// start with "/" and must not end with "/". Every driver calls it at the top of
+// NewLocker so the lock-name contract is uniform across backends.
+func ValidateName(name string) error {
+	if !strings.HasPrefix(name, "/") {
+		return fmt.Errorf("%w: %q", ErrNameNoLeadingSlash, name)
+	}
+
+	if strings.HasSuffix(name, "/") {
+		return fmt.Errorf("%w: %q", ErrNameTrailingSlash, name)
+	}
+
+	return nil
+}
 
 // Locker acquires and releases a named distributed lock. A single Locker
 // instance holds the lock at most once at a time: re-Lock on an already-held

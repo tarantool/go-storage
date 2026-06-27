@@ -11,7 +11,7 @@ import (
 // Error definitions for err113 compliance.
 var (
 	// ErrUnknownOperation is returned when the operation is unknown.
-	ErrUnknownOperation = errors.New("unknown operation")
+	ErrUnknownOperation = errors.New("tcs: unknown operation")
 )
 
 const (
