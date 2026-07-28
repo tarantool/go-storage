@@ -32,13 +32,13 @@ jobs:
     steps:
       # `ref` as merge request is needed for pull_request_target because this
       # target runs in the context of the base commit of the pull request.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name == 'pull_request_target'
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.event_name != 'pull_request_target'
         with:
           fetch-depth: 0
