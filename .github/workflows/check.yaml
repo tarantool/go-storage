@@ -18,18 +18,18 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         name: run golangci-lint with gha format
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
         continue-on-error: true
 
-      - uses: golangci/golangci-lint-action@v8
+      - uses: golangci/golangci-lint-action@v9
         name: run golangci-lint with human-readable format
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
@@ -42,7 +42,7 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: install codespell
         run:  pip3 install codespell==${CODESPELL_VERSION}
@@ -58,8 +58,8 @@ jobs:
       github.event.pull_request.head.repo.full_name != github.repository
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
 
