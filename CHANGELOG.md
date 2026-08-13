@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **BREAKING:** `deps`: go-tarantool was bumped to v3 and go-tlsdialer to v2.
+  `driver/tcs.Client.Do` returns `tarantool.Future` (an interface in v3)
+  instead of `*tarantool.Future`, and the `go_storage_ssl` build tag now
+  requires `github.com/tarantool/go-tlsdialer/v2`.
 - **BREAKING:** dropped the redundant `Layered` qualifier from the `namer`
   API now that it is the only namer: `NewLayeredNamer` → `namer.New`,
   `LayeredHashLocation` → `namer.HashLocation`, `LayeredSigLocation` →

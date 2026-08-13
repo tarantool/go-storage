@@ -463,7 +463,7 @@ The library supports the following build tags:
 #### `go_storage_ssl`
 
 Enables SSL/TLS support for Tarantool Config Storage connections. This tag
-requires the [`go-tlsdialer`](https://github.com/tarantool/go-tlsdialer)
+requires the [`go-tlsdialer/v2`](https://github.com/tarantool/go-tlsdialer)
 dependency.
 
 ```bash
