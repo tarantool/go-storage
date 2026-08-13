@@ -8,7 +8,7 @@ import (
 	mm_time "time"
 
 	"github.com/gojuno/minimock/v3"
-	"github.com/tarantool/go-tarantool/v2"
+	"github.com/tarantool/go-tarantool/v3"
 )
 
 // DoerWatcherMock implements mm_tcs.DoerWatcher
@@ -16,7 +16,7 @@ type DoerWatcherMock struct {
 	t          minimock.Tester
 	finishOnce sync.Once
 
-	funcDo          func(req tarantool.Request) (fut *tarantool.Future)
+	funcDo          func(req tarantool.Request) (fut tarantool.Future)
 	funcDoOrigin    string
 	inspectFuncDo   func(req tarantool.Request)
 	afterDoCounter  uint64
@@ -86,7 +86,7 @@ type DoerWatcherMockDoParamPtrs struct {
 
 // DoerWatcherMockDoResults contains results of the DoerWatcher.Do
 type DoerWatcherMockDoResults struct {
-	fut *tarantool.Future
+	fut tarantool.Future
 }
 
 // DoerWatcherMockDoOrigins contains origins of expectations of the DoerWatcher.Do
@@ -165,7 +165,7 @@ func (mmDo *mDoerWatcherMockDo) Inspect(f func(req tarantool.Request)) *mDoerWat
 }
 
 // Return sets up results that will be returned by DoerWatcher.Do
-func (mmDo *mDoerWatcherMockDo) Return(fut *tarantool.Future) *DoerWatcherMock {
+func (mmDo *mDoerWatcherMockDo) Return(fut tarantool.Future) *DoerWatcherMock {
 	if mmDo.mock.funcDo != nil {
 		mmDo.mock.t.Fatalf("DoerWatcherMock.Do mock is already set by Set")
 	}
@@ -179,7 +179,7 @@ func (mmDo *mDoerWatcherMockDo) Return(fut *tarantool.Future) *DoerWatcherMock {
 }
 
 // Set uses given function f to mock the DoerWatcher.Do method
-func (mmDo *mDoerWatcherMockDo) Set(f func(req tarantool.Request) (fut *tarantool.Future)) *DoerWatcherMock {
+func (mmDo *mDoerWatcherMockDo) Set(f func(req tarantool.Request) (fut tarantool.Future)) *DoerWatcherMock {
 	if mmDo.defaultExpectation != nil {
 		mmDo.mock.t.Fatalf("Default expectation is already set for the DoerWatcher.Do method")
 	}
@@ -210,7 +210,7 @@ func (mmDo *mDoerWatcherMockDo) When(req tarantool.Request) *DoerWatcherMockDoEx
 }
 
 // Then sets up DoerWatcher.Do return parameters for the expectation previously defined by the When method
-func (e *DoerWatcherMockDoExpectation) Then(fut *tarantool.Future) *DoerWatcherMock {
+func (e *DoerWatcherMockDoExpectation) Then(fut tarantool.Future) *DoerWatcherMock {
 	e.results = &DoerWatcherMockDoResults{fut}
 	return e.mock
 }
@@ -237,7 +237,7 @@ func (mmDo *mDoerWatcherMockDo) invocationsDone() bool {
 }
 
 // Do implements mm_tcs.DoerWatcher
-func (mmDo *DoerWatcherMock) Do(req tarantool.Request) (fut *tarantool.Future) {
+func (mmDo *DoerWatcherMock) Do(req tarantool.Request) (fut tarantool.Future) {
 	mm_atomic.AddUint64(&mmDo.beforeDoCounter, 1)
 	defer mm_atomic.AddUint64(&mmDo.afterDoCounter, 1)
 

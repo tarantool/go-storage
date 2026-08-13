@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- `deps`: go-tarantool was bumped to v3.
+
 ### Fixed
 
 ## [v1.6.1] - 2026-06-22

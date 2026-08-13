@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tarantool/go-option"
-	"github.com/tarantool/go-tarantool/v2"
-	"github.com/tarantool/go-tarantool/v2/pool"
-	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
+	"github.com/tarantool/go-tarantool/v3"
+	"github.com/tarantool/go-tarantool/v3/pool"
+	tcshelper "github.com/tarantool/go-tarantool/v3/test_helpers/tcs"
 	etcdclient "go.etcd.io/etcd/client/v3"
 
 	"github.com/tarantool/go-storage"
@@ -186,15 +186,16 @@ func createTcsTestDriver(ctx context.Context, t *testing.T) (driver.Driver, func
 				Notify:        nil,
 				Handle:        nil,
 				Logger:        nil,
+				Allocator:     nil,
 			},
 		})
 	}
 
-	conn, err := pool.Connect(ctx, instances)
+	conn, err := pool.New(ctx, instances)
 	require.NoError(t, err, "Failed to connect to Tarantool pool")
 
 	// Wrap the pool connection to implement DoerWatcher.
-	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
+	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	return tcsdriver.New(wrapper), func() { _ = wrapper.Close() }
 }

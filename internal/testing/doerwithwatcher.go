@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tarantool/go-tarantool/v2"
+	"github.com/tarantool/go-tarantool/v3"
 )
 
 // MockDoerWithWatcher is a mock implementation of the tarantool.DoerWithWatcher interface.
@@ -29,7 +29,7 @@ const (
 )
 
 // Do returns a new future.
-func (m *MockDoerWithWatcher) Do(req tarantool.Request) *tarantool.Future {
+func (m *MockDoerWithWatcher) Do(req tarantool.Request) tarantool.Future {
 	return m.mockDoer.Do(req)
 }
 
