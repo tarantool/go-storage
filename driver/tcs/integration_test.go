@@ -12,9 +12,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tarantool/go-tarantool/v2"
-	"github.com/tarantool/go-tarantool/v2/pool"
-	tcshelper "github.com/tarantool/go-tarantool/v2/test_helpers/tcs"
+	"github.com/tarantool/go-tarantool/v3"
+	"github.com/tarantool/go-tarantool/v3/pool"
+	tcshelper "github.com/tarantool/go-tarantool/v3/test_helpers/tcs"
 
 	"github.com/tarantool/go-storage/driver/tcs"
 	"github.com/tarantool/go-storage/operation"
@@ -66,15 +66,16 @@ func createTestDriver(ctx context.Context, t *testing.T) (*tcs.Driver, func()) {
 				Notify:        nil,
 				Handle:        nil,
 				Logger:        nil,
+				Allocator:     nil,
 			},
 		})
 	}
 
-	conn, err := pool.Connect(ctx, instances)
+	conn, err := pool.New(ctx, instances)
 	require.NoError(t, err, "Failed to connect to Tarantool pool")
 
 	// Wrap the pool connection to implement DoerWatcher.
-	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
+	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	return tcs.New(wrapper), func() { _ = wrapper.Close() }
 }
@@ -807,7 +808,10 @@ func TestTCSDriver_ErrConnect(t *testing.T) {
 		{
 			Name: "a",
 			Dialer: &tarantool.NetDialer{
-				Address:  "10.0.0.1:65534",
+				// A closed loopback port is refused immediately (RST) by the
+				// kernel, unlike a routable-but-unreachable address, whose
+				// connect can hang indefinitely with no response at all.
+				Address:  "127.0.0.1:1",
 				User:     "client",
 				Password: "secret",
 				RequiredProtocolInfo: tarantool.ProtocolInfo{
@@ -818,8 +822,8 @@ func TestTCSDriver_ErrConnect(t *testing.T) {
 			},
 			Opts: tarantool.Opts{
 				Timeout:       10 * time.Millisecond,
-				Reconnect:     1,
-				MaxReconnects: 1,
+				Reconnect:     0,
+				MaxReconnects: 0,
 				RateLimit:     0,
 				RLimitAction:  0,
 				Concurrency:   0,
@@ -827,14 +831,15 @@ func TestTCSDriver_ErrConnect(t *testing.T) {
 				Notify:        nil,
 				Handle:        nil,
 				Logger:        nil,
+				Allocator:     nil,
 			},
 		},
 	}
 
-	conn, err := pool.Connect(ctx, instances)
+	conn, err := pool.New(ctx, instances)
 	require.NoError(t, err, "failed to connect to Tarantool pool")
 
-	wrapper := pool.NewConnectorAdapter(conn, pool.RW)
+	wrapper := pool.NewConnectorAdapter(conn, pool.ModeRW)
 
 	defer func() { _ = wrapper.Close() }()
 

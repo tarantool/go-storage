@@ -3,13 +3,14 @@
 package connect
 
 import (
-	"github.com/tarantool/go-tarantool/v2"
-	"github.com/tarantool/go-tlsdialer"
+	"github.com/tarantool/go-tarantool/v3"
+	"github.com/tarantool/go-tlsdialer/v2"
+	"github.com/tarantool/go-tlsdialer/v2/backend/openssl"
 )
 
 func newDialerForAddress(cfg Config, address string) (tarantool.Dialer, error) {
 	if cfg.SSL.Enable {
-		return tlsdialer.OpenSSLDialer{
+		return tlsdialer.TLSDialer{
 			Address:         address,
 			Auth:            tarantool.AutoAuth,
 			User:            cfg.Username,
@@ -20,6 +21,7 @@ func newDialerForAddress(cfg Config, address string) (tarantool.Dialer, error) {
 			SslCiphers:      cfg.SSL.Ciphers,
 			SslPassword:     cfg.SSL.Password,
 			SslPasswordFile: cfg.SSL.PasswordFile,
+			Backend:         openssl.New(),
 		}, nil
 	}
 
