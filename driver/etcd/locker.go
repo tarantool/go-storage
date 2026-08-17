@@ -9,7 +9,7 @@ import (
 	etcd "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 
-	"github.com/tarantool/go-storage/locker"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 type etcdLocker struct {

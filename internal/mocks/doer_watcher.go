@@ -1,3 +1,3 @@
 package mocks
 
-//go:generate go tool minimock -g -i github.com/tarantool/go-storage/driver/tcs.DoerWatcher -s _mock.go
+//go:generate go tool minimock -g -i github.com/tarantool/go-storage/v2/driver/tcs.DoerWatcher -s _mock.go

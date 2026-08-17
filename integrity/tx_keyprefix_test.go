@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	storage "github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/hasher"
-	"github.com/tarantool/go-storage/integrity"
-	"github.com/tarantool/go-storage/operation"
+	storage "github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/hasher"
+	"github.com/tarantool/go-storage/v2/integrity"
+	"github.com/tarantool/go-storage/v2/operation"
 )
 
 func newPrefixedCodec(t *testing.T, prefix string) *integrity.Codec[txTestValue] {

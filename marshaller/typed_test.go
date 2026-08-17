@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/marshaller"
+	"github.com/tarantool/go-storage/v2/marshaller"
 )
 
 type TestStruct struct {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tarantool/go-storage/locker"
+	"github.com/tarantool/go-storage/v2/locker"
 )
 
 type dummyLockEntry struct {

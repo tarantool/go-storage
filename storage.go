@@ -8,13 +8,13 @@ import (
 
 	"github.com/tarantool/go-option"
 
-	"github.com/tarantool/go-storage/driver"
-	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/locker"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	txPkg "github.com/tarantool/go-storage/tx"
-	"github.com/tarantool/go-storage/watch"
+	"github.com/tarantool/go-storage/v2/driver"
+	"github.com/tarantool/go-storage/v2/kv"
+	"github.com/tarantool/go-storage/v2/locker"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	txPkg "github.com/tarantool/go-storage/v2/tx"
+	"github.com/tarantool/go-storage/v2/watch"
 )
 
 // rangeOptions contains configuration options for range operations.

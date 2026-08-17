@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/tarantool/go-storage/operation"
+	"github.com/tarantool/go-storage/v2/operation"
 )
 
 func TestTypeString(t *testing.T) {

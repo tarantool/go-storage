@@ -26,14 +26,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/v2/tx"
 	etcdclient "go.etcd.io/etcd/client/v3"
 
-	etcddriver "github.com/tarantool/go-storage/driver/etcd"
-	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
+	etcddriver "github.com/tarantool/go-storage/v2/driver/etcd"
+	"github.com/tarantool/go-storage/v2/kv"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	etcdtest "github.com/tarantool/go-storage/v2/test_helpers/etcd"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 
 	etcdclient "go.etcd.io/etcd/client/v3"
 
-	etcdtest "github.com/tarantool/go-storage/test_helpers/etcd"
+	etcdtest "github.com/tarantool/go-storage/v2/test_helpers/etcd"
 )
 
 // TestLazyCluster_LazyStart asserts that the cluster is only started on

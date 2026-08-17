@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tarantool/go-storage"
-	"github.com/tarantool/go-storage/internal/options"
-	"github.com/tarantool/go-storage/kv"
-	"github.com/tarantool/go-storage/namer"
-	"github.com/tarantool/go-storage/operation"
-	"github.com/tarantool/go-storage/predicate"
-	storagetx "github.com/tarantool/go-storage/tx"
+	"github.com/tarantool/go-storage/v2"
+	"github.com/tarantool/go-storage/v2/internal/options"
+	"github.com/tarantool/go-storage/v2/kv"
+	"github.com/tarantool/go-storage/v2/namer"
+	"github.com/tarantool/go-storage/v2/operation"
+	"github.com/tarantool/go-storage/v2/predicate"
+	storagetx "github.com/tarantool/go-storage/v2/tx"
 )
 
 // Sentinel errors for Tx operations.

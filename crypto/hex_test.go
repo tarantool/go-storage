@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tarantool/go-storage/crypto"
+	"github.com/tarantool/go-storage/v2/crypto"
 )
 
 func TestHexSignerVerifierRoundTrip(t *testing.T) {

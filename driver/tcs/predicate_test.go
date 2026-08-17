@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v5"
 
-	goPredicate "github.com/tarantool/go-storage/predicate"
+	goPredicate "github.com/tarantool/go-storage/v2/predicate"
 )
 
 func TestPredicate_EncodeMsgpack(t *testing.T) {

@@ -6,7 +6,7 @@ The project requires Go 1.25 or later. Clone the repository and install
 dependencies.
 
 ```sh
-$ git clone https://github.com/tarantool/go-storage
+$ git clone https://github.com/tarantool/go-storage/v2
 $ cd go-storage
 $ go mod tidy
 ```
