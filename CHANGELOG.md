@@ -175,6 +175,11 @@ New constructors wrap an existing `Hasher` or `SignerVerifier` so the stored
 payload is lower-case hex while `Name()` is passed through unchanged,
 preserving the on-disk key layout.
 
+These decorators do not exist in `v2`. The same capability is offered there as
+an encoding mode on the ordinary constructors — `WithMode(ModeHex)` — which
+also covers the raw and migration-friendly read paths; see the Unreleased
+section.
+
 ### Added
 
 - hasher, crypto: hex-encoding decorators that wrap an existing `Hasher` or
