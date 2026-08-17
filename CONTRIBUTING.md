@@ -2,7 +2,7 @@
 
 ## First steps
 
-The project requires Go 1.24 or later. Clone the repository and install
+The project requires Go 1.25 or later. Clone the repository and install
 dependencies.
 
 ```sh
