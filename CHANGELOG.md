@@ -168,6 +168,28 @@ See [MIGRATION.md](MIGRATION.md) for the step-by-step guide.
   `go get github.com/tarantool/go-storage/v2@latest`. No other code changes are
   required. The minimum Go version is unchanged (`1.25`).
 
+## [v1.6.1] - 2026-06-22
+
+This release adds hex-encoding decorators for hashers and signer/verifiers.
+New constructors wrap an existing `Hasher` or `SignerVerifier` so the stored
+payload is lower-case hex while `Name()` is passed through unchanged,
+preserving the on-disk key layout.
+
+These decorators do not exist in `v2`. The same capability is offered there as
+an encoding mode on the ordinary constructors — `WithMode(ModeHex)` — which
+also covers the raw and migration-friendly read paths; see the Unreleased
+section.
+
+### Added
+
+- hasher, crypto: hex-encoding decorators that wrap an existing `Hasher` or
+  `SignerVerifier` so the stored payload is lower-case hex while `Name()` is
+  passed through unchanged, preserving the on-disk key layout. New
+  constructors: `hasher.NewHexHasher`, `hasher.NewHexSHA256Hasher`,
+  `hasher.NewHexSHA1Hasher`, `crypto.NewHexSignerVerifier`,
+  `crypto.NewHexVerifier`, `crypto.NewHexRSAPSSSignerVerifier`, and
+  `crypto.NewHexRSAPSSVerifier`. The raw constructors are unchanged (#114).
+
 ## [v1.6.0] - 2026-06-09
 
 This release introduces a new `locker` package providing distributed locking
