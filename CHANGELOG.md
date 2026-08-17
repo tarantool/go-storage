@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [v2.0.0] - 2026-08-17
+
+`go-storage` v2 moves the module to the /v2 import path and ships a broad breaking API cleanup on 
+top of that: `integrity.Typed[T]` is removed in favor of the schema-first `Codec[T]` API, redundant
+naming was dropped across namer and marshaller, a few things were renamed
+(`connect.NewStorage` → `Connect`), `hasher/crypto` gained configurable encoding modes plus
+a `Verify` method, and driver behavior changed (`driver/etcd.New` no longer enables locking by
+default, lock-name validation is now uniform across drivers). Dependencies were also bumped to close
+known vulnerabilities.
+
+For migration guidance, be sure to check `MIGRATION.md`.
+
+### Added
+
 - hasher, crypto: three encoding modes selected via `WithMode()` —
   `ModeAuto` (default), `ModeHex` and `ModeBin`. All hasher/crypto constructors
   (`NewSHA256Hasher`, `NewSHA1Hasher`, `NewRSAPSS`, `NewRSAPSSVerifier`) take
@@ -32,6 +50,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
+- **BREAKING:** the module path is now
+  `github.com/tarantool/go-storage/v2` (was
+  `github.com/tarantool/go-storage`), per the Go module major-version rules.
+  Update every `go-storage` import to add the `/v2` suffix and run
+  `go get github.com/tarantool/go-storage/v2@latest`. The minimum Go version is unchanged (`1.25`).
 - **BREAKING:** `deps`: go-tarantool was bumped to v3 and go-tlsdialer to v2.
   `driver/tcs.Client.Do` returns `tarantool.Future` (an interface in v3)
   instead of `*tarantool.Future`, and the `go_storage_ssl` build tag now
@@ -150,23 +173,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `driver/dummy` scopes its lock registry to the `Driver` instance instead of a
   process-global `sync.Map`, so two independent dummy drivers no longer share a
   lock namespace.
-
-## [v2.0.0]
-
-This is the first `v2` release. It bumps the Go module path to carry the
-required `/v2` major-version suffix and contains **no source-level API
-changes**: every package, type, function, and method keeps the same name and
-signature as in `v1.6.0`. Upgrading is a mechanical rewrite of import paths.
-See [MIGRATION.md](MIGRATION.md) for the step-by-step guide.
-
-### Changed
-
-- **BREAKING:** the module path is now
-  `github.com/tarantool/go-storage/v2` (was
-  `github.com/tarantool/go-storage`), per the Go module major-version rules.
-  Update every `go-storage` import to add the `/v2` suffix and run
-  `go get github.com/tarantool/go-storage/v2@latest`. No other code changes are
-  required. The minimum Go version is unchanged (`1.25`).
 
 ## [v1.6.1] - 2026-06-22
 
