@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `driver/tcs.Client.Do` returns `tarantool.Future` (an interface in v3)
   instead of `*tarantool.Future`, and the `go_storage_ssl` build tag now
   requires `github.com/tarantool/go-tlsdialer/v2`.
+- `deps`: bumped the indirect `google.golang.org/grpc` (1.79.3 → 1.82.1) and
+  OpenTelemetry (`otel` 1.40.0 → 1.44.0, `otel/sdk` 1.40.0 → 1.43.0)
+  requirements pulled in by etcd, closing GO-2026-6061, GO-2026-5506,
+  GO-2026-5426 and GO-2026-5158. No API changes.
 - **BREAKING:** dropped the redundant `Layered` qualifier from the `namer`
   API now that it is the only namer: `NewLayeredNamer` → `namer.New`,
   `LayeredHashLocation` → `namer.HashLocation`, `LayeredSigLocation` →
