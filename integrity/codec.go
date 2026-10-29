@@ -262,7 +262,9 @@ func (b CodecBuilder[T]) WithSingleHashCompact() CodecBuilder[T] {
 // WithSingleSigCompact opts the codec into the compact sig key layout
 // (/sig/<objectLocation>/<name>, dropping the per-signer segment). Build
 // returns ErrSingleSigCompactCardinality if the union of signers and
-// verifiers (deduped by name) is not of size one.
+// verifiers (deduped by name) is not of size one. A codec that only signs or
+// only verifies is fine: the compact layout is applied to the side that has
+// the signature.
 func (b CodecBuilder[T]) WithSingleSigCompact() CodecBuilder[T] {
 	out := b.copy()
 
@@ -399,8 +401,8 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 	}
 
 	// Compact flags must be uniform across gen/val/top — otherwise their
-	// emitted/parsed key shapes diverge and round-trips break. Check
-	// cardinality against every list that will become a namer's sig/hash list.
+	// emitted/parsed key shapes diverge and round-trips break. The hash list is
+	// the same for all three namers, so it is checked once.
 	var opts []namer.Option
 
 	if b.compactHash {
@@ -411,30 +413,42 @@ func (b CodecBuilder[T]) Build() (*Codec[T], error) {
 		opts = append(opts, namer.CompactSingleHash())
 	}
 
-	if b.compactSig {
-		if len(genSigLocs) != 1 || len(valSigLocs) != 1 || len(topSigLocs) != 1 {
-			return nil, fmt.Errorf("%w: signers=%d verifiers=%d union=%d",
-				ErrSingleSigCompactCardinality, len(genSigLocs), len(valSigLocs), len(topSigLocs))
-		}
-
-		opts = append(opts, namer.CompactSingleSig())
+	// The sig cardinality is the size of the union of signers and verifiers: it
+	// is what the top-level namer, which parses keys of either side, needs. The
+	// generator and the validator hold only their own side, so one of them may
+	// have no sig location at all (a codec that only verifies has no signer, one
+	// that only signs has no verifier). Such a side neither emits nor parses sig
+	// keys, so the compact layout means nothing to it and its namer must not
+	// ask for it — a namer with no sig entry would reject CompactSingleSig.
+	if b.compactSig && len(topSigLocs) != 1 {
+		return nil, fmt.Errorf("%w: signers=%d verifiers=%d union=%d",
+			ErrSingleSigCompactCardinality, len(genSigLocs), len(valSigLocs), len(topSigLocs))
 	}
 
 	if b.keyPrefix != "" {
 		opts = append(opts, namer.WithKeyPrefix(b.keyPrefix))
 	}
 
-	genNamer, err := namerFn(objLoc, genHashLocs, genSigLocs, opts...)
+	// sideOpts returns the options for a namer with the given sig locations.
+	sideOpts := func(sigLocs []namer.SigLocation) []namer.Option {
+		if !b.compactSig || len(sigLocs) == 0 {
+			return opts
+		}
+
+		return append(slices.Clone(opts), namer.CompactSingleSig())
+	}
+
+	genNamer, err := namerFn(objLoc, genHashLocs, genSigLocs, sideOpts(genSigLocs)...)
 	if err != nil {
 		return nil, fmt.Errorf("codec: failed to build generator namer: %w", err)
 	}
 
-	valNamer, err := namerFn(objLoc, genHashLocs, valSigLocs, opts...)
+	valNamer, err := namerFn(objLoc, genHashLocs, valSigLocs, sideOpts(valSigLocs)...)
 	if err != nil {
 		return nil, fmt.Errorf("codec: failed to build validator namer: %w", err)
 	}
 
-	topNamer, err := namerFn(objLoc, genHashLocs, topSigLocs, opts...)
+	topNamer, err := namerFn(objLoc, genHashLocs, topSigLocs, sideOpts(topSigLocs)...)
 	if err != nil {
 		return nil, fmt.Errorf("codec: failed to build top-level namer: %w", err)
 	}
