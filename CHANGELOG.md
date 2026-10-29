@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- integrity: `CodecBuilder.WithSingleSigCompact` no longer rejects a codec that
+  only signs or only verifies. Build checked that the generator, the validator
+  and the top-level namer each had exactly one signature location, but a codec
+  with a verifier and no signer has none on the generator side (and one with a
+  signer and no verifier has none on the validator side), so it failed with
+  `WithSingleSigCompact requires exactly one unique signer/verifier:
+  signers=0 verifiers=1 union=1`. Build now checks the size of the union of
+  signers and verifiers, as documented, and applies the compact layout to the
+  sides that have the signature.
+
 ## [v2.0.0] - 2026-08-17
 
 `go-storage` v2 moves the module to the /v2 import path and ships a broad breaking API cleanup on 
