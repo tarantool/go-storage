@@ -37,6 +37,11 @@ openssl x509 -req -sha256 -days 8192 \
 openssl rsa -aes256 -passout pass:testpass -in localhost.key \
     -out localhost-encrypted.key -traditional
 
+# Generate encrypted private key in PKCS#8 format. The pure-Go TLS backend used
+# for TCS (gostls) cannot read the legacy PKCS#1 encrypted key above.
+openssl pkcs8 -topk8 -v2 aes-256-cbc -passout pass:testpass \
+    -in localhost.key -out localhost-encrypted-pkcs8.key
+
 # Generate password file for testing PasswordFile config option.
 echo -n "testpass" > password.txt
 
@@ -49,4 +54,5 @@ rm -f ca.key ca.pem ca.srl localhost.csr domains.ext
 
 echo "Generated:"
 echo "ca.crt, localhost.crt, localhost.key,"
-echo "localhost-encrypted.key, password.txt, only_ca/ca.crt"
+echo "localhost-encrypted.key, localhost-encrypted-pkcs8.key,"
+echo "password.txt, only_ca/ca.crt"

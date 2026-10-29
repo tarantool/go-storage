@@ -20,6 +20,7 @@ require (
 )
 
 require (
+	filippo.io/bigmod v0.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -53,6 +54,8 @@ require (
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/tarantool/go-gostcrypto v0.1.0 // indirect
+	github.com/tarantool/go-gostls v0.1.0 // indirect
 	github.com/tarantool/go-openssl v1.4.1 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect

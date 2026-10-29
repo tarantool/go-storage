@@ -27,7 +27,7 @@ jobs:
       matrix:
         sdk-version:
           - "3.5.0-0-r70.linux.x86_64"
-        tags: ['integration', 'integration,go_storage_ssl']
+        tags: ['integration', 'integration,openssl']
       fail-fast: false
     steps:
       # `ref` as merge request is needed for pull_request_target because this
