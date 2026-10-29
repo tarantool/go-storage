@@ -9,7 +9,26 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- connect: TLS to Tarantool Config Storage (TCS) is now available in every
+  build. By default it is provided by the pure-Go `backend/gostls` of
+  `go-tlsdialer/v2` and needs neither cgo nor OpenSSL, so `SSL.Enable = true`
+  works with `CGO_ENABLED=0`. The `openssl` build tag switches it to the OpenSSL
+  backend (`backend/openssl`, requires cgo and OpenSSL; combine with
+  `openssl_static` for a static link). The SSL settings `CaFile`, `CertFile`,
+  `KeyFile`, `Ciphers`, `Password` and `PasswordFile` are passed to both
+  backends. The pure-Go backend supports TLS 1.2 only and reads encrypted private
+  keys in PKCS#8 format only.
+
 ### Changed
+
+- connect: connecting to TCS with `SSL.Enable = true` no longer returns
+  `ErrSSLDisabled` in a build without the `go_storage_ssl` tag; it uses the
+  pure-Go TLS backend instead. `ErrSSLDisabled` is deprecated and never returned.
+- connect: the `go_storage_ssl` build tag is deprecated in favor of `openssl`.
+  It stays a synonym of `openssl` for backward compatibility.
+- deps: `github.com/tarantool/go-gostls`, `go-gostcrypto` and `filippo.io/bigmod`
+  are now (indirect) dependencies, pulled in by the `go-tlsdialer/v2` gostls
+  backend.
 
 ### Fixed
 

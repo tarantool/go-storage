@@ -5,7 +5,12 @@ import "errors"
 var (
 	// ErrNoEndpoint is returned when no endpoint is provided.
 	ErrNoEndpoint = errors.New("connect: at least one endpoint is required")
-	// ErrSSLDisabled is returned when SSL is requested but support is disabled.
+	// ErrSSLDisabled used to be returned when SSL was requested for TCS in a build
+	// without the go_storage_ssl tag.
+	//
+	// Deprecated: TLS for TCS is always available now (pure-Go backend by default,
+	// OpenSSL with the openssl build tag), so this error is never returned. It is
+	// kept only so that existing errors.Is checks keep compiling.
 	ErrSSLDisabled = errors.New("connect: SSL support is disabled")
 	// ErrInvalidSSLConfig is returned when SSL configuration is invalid.
 	ErrInvalidSSLConfig = errors.New("connect: invalid SSL configuration")

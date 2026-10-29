@@ -28,14 +28,9 @@ func createTCSConnection(ctx context.Context, cfg Config) (tcsdriver.Client, Cle
 		addr = strings.TrimPrefix(addr, "http://")
 		addr = strings.TrimPrefix(addr, "https://")
 
-		instDialer, dialerErr := newDialerForAddress(cfg, addr)
-		if dialerErr != nil {
-			return nil, nil, dialerErr
-		}
-
 		instances = append(instances, pool.Instance{
 			Name:   fmt.Sprintf("instance_%d", idx),
-			Dialer: instDialer,
+			Dialer: newDialerForAddress(cfg, addr),
 			Opts:   tarantool.Opts{}, //nolint:exhaustruct
 		})
 	}

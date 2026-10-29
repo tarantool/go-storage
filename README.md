@@ -145,9 +145,10 @@ The `connect` package provides a simplified way to connect to storage backends
 using a unified configuration. It handles connection establishment, SSL/TLS
 setup, and authentication.
 
-> **Note**: Connecting to Tarantool Config Storage (TCS) with SSL requires the
-> `go_storage_ssl` build tag. Without this tag, SSL support is disabled and
-> attempting to connect with `SSL.Enable = true` will return `ErrSSLDisabled`.
+> **Note**: SSL/TLS for Tarantool Config Storage (TCS) is always available. By
+> default it uses a pure-Go TLS implementation, so it works with `CGO_ENABLED=0`
+> and without OpenSSL. Build with the `openssl` tag to use OpenSSL instead (see
+> [Build Tags](#build-tags)).
 
 #### Quick Start with Connect
 
@@ -206,6 +207,19 @@ cfg := connect.Config{
     },
 }
 ```
+
+For TCS only `CaFile`, `CertFile`, `KeyFile`, `Ciphers`, `Password` and
+`PasswordFile` are used; the server certificate is always verified against
+`CaFile`. `CaPath`, `VerifyHost` and `VerifyPeer` apply to etcd only.
+
+The two TCS TLS backends differ in a few details:
+
+- `Ciphers` is an OpenSSL cipher list (`:`-separated). OpenSSL gets it verbatim;
+  the pure-Go backend parses it itself and fails on an unknown cipher name.
+- The pure-Go backend reads an encrypted private key in PKCS#8 format only
+  (`openssl pkcs8 -topk8 -v2 aes-256-cbc ...`), not the legacy PKCS#1 form with
+  a `DEK-Info` header that OpenSSL accepts.
+- The pure-Go backend implements TLS 1.2 only.
 
 ### API Overview
 
@@ -458,23 +472,36 @@ Run them with `go test -v -run Example ./driver/etcd` or `./driver/tcs`.
 
 ### Build Tags
 
-The library supports the following build tags:
+The library supports the following build tags. They select the TLS backend used
+for connections to Tarantool Config Storage (the etcd part uses `crypto/tls` and
+does not depend on them).
 
-#### `go_storage_ssl`
+#### Default: pure-Go TLS
 
-Enables SSL/TLS support for Tarantool Config Storage connections. This tag
-requires the [`go-tlsdialer/v2`](https://github.com/tarantool/go-tlsdialer)
-dependency.
+Without tags TLS to TCS is provided by the pure-Go backend of
+[`go-tlsdialer/v2`](https://github.com/tarantool/go-tlsdialer) (`backend/gostls`).
+It needs neither cgo nor OpenSSL.
 
 ```bash
-# Build with SSL support for TCS
-go build -tags go_storage_ssl ./...
+CGO_ENABLED=0 go build ./...
 ```
 
-Without this tag:
-- SSL support for TCS is disabled
-- Connecting to TCS with `SSL.Enable = true` returns `ErrSSLDisabled`
-- The `go-tlsdialer` dependency and CGO is not required on build-time
+#### `openssl`
+
+Uses the OpenSSL backend of `go-tlsdialer/v2` (`backend/openssl`) for TLS to
+TCS. It requires cgo and the OpenSSL development files (`libssl-dev`). Add
+`openssl_static` as well to link OpenSSL statically.
+
+```bash
+go build -tags openssl ./...
+go build -tags "openssl openssl_static" ./...
+```
+
+#### `go_storage_ssl` (deprecated)
+
+A synonym of `openssl`, kept for backward compatibility. Before TLS to TCS was
+available by default, this was the tag that enabled it (with OpenSSL). Use
+`openssl` in new code.
 
 ### Contributing
 
